@@ -69,18 +69,29 @@ def fetch_solar_wind_data():
             latest_plasma = plasma_data[-1]
             latest_mag = mag_data[-1]
             
+            # Handle both array formats and potential null values
+            speed = latest_plasma[2] if len(latest_plasma) > 2 and latest_plasma[2] not in [None, '', -999, -9999] else None
+            density = latest_plasma[1] if len(latest_plasma) > 1 and latest_plasma[1] not in [None, '', -999, -9999] else None
+            temperature = latest_plasma[3] if len(latest_plasma) > 3 and latest_plasma[3] not in [None, '', -999, -9999] else None
+            bt = latest_mag[6] if len(latest_mag) > 6 and latest_mag[6] not in [None, '', -999, -9999] else None
+            bz = latest_mag[3] if len(latest_mag) > 3 and latest_mag[3] not in [None, '', -999, -9999] else None
+            bx = latest_mag[1] if len(latest_mag) > 1 and latest_mag[1] not in [None, '', -999, -9999] else None
+            by = latest_mag[2] if len(latest_mag) > 2 and latest_mag[2] not in [None, '', -999, -9999] else None
+            
             return {
                 'time': latest_plasma[0],
-                'speed': float(latest_plasma[2]) if latest_plasma[2] else None,
-                'density': float(latest_plasma[1]) if latest_plasma[1] else None,
-                'temperature': float(latest_plasma[3]) if latest_plasma[3] else None,
-                'bt': float(latest_mag[6]) if latest_mag[6] else None,
-                'bz': float(latest_mag[3]) if latest_mag[3] else None,
-                'bx': float(latest_mag[1]) if latest_mag[1] else None,
-                'by': float(latest_mag[2]) if latest_mag[2] else None
+                'speed': float(speed) if speed is not None else None,
+                'density': float(density) if density is not None else None,
+                'temperature': float(temperature) if temperature is not None else None,
+                'bt': float(bt) if bt is not None else None,
+                'bz': float(bz) if bz is not None else None,
+                'bx': float(bx) if bx is not None else None,
+                'by': float(by) if by is not None else None
             }
     except Exception as e:
         print(f"Error fetching solar wind data: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def fetch_solar_wind_history():
@@ -129,11 +140,18 @@ def fetch_solar_wind_history():
                 dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S.%f")
                 times.append(dt.replace(tzinfo=timezone.utc))
                 
-                speeds.append(float(p_row[2]) if p_row[2] else None)
-                densities.append(float(p_row[1]) if p_row[1] else None)
-                bzs.append(float(m_row[3]) if m_row[3] else None)
-                bts.append(float(m_row[6]) if m_row[6] else None)
-            except:
+                # Filter out invalid values (-999, -9999, None, empty strings)
+                speed = p_row[2] if len(p_row) > 2 and p_row[2] not in [None, '', -999, -9999] else None
+                density = p_row[1] if len(p_row) > 1 and p_row[1] not in [None, '', -999, -9999] else None
+                bz = m_row[3] if len(m_row) > 3 and m_row[3] not in [None, '', -999, -9999] else None
+                bt = m_row[6] if len(m_row) > 6 and m_row[6] not in [None, '', -999, -9999] else None
+                
+                speeds.append(float(speed) if speed is not None else None)
+                densities.append(float(density) if density is not None else None)
+                bzs.append(float(bz) if bz is not None else None)
+                bts.append(float(bt) if bt is not None else None)
+            except Exception as row_error:
+                print(f"Error parsing row {i}: {row_error}")
                 continue
         
         if len(times) == 0:
@@ -149,6 +167,8 @@ def fetch_solar_wind_history():
         }
     except Exception as e:
         print(f"Error fetching solar wind history: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def parse_solar_regions(data):
@@ -2031,6 +2051,137 @@ def get_aurora_map_image():
         traceback.print_exc()
         return f"Error generating map image: {e}", 500
 
+@app.route('/api/geomagnetic-alerts')
+def get_geomagnetic_alerts():
+    """Get SWPC 3-Day Geomagnetic Forecast"""
+    try:
+        from datetime import datetime, timedelta, timezone
+        from collections import defaultdict
+        
+        # Use the 3-day Kp forecast which is more reliable
+        KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
+        
+        response = requests.get(KP_FORECAST_URL, timeout=10)
+        
+        if response.status_code != 200:
+            print(f"Error: Got status {response.status_code} from SWPC")
+            return jsonify({'forecast': []}), 500
+        
+        forecast_data = response.json()
+        
+        # Parse the 3-day forecast
+        # Format: [timestamp, kp_value, observed/predicted]
+        # Group by date and find max Kp per day
+        daily_kp = defaultdict(list)
+        current_time = datetime.now(timezone.utc)
+        
+        print(f"DEBUG: Current UTC time: {current_time}")
+        print(f"DEBUG: Processing {len(forecast_data)-1} forecast rows")
+        
+        for row in forecast_data[1:]:  # Skip header
+            try:
+                timestamp_str = row[0]  # Format: "YYYY-MM-DD HH:MM:SS"
+                kp_str = row[1]
+                
+                if not timestamp_str or not kp_str:
+                    continue
+                
+                # Parse timestamp
+                try:
+                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    dt = dt.replace(tzinfo=timezone.utc)
+                except:
+                    continue
+                
+                # Only include current and future predictions
+                if dt < current_time - timedelta(hours=3):  # Allow 3-hour lookback
+                    continue
+                
+                # Extract date
+                date = dt.strftime('%Y-%m-%d')
+                
+                # Parse Kp value
+                try:
+                    kp_value = float(kp_str)
+                except (ValueError, TypeError):
+                    continue
+                
+                daily_kp[date].append(kp_value)
+                
+            except Exception as e:
+                continue
+        
+        print(f"DEBUG: Found {len(daily_kp)} unique dates with forecast data")
+        
+        # Build forecast for next 3 days starting from today
+        daily_forecasts = []
+        
+        # Get dates for the next 3 days
+        forecast_dates = []
+        for i in range(3):
+            future_date = current_time + timedelta(days=i)
+            forecast_dates.append(future_date.strftime('%Y-%m-%d'))
+        
+        print(f"DEBUG: Forecast dates: {forecast_dates}")
+        
+        # Create forecast for each day
+        for date in forecast_dates:
+            if date in daily_kp and daily_kp[date]:
+                kp_values = daily_kp[date]
+                max_kp = max(kp_values)
+                print(f"DEBUG: {date} - Kp values: {kp_values}, Max: {max_kp}")
+            else:
+                # No data for this day, use a default quiet value
+                max_kp = 2.0
+                print(f"DEBUG: {date} - No data, using default Kp 2.0")
+            
+            # Convert Kp to G-scale
+            # G1 = Kp 5 (5.00-5.33)
+            # G2 = Kp 6- (5.67-6.00)
+            # G3 = Kp 7- (6.67-7.00)
+            # G4 = Kp 8- (7.67-8.00)
+            # G5 = Kp 9- (8.67+)
+            if max_kp >= 8.67:
+                g_scale = 5
+            elif max_kp >= 7.67:
+                g_scale = 4
+            elif max_kp >= 6.67:
+                g_scale = 3
+            elif max_kp >= 5.67:
+                g_scale = 2
+            elif max_kp >= 5.00:
+                g_scale = 1
+            else:
+                g_scale = 0
+            
+            daily_forecasts.append({
+                'date': date,
+                'max_kp': round(max_kp, 1),
+                'g_scale': g_scale
+            })
+        
+        print(f"DEBUG: Final forecast: {daily_forecasts}")
+        
+        return jsonify({'forecast': daily_forecasts})
+        
+    except Exception as e:
+        print(f"Error fetching geomagnetic forecast: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return placeholder data on error
+        from datetime import datetime, timedelta, timezone
+        current_date = datetime.now(timezone.utc)
+        placeholder = [
+            {
+                'date': (current_date + timedelta(days=i)).strftime('%Y-%m-%d'),
+                'max_kp': 2.0,
+                'g_scale': 0
+            }
+            for i in range(3)
+        ]
+        return jsonify({'forecast': placeholder})
+
 @app.route('/api/region-flares/<region_number>')
 def get_region_flares(region_number):
     """Get comprehensive flare history for a specific active region from LMSAL archives"""
@@ -2459,9 +2610,14 @@ if __name__ == '__main__':
         
     else:
         # Web server mode
+        import os
+        debug_mode = os.environ.get('FLASK_ENV') == 'development'
+        host = os.environ.get('HOST', '0.0.0.0')
+        port = int(os.environ.get('PORT', 5000))
+        
         print("🌌 Aurora Dashboard Starting...")
-        print("🌐 Open your browser to: http://localhost:5000")
-        print("🎬 Generate GIF: http://localhost:5000/generate-gif?hours=2&interval=1&duration=500")
+        print(f"🌐 Open your browser to: http://localhost:{port}")
+        print(f"🎬 Generate GIF: http://localhost:{port}/generate-gif?hours=2&interval=1&duration=500")
         print("\n💡 CLI Mode: python aurora.py generate-gif [hours] [interval_minutes] [frame_duration_ms]")
         print("   Example: python aurora.py generate-gif 2 1 500  (captures 2 hours at 1-min intervals)")
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        app.run(debug=debug_mode, host=host, port=port)
