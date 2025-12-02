@@ -2613,7 +2613,7 @@ if __name__ == '__main__':
         import os
         debug_mode = os.environ.get('FLASK_ENV') == 'development'
         host = os.environ.get('HOST', '0.0.0.0')
-        port = int(os.environ.get('PORT', 5000))
+        port = int(os.environ.get('PORT', 3005))
         
         print("🌌 Aurora Dashboard Starting...")
         print(f"🌐 Open your browser to: http://localhost:{port}")
