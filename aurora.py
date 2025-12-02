@@ -2103,7 +2103,7 @@ def get_geomagnetic_alerts():
                 # Parse Kp value
                 try:
                     kp_value = float(kp_str)
-                except:
+                except (ValueError, TypeError):
                     continue
                 
                 daily_kp[date].append(kp_value)
