@@ -1133,17 +1133,13 @@
                 let html = '<div class="forecast-grid">';
                 
                 data.forecast.forEach((day, index) => {
-                    // Parse the date string (YYYY-MM-DD format from API)
-                    const dateParts = day.date.split('-');
-                    const year = parseInt(dateParts[0]);
-                    const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in JS
-                    const dayNum = parseInt(dateParts[2]);
-                    const date = new Date(year, month, dayNum);
+                    // Parse the date string in UTC to avoid timezone boundary issues
+                    const date = new Date(day.date + 'T00:00:00Z');
                     
                     const dayName = index === 0 ? 'Today' : 
                                    index === 1 ? 'Tomorrow' : 
-                                   date.toLocaleDateString('en-US', { weekday: 'short' });
-                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                   date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
                     
                     const gScale = day.g_scale;
                     const gClass = `g${gScale}`;
