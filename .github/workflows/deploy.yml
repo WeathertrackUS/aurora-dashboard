@@ -65,3 +65,7 @@ jobs:
             # Note: We need to allow the robot to do this in sudoers!
             sudo systemctl restart aurora.service
           EOF
+          if [ $? -ne 0 ]; then
+            echo "Remote setup failed"
+            exit 1
+          fi
