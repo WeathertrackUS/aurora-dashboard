@@ -735,6 +735,131 @@
         .toast-success { border-left: 4px solid var(--success); }
         .toast-error { border-left: 4px solid var(--danger); }
 
+        /* Geomagnetic Forecast Styles */
+        .forecast-day {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .forecast-date {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .forecast-bar-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .forecast-bar {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .forecast-fill {
+            width: 100%;
+            border-radius: 4px;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .forecast-fill.g0 {
+            background: linear-gradient(to top, #4ade80, #22c55e);
+            height: 16.67%;
+        }
+
+        .forecast-fill.g1 {
+            background: linear-gradient(to top, #fbbf24, #f59e0b);
+            height: 33.33%;
+        }
+
+        .forecast-fill.g2 {
+            background: linear-gradient(to top, #fb923c, #f97316);
+            height: 50%;
+        }
+
+        .forecast-fill.g3 {
+            background: linear-gradient(to top, #ef4444, #dc2626);
+            height: 66.67%;
+        }
+
+        .forecast-fill.g4 {
+            background: linear-gradient(to top, #dc2626, #b91c1c);
+            height: 83.33%;
+        }
+
+        .forecast-fill.g5 {
+            background: linear-gradient(to top, #991b1b, #7f1d1d);
+            height: 100%;
+        }
+
+        .forecast-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 0.25rem;
+        }
+
+        .forecast-kp {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .forecast-legend {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.7rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
         /* Pulse Dot Animation */
         @keyframes pulse-dot {
             0% { opacity: 1; transform: scale(1); }
@@ -871,51 +996,37 @@
 
         <!-- Right Column: Sidebar -->
         <aside class="sidebar">
+            <!-- Geomagnetic Forecast Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">3-Day Geomagnetic Forecast</div>
+                </div>
+                <div id="geomag-forecast-container" style="padding: 0.75rem;">
+                    <p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem;">Loading forecast...</p>
+                </div>
+            </div>
+
             <!-- Controls Card -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">🎮 Controls</div>
+                    <div class="card-title">Controls</div>
                 </div>
                 <div class="control-grid">
                     <button class="btn btn-primary btn-full" onclick="refreshDashboard()">
-                        🔄 Refresh Now
+                         Refresh Now
                     </button>
                     <button class="btn btn-secondary" id="download-btn" onclick="downloadDashboard()">
-                        💾 Download
+                         Download
                     </button>
                     <button class="btn btn-secondary" onclick="copyImageToClipboard()">
-                        📋 Copy
+                         Copy
                     </button>
                 </div>
             </div>
-
-            <!-- GIF Generator Card -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">🎬 Historical Animation</div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Hours Back (0.5-24)</label>
-                    <input type="number" class="form-input" id="gif-hours" value="2" min="0.5" max="24" step="0.5">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Frame Interval (Min)</label>
-                    <input type="number" class="form-input" id="gif-interval" value="5" min="1" max="60">
-                </div>
-                <button class="btn btn-primary btn-full" id="generate-gif-btn" onclick="generateGif()">
-                    Generate Animation
-                </button>
-                <div class="progress-container" id="gif-progress">
-                    <div class="progress-bar" id="gif-progress-bar"></div>
-                </div>
-                <p id="gif-status-text" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); text-align: center;"></p>
-            </div>
-        </aside>
-    </main>
 
     <footer>
         <p>Data provided by NOAA Space Weather Prediction Center</p>
-        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2025 Aurora Dashboard</p>
+        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2025 Weather Track US</p>
     </footer>
 
     <div class="toast" id="toast">
@@ -975,7 +1086,10 @@
                 updateDataCard(data);
                 renderCharts(data);
 
-                // 3. Refresh Map Image
+                // 3. Fetch Geomagnetic Alerts
+                fetchGeomagneticAlerts();
+
+                // 4. Refresh Map Image
                 const timestamp = new Date().getTime();
                 const newSrc = `/aurora-map.png?t=${timestamp}`;
                 
@@ -997,6 +1111,94 @@
                 console.error('Error refreshing dashboard:', error);
                 showToast('Failed to refresh data', 'error');
                 loadingOverlay.classList.remove('active');
+            }
+        }
+
+        async function fetchGeomagneticAlerts() {
+            try {
+                const response = await fetch('/api/geomagnetic-alerts');
+                const data = await response.json();
+                
+                const container = document.getElementById('geomag-forecast-container');
+                if (!container) return;
+                
+                if (!data.forecast || data.forecast.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem;">No forecast data available</p>';
+                    return;
+                }
+                
+                // Build the forecast chart
+                let html = '<div class="forecast-grid">';
+                
+                data.forecast.forEach((day, index) => {
+                    // Parse the date string (YYYY-MM-DD format from API)
+                    const dateParts = day.date.split('-');
+                    const year = parseInt(dateParts[0]);
+                    const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in JS
+                    const dayNum = parseInt(dateParts[2]);
+                    const date = new Date(year, month, dayNum);
+                    
+                    const dayName = index === 0 ? 'Today' : 
+                                   index === 1 ? 'Tomorrow' : 
+                                   date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    
+                    const gScale = day.g_scale;
+                    const gClass = `g${gScale}`;
+                    const gLabel = gScale === 0 ? 'Quiet' : `G${gScale}`;
+                    
+                    html += `
+                        <div class="forecast-day">
+                            <div class="forecast-date">${dayName}</div>
+                            <div class="forecast-date" style="font-size: 0.65rem; margin-top: -0.25rem;">${dateStr}</div>
+                            <div class="forecast-bar-container">
+                                <div class="forecast-bar">
+                                    <div class="forecast-fill ${gClass}">
+                                        ${gLabel}
+                                    </div>
+                                </div>
+                                <div class="forecast-kp">Kp ${day.max_kp}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                
+                // Add legend with separate colors for each G-level
+                html += `
+                    <div class="forecast-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #4ade80;"></div>
+                            <span>G0</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #fbbf24;"></div>
+                            <span>G1</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #fb923c;"></div>
+                            <span>G2</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ef4444;"></div>
+                            <span>G3</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #dc2626;"></div>
+                            <span>G4</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #991b1b;"></div>
+                            <span>G5</span>
+                        </div>
+                    </div>
+                `;
+                
+                container.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error fetching geomagnetic forecast:', error);
             }
         }
 

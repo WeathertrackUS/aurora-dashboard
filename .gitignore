@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.backup
+*.bak
+
+# Temporary files
+*.tmp
+*.log
+
+# Aurora animations (optional - keep generated GIFs local)
+aurora_animations/*.gif
+
+# Environment variables
+.env
+.env.local
