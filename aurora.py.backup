@@ -1,0 +1,458 @@
+from flask import Flask, render_template, jsonify, send_file
+import requests
+from datetime import datetime
+import json
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.patches import Circle, Polygon
+import numpy as np
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+app = Flask(__name__)
+
+# SWPC API endpoints
+PLASMA_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
+MAG_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json"
+PLASMA_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json"
+MAG_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json"
+KP_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
+SCALES_URL = "https://services.swpc.noaa.gov/products/noaa-scales.json"
+
+def fetch_solar_wind_data():
+    """Fetch current solar wind plasma and magnetic field data"""
+    try:
+        # Fetch plasma data (speed, density)
+        plasma_response = requests.get(PLASMA_URL, timeout=10)
+        plasma_data = plasma_response.json()
+        
+        # Fetch magnetic field data (Bt, Bz)
+        mag_response = requests.get(MAG_URL, timeout=10)
+        mag_data = mag_response.json()
+        
+        # Get latest values (last entry in the array)
+        if len(plasma_data) > 1 and len(mag_data) > 1:
+            latest_plasma = plasma_data[-1]
+            latest_mag = mag_data[-1]
+            
+            return {
+                'time': latest_plasma[0],
+                'speed': float(latest_plasma[2]) if latest_plasma[2] else None,
+                'density': float(latest_plasma[1]) if latest_plasma[1] else None,
+                'temperature': float(latest_plasma[3]) if latest_plasma[3] else None,
+                'bt': float(latest_mag[6]) if latest_mag[6] else None,
+                'bz': float(latest_mag[3]) if latest_mag[3] else None,
+                'bx': float(latest_mag[1]) if latest_mag[1] else None,
+                'by': float(latest_mag[2]) if latest_mag[2] else None
+            }
+    except Exception as e:
+        print(f"Error fetching solar wind data: {e}")
+        return None
+
+def fetch_solar_wind_history():
+    """Fetch 2-hour history of solar wind data for plotting"""
+    try:
+        plasma_response = requests.get(PLASMA_2HR_URL, timeout=10)
+        mag_response = requests.get(MAG_2HR_URL, timeout=10)
+        
+        plasma_data = plasma_response.json()
+        mag_data = mag_response.json()
+        
+        # Parse data (skip header row)
+        times = []
+        speeds = []
+        densities = []
+        bzs = []
+        bts = []
+        
+        for i in range(1, min(len(plasma_data), len(mag_data))):
+            try:
+                p_row = plasma_data[i]
+                m_row = mag_data[i]
+                
+                time_str = p_row[0]
+                times.append(datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S.%f"))
+                
+                speeds.append(float(p_row[2]) if p_row[2] else None)
+                densities.append(float(p_row[1]) if p_row[1] else None)
+                bzs.append(float(m_row[3]) if m_row[3] else None)
+                bts.append(float(m_row[6]) if m_row[6] else None)
+            except:
+                continue
+        
+        return {
+            'times': times,
+            'speeds': speeds,
+            'densities': densities,
+            'bzs': bzs,
+            'bts': bts
+        }
+    except Exception as e:
+        print(f"Error fetching solar wind history: {e}")
+        return None
+
+def fetch_kp_index():
+    """Fetch current Kp index"""
+    try:
+        response = requests.get(KP_URL, timeout=10)
+        kp_data = response.json()
+        
+        # Get the most recent Kp value
+        if len(kp_data) > 1:
+            latest = kp_data[-1]
+            return {
+                'time': latest[0],
+                'kp': float(latest[1])
+            }
+    except Exception as e:
+        print(f"Error fetching Kp index: {e}")
+        return None
+
+def fetch_noaa_scales():
+    """Fetch NOAA space weather scales"""
+    try:
+        response = requests.get(SCALES_URL, timeout=10)
+        scales_data = response.json()
+        
+        # Get current conditions (index "0")
+        current = scales_data.get("0", {})
+        
+        return {
+            'time': f"{current.get('DateStamp', '')} {current.get('TimeStamp', '')}",
+            'g_scale': current.get('G', {}).get('Scale', '0'),
+            'g_text': current.get('G', {}).get('Text', 'none'),
+            'r_scale': current.get('R', {}).get('Scale', '0'),
+            's_scale': current.get('S', {}).get('Scale', '0')
+        }
+    except Exception as e:
+        print(f"Error fetching NOAA scales: {e}")
+        return None
+
+def get_aurora_likelihood(kp, g_scale):
+    """Determine aurora viewing likelihood based on Kp and G-scale"""
+    if kp is None:
+        return "Unknown"
+    
+    if kp >= 7:
+        return "Very High - Visible at mid-latitudes"
+    elif kp >= 6:
+        return "High - Visible at higher mid-latitudes"
+    elif kp >= 5:
+        return "Moderate - Visible at high latitudes"
+    elif kp >= 4:
+        return "Low - Visible near polar regions"
+    else:
+        return "Very Low - Minimal activity"
+
+def get_condition_status(kp, speed, bz, g_scale):
+    """Get overall aurora conditions status"""
+    score = 0
+    
+    # Kp scoring
+    if kp and kp >= 6:
+        score += 3
+    elif kp and kp >= 4:
+        score += 2
+    elif kp and kp >= 3:
+        score += 1
+    
+    # Solar wind speed scoring
+    if speed and speed >= 600:
+        score += 2
+    elif speed and speed >= 500:
+        score += 1
+    
+    # Bz scoring (negative Bz is good for auroras)
+    if bz and bz < -5:
+        score += 3
+    elif bz and bz < -2:
+        score += 2
+    elif bz and bz < 0:
+        score += 1
+    
+    # G-scale scoring
+    if g_scale:
+        try:
+            g_val = int(g_scale)
+            if g_val >= 3:
+                score += 2
+            elif g_val >= 1:
+                score += 1
+        except:
+            pass
+    
+    if score >= 7:
+        return "Excellent"
+    elif score >= 5:
+        return "Good"
+    elif score >= 3:
+        return "Fair"
+    else:
+        return "Poor"
+
+def calculate_auroral_oval(kp):
+    """Calculate auroral oval boundary based on Kp index"""
+    # Simplified model: auroral oval latitude varies with Kp
+    # Base latitude at midnight (most equatorward)
+    if kp < 1:
+        base_lat = 67
+    elif kp < 2:
+        base_lat = 64
+    elif kp < 3:
+        base_lat = 62
+    elif kp < 4:
+        base_lat = 60
+    elif kp < 5:
+        base_lat = 58
+    elif kp < 6:
+        base_lat = 56
+    elif kp < 7:
+        base_lat = 54
+    elif kp < 8:
+        base_lat = 52
+    else:
+        base_lat = 50
+    
+    # Generate oval coordinates (approximately circular with offset for magnetic pole)
+    # Magnetic north pole is roughly at 80°N, 72°W
+    mag_pole_lat = 80
+    mag_pole_lon = -72
+    
+    angles = np.linspace(0, 2*np.pi, 100)
+    
+    # Oval is wider on night side, narrower on day side
+    lats = []
+    lons = []
+    
+    for angle in angles:
+        # Distance from pole varies with local time (angle)
+        # Night side (angle near pi) has larger radius
+        radius = (mag_pole_lat - base_lat) * (1 + 0.3 * np.cos(angle))
+        
+        lat = mag_pole_lat - radius * np.cos(angle)
+        lon = mag_pole_lon + radius * np.sin(angle) / np.cos(np.radians(lat))
+        
+        lats.append(lat)
+        lons.append(lon)
+    
+    return lons, lats
+
+def generate_aurora_image():
+    """Generate the complete aurora monitoring image"""
+    # Fetch all data
+    sw_current = fetch_solar_wind_data()
+    sw_history = fetch_solar_wind_history()
+    kp_data = fetch_kp_index()
+    scales = fetch_noaa_scales()
+    
+    # Create figure with custom layout
+    fig = plt.figure(figsize=(20, 10))
+    fig.patch.set_facecolor('#0a0e27')
+    
+    # Create grid for layout: map on left, graphs on right
+    gs = fig.add_gridspec(3, 2, width_ratios=[1.2, 1], height_ratios=[1, 1, 1], 
+                          hspace=0.3, wspace=0.25, left=0.05, right=0.95, top=0.92, bottom=0.08)
+    
+    # === AURORAL OVAL MAP (Left side, spans all rows) ===
+    ax_map = fig.add_subplot(gs[:, 0])
+    ax_map.set_facecolor('#0f1729')
+    
+    # Set up North America view
+    ax_map.set_xlim(-170, -50)
+    ax_map.set_ylim(25, 75)
+    ax_map.set_aspect('equal')
+    
+    # Draw simplified North America coastline
+    # USA/Canada border approximation
+    ax_map.plot([-130, -95, -95, -83, -83, -67], [49, 49, 49, 49, 45, 45], 
+                'w-', linewidth=1.5, alpha=0.5)
+    
+    # West coast
+    ax_map.plot([-125, -123, -122], [50, 48, 47], 'w-', linewidth=1.5, alpha=0.5)
+    ax_map.plot([-122, -117], [47, 32], 'w-', linewidth=1.5, alpha=0.5)
+    
+    # East coast
+    ax_map.plot([-67, -70, -71, -76, -76, -80], [45, 43, 41, 37, 36, 26], 
+                'w-', linewidth=1.5, alpha=0.5)
+    
+    # Gulf coast
+    ax_map.plot([-80, -87, -95, -97], [26, 30, 29, 26], 'w-', linewidth=1.5, alpha=0.5)
+    
+    # Alaska outline
+    ax_map.plot([-130, -141, -141, -168, -168, -161, -155, -130], 
+                [55, 60, 69, 69, 66, 63, 57, 55], 'w-', linewidth=1.5, alpha=0.5)
+    
+    # Plot auroral oval
+    kp_val = kp_data.get('kp', 3) if kp_data else 3
+    oval_lons, oval_lats = calculate_auroral_oval(kp_val)
+    
+    # Fill auroral oval with gradient
+    ax_map.fill(oval_lons, oval_lats, color='lime', alpha=0.3, label='Auroral Oval')
+    ax_map.plot(oval_lons, oval_lats, color='lime', linewidth=2.5, linestyle='-')
+    
+    # Add some cities for reference
+    cities = {
+        'Seattle': (-122.3, 47.6),
+        'Vancouver': (-123.1, 49.3),
+        'Calgary': (-114.1, 51.0),
+        'Winnipeg': (-97.1, 49.9),
+        'Chicago': (-87.6, 41.9),
+        'New York': (-74.0, 40.7),
+        'Anchorage': (-149.9, 61.2),
+        'Fairbanks': (-147.7, 64.8),
+        'Yellowknife': (-114.4, 62.5)
+    }
+    
+    for city, (lon, lat) in cities.items():
+        ax_map.plot(lon, lat, 'o', color='yellow', markersize=5, markeredgecolor='white', markeredgewidth=1)
+        ax_map.text(lon, lat-1.5, city, fontsize=8, ha='center', color='white', 
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.7))
+    
+    ax_map.set_xlabel('Longitude', fontsize=11, color='white')
+    ax_map.set_ylabel('Latitude', fontsize=11, color='white')
+    ax_map.set_title(f'Auroral Oval - Kp = {kp_val:.1f}', fontsize=14, color='lime', fontweight='bold', pad=10)
+    ax_map.tick_params(colors='white', labelsize=9)
+    ax_map.grid(True, alpha=0.2, color='white', linestyle='--')
+    
+    for spine in ax_map.spines.values():
+        spine.set_edgecolor('white')
+        spine.set_linewidth(1.5)
+    
+    # === SOLAR WIND GRAPHS (Right side) ===
+    if sw_history and len(sw_history['times']) > 0:
+        times = sw_history['times']
+        
+        # Graph 1: Solar Wind Speed
+        ax1 = fig.add_subplot(gs[0, 1])
+        ax1.set_facecolor('#0f1729')
+        speeds = [s if s else np.nan for s in sw_history['speeds']]
+        ax1.plot(times, speeds, color='cyan', linewidth=2, marker='o', markersize=3)
+        ax1.axhline(500, color='yellow', linestyle='--', linewidth=1, alpha=0.5, label='500 km/s')
+        ax1.set_ylabel('Speed (km/s)', fontsize=11, color='white', fontweight='bold')
+        ax1.set_title('Solar Wind Speed', fontsize=12, color='cyan', fontweight='bold')
+        ax1.tick_params(colors='white', labelsize=9)
+        ax1.grid(True, alpha=0.2, color='white')
+        for spine in ax1.spines.values():
+            spine.set_edgecolor('white')
+        ax1.set_xticklabels([])
+        
+        # Graph 2: Density
+        ax2 = fig.add_subplot(gs[1, 1])
+        ax2.set_facecolor('#0f1729')
+        densities = [d if d else np.nan for d in sw_history['densities']]
+        ax2.plot(times, densities, color='orange', linewidth=2, marker='o', markersize=3)
+        ax2.set_ylabel('Density (p/cm³)', fontsize=11, color='white', fontweight='bold')
+        ax2.set_title('Proton Density', fontsize=12, color='orange', fontweight='bold')
+        ax2.tick_params(colors='white', labelsize=9)
+        ax2.grid(True, alpha=0.2, color='white')
+        for spine in ax2.spines.values():
+            spine.set_edgecolor('white')
+        ax2.set_xticklabels([])
+        
+        # Graph 3: Bz and Bt
+        ax3 = fig.add_subplot(gs[2, 1])
+        ax3.set_facecolor('#0f1729')
+        bzs = [b if b else np.nan for b in sw_history['bzs']]
+        bts = [b if b else np.nan for b in sw_history['bts']]
+        ax3.plot(times, bzs, color='lime', linewidth=2, marker='o', markersize=3, label='Bz')
+        ax3.plot(times, bts, color='magenta', linewidth=2, marker='s', markersize=3, label='Bt')
+        ax3.axhline(0, color='red', linestyle='--', linewidth=1, alpha=0.5)
+        ax3.axhline(-5, color='yellow', linestyle='--', linewidth=1, alpha=0.3)
+        ax3.set_ylabel('Magnetic Field (nT)', fontsize=11, color='white', fontweight='bold')
+        ax3.set_xlabel('Time (UTC)', fontsize=11, color='white', fontweight='bold')
+        ax3.set_title('IMF Components', fontsize=12, color='lime', fontweight='bold')
+        ax3.tick_params(colors='white', labelsize=9)
+        ax3.legend(loc='upper right', fontsize=9, facecolor='#0a0e27', edgecolor='white', labelcolor='white')
+        ax3.grid(True, alpha=0.2, color='white')
+        for spine in ax3.spines.values():
+            spine.set_edgecolor('white')
+        
+        # Format x-axis time labels
+        import matplotlib.dates as mdates
+        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    
+    # === HEADER with current conditions ===
+    header_text = f"🌌 AURORA DASHBOARD - {datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M UTC')}"
+    fig.text(0.5, 0.97, header_text, ha='center', fontsize=18, color='white', fontweight='bold')
+    
+    # === INFO BOX with current values ===
+    info_parts = []
+    if sw_current:
+        info_parts.append(f"Speed: {sw_current['speed']:.1f} km/s" if sw_current['speed'] else "Speed: N/A")
+        info_parts.append(f"Density: {sw_current['density']:.1f} p/cm³" if sw_current['density'] else "Density: N/A")
+        info_parts.append(f"Bz: {sw_current['bz']:.1f} nT" if sw_current['bz'] else "Bz: N/A")
+        info_parts.append(f"Bt: {sw_current['bt']:.1f} nT" if sw_current['bt'] else "Bt: N/A")
+    if kp_data:
+        info_parts.append(f"Kp: {kp_data['kp']:.1f}")
+    if scales:
+        info_parts.append(f"G-Scale: G{scales['g_scale']} ({scales['g_text']})")
+    
+    kp_val = kp_data.get('kp') if kp_data else None
+    g_scale = scales.get('g_scale') if scales else None
+    likelihood = get_aurora_likelihood(kp_val, g_scale)
+    info_parts.append(f"Likelihood: {likelihood}")
+    
+    info_text = " | ".join(info_parts)
+    fig.text(0.5, 0.01, info_text, ha='center', fontsize=10, color='lime', 
+             bbox=dict(boxstyle='round,pad=0.8', facecolor='black', alpha=0.8, edgecolor='lime', linewidth=2))
+    
+    # Save to BytesIO
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=150, facecolor='#0a0e27', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    
+    return buf
+
+@app.route('/')
+def index():
+    """Render the dashboard"""
+    return render_template('index.html')
+
+@app.route('/aurora-image.png')
+def get_aurora_image():
+    """Generate and serve the aurora monitoring image"""
+    try:
+        img_buffer = generate_aurora_image()
+        return send_file(img_buffer, mimetype='image/png', as_attachment=False, 
+                        download_name=f'aurora_dashboard_{datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M")}.png')
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error generating image: {e}", 500
+
+@app.route('/api/aurora-data')
+def get_aurora_data():
+    """API endpoint to get all aurora-related data"""
+    solar_wind = fetch_solar_wind_data()
+    kp_data = fetch_kp_index()
+    noaa_scales = fetch_noaa_scales()
+    
+    kp_value = kp_data.get('kp') if kp_data else None
+    g_scale = noaa_scales.get('g_scale') if noaa_scales else None
+    
+    response = {
+        'solar_wind': solar_wind,
+        'kp_index': kp_data,
+        'noaa_scales': noaa_scales,
+        'aurora_likelihood': get_aurora_likelihood(kp_value, g_scale),
+        'condition_status': get_condition_status(
+            kp_value,
+            solar_wind.get('speed') if solar_wind else None,
+            solar_wind.get('bz') if solar_wind else None,
+            g_scale
+        ),
+        'timestamp': datetime.now(datetime.UTC).isoformat()
+    }
+    
+    return jsonify(response)
+
+if __name__ == '__main__':
+    print("🌌 Aurora Dashboard Starting...")
+    print("🌐 Open your browser to: http://localhost:5000")
+    app.run(debug=True, host='0.0.0.0', port=5000)

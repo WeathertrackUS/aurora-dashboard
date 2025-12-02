@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Dashboard | Real-time Space Weather</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌌</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --bg-card-hover: rgba(51, 65, 85, 0.8);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --border: rgba(148, 163, 184, 0.1);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.08), transparent 25%);
+        }
+
+        /* New Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        
+        .chart-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: var(--glass-border);
+            border-radius: 1.25rem;
+            padding: 1rem;
+            min-height: 220px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .chart-panel:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.4);
+            border-color: rgba(56, 189, 248, 0.3);
+            background: var(--bg-card-hover);
+        }
+        
+        .map-panel {
+            grid-row: 1 / span 4;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: var(--glass-border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 600px;
+            position: relative;
+            box-shadow: var(--glass-shadow);
+        }
+        
+        .map-image {
+            width: 100%;
+            height: auto;
+            max-height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(14, 165, 233, 0.1));
+            transition: filter 0.3s ease;
+            border-radius: 0.5rem;
+        }
+        
+        .map-panel:hover .map-image {
+            filter: drop-shadow(0 0 30px rgba(14, 165, 233, 0.2));
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 100%;
+            min-height: 180px;
+        }
+
+        .chart-title {
+            position: absolute;
+            top: 16px;
+            left: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            z-index: 10;
+            pointer-events: none;
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+            letter-spacing: 0.1em;
+            opacity: 0.8;
+        }
+        
+        .chart-value {
+            position: absolute;
+            top: 12px;
+            right: 20px;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            z-index: 10;
+            pointer-events: none;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.5rem;
+            backdrop-filter: blur(4px);
+        }
+
+        @media (max-width: 1400px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .map-panel {
+                grid-row: auto;
+                min-height: 400px;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.15) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(129, 140, 248, 0.15) 0%, transparent 20%),
+                radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Noise Texture */
+        .bg-noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Tooltips */
+        .tooltip-container {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            cursor: help;
+            margin-left: 4px;
+        }
+
+        .info-icon {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-secondary);
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .tooltip-container:hover .info-icon {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .tooltip-content {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            width: 200px;
+            font-size: 0.75rem;
+            color: var(--text-primary);
+            text-transform: none;
+            letter-spacing: normal;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 100;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .tooltip-container:hover .tooltip-content {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-8px);
+        }
+
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: var(--glass-border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            letter-spacing: -0.025em;
+        }
+
+        .brand span {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.3));
+        }
+
+        .nav-stats {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            border: var(--glass-border);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-value {
+            color: var(--accent-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        /* Main Layout */
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1920px;
+            margin: 0 auto;
+            width: 100%;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Dashboard Image Area */
+        .dashboard-view {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            border: var(--glass-border);
+            overflow: hidden;
+            position: relative;
+            min-height: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--glass-shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .dashboard-view:hover {
+            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        .dashboard-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .dashboard-image.loaded {
+            opacity: 1;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: var(--glass-border);
+            border-radius: 1.25rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            background: var(--bg-card-hover);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Live Data Grid */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .data-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        
+        .data-item:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .data-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+        }
+
+        .data-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+        
+        .data-unit {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-left: 2px;
+        }
+
+        .status-badge {
+            grid-column: span 2;
+            padding: 1rem;
+            border-radius: 1rem;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1rem;
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-primary);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.pulse-active {
+            animation: badge-pulse 2s infinite;
+        }
+
+        @keyframes badge-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+
+        .status-badge.pulse-warning {
+            animation: badge-pulse-warning 2s infinite;
+        }
+
+        @keyframes badge-pulse-warning {
+            0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+        }
+
+        /* Kp Meter */
+        .kp-meter-container {
+            grid-column: span 2;
+            margin-top: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 1rem;
+            padding: 1rem;
+        }
+        
+        .kp-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .kp-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .kp-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4ade80, #fbbf24, #f87171);
+            border-radius: 4px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .kp-ticks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+            padding: 0 2px;
+        }
+        
+        .kp-tick {
+            width: 2px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Controls */
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.875rem 1rem;
+            border-radius: 0.75rem;
+            border: none;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(255, 255, 255, 0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .btn:hover::after {
+            opacity: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), #0ea5e9);
+            color: #0f172a;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(56, 189, 248, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-full {
+            grid-column: span 2;
+        }
+
+        /* GIF Generator */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            padding: 0.875rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+        }
+
+        .progress-container {
+            margin-top: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 999px;
+            height: 6px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: auto;
+            background: rgba(15, 23, 42, 0.4);
+        }
+
+        /* Utilities */
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 50;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success { border-left: 4px solid var(--success); }
+        .toast-error { border-left: 4px solid var(--danger); }
+
+        /* Pulse Dot Animation */
+        @keyframes pulse-dot {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+            
+            .nav-stats {
+                width: 100%;
+                justify-content: space-between;
+                font-size: 0.8rem;
+            }
+            
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .nav-link:hover {
+                color: var(--accent-primary) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-noise"></div>
+    <nav class="navbar">
+        <div class="brand">
+            <span>🌌</span> Aurora Dashboard
+            <span style="margin-left: 1rem; font-size: 0.7rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 0.25rem 0.6rem; border-radius: 99px; border: 1px solid rgba(239, 68, 68, 0.3); display: flex; align-items: center; gap: 0.4rem; font-weight: 700; letter-spacing: 0.05em;">
+                <span style="width: 6px; height: 6px; background: #ef4444; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #ef4444; animation: pulse-dot 2s infinite;"></span>
+                LIVE
+            </span>
+        </div>
+        <div class="nav-links" style="display: flex; gap: 1.5rem; margin-left: 2rem; margin-right: auto;">
+            <a href="/" class="nav-link active" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Dashboard</a>
+            <a href="/solar" class="nav-link" style="color: var(--text-secondary); text-decoration: none; font-weight: 500; transition: color 0.2s;">Solar Activity</a>
+        </div>
+        <div class="nav-stats">
+            <div class="stat-item">
+                <span>UTC:</span>
+                <span class="stat-value" id="utc-time">--:--</span>
+            </div>
+            <div class="stat-item">
+                <span>Next Update:</span>
+                <span class="stat-value" id="countdown">60s</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <!-- Left Column: Main Visualization -->
+        <div class="dashboard-grid">
+            <!-- Map Panel -->
+            <div class="map-panel">
+                <div class="chart-title" style="font-size: 1.1rem; color: var(--accent-primary); top: 20px; left: 20px;">REAL-TIME AURORAL OVAL</div>
+                <div class="loading-overlay" id="loading-overlay">
+                    <div class="spinner"></div>
+                    <p>Updating Data...</p>
+                </div>
+                <img src="/aurora-map.png" alt="Aurora Map" class="map-image" id="map-image">
+            </div>
+            
+            <!-- Charts Column -->
+            <div class="chart-panel">
+                <div class="chart-title">SOLAR WIND SPEED</div>
+                <div class="chart-value" id="chart-val-speed">--</div>
+                <div id="chart-speed" class="chart-container"></div>
+            </div>
+            
+            <div class="chart-panel">
+                <div class="chart-title">PROTON DENSITY</div>
+                <div class="chart-value" id="chart-val-density">--</div>
+                <div id="chart-density" class="chart-container"></div>
+            </div>
+            
+            <div class="chart-panel">
+                <div class="chart-title">IMF Bt</div>
+                <div class="chart-value" id="chart-val-bt">--</div>
+                <div id="chart-bt" class="chart-container"></div>
+            </div>
+            
+            <div class="chart-panel">
+                <div class="chart-title">IMF Bz</div>
+                <div class="chart-value" id="chart-val-bz">--</div>
+                <div id="chart-bz" class="chart-container"></div>
+            </div>
+            
+            <!-- Bottom Row: Magnetometer & Power -->
+            <div class="chart-panel" style="grid-column: 1 / -1; display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; min-height: 250px;">
+                <div style="position: relative;">
+                    <div class="chart-title">GOES MAGNETOMETER</div>
+                    <div id="chart-mag" class="chart-container"></div>
+                </div>
+                <div style="position: relative;">
+                    <div class="chart-title">HEMISPHERIC POWER</div>
+                    <div class="chart-value" id="chart-val-power">--</div>
+                    <div id="chart-power" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Sidebar -->
+        <aside class="sidebar">
+            <!-- Live Data Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>📊</span> Live Conditions
+                    </div>
+                    <div class="spinner" id="data-spinner" style="width: 16px; height: 16px; opacity: 0;"></div>
+                </div>
+                <div class="data-grid">
+                    
+                    <div class="kp-meter-container">
+                        <div class="kp-label">
+                            <span>Kp Index</span>
+                            <span id="kp-value-text" style="font-weight: 700; color: var(--text-primary);">--</span>
+                        </div>
+                        <div class="kp-track">
+                            <div class="kp-fill" id="kp-fill"></div>
+                        </div>
+                        <div class="kp-ticks">
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                            <div class="kp-tick"></div>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+
+            <!-- Controls Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🎮 Controls</div>
+                </div>
+                <div class="control-grid">
+                    <button class="btn btn-primary btn-full" onclick="refreshDashboard()">
+                        🔄 Refresh Now
+                    </button>
+                    <a href="#" class="btn btn-secondary" id="download-btn" download="aurora_dashboard.png">
+                        💾 Download
+                    </a>
+                    <button class="btn btn-secondary" onclick="copyImageToClipboard()">
+                        📋 Copy
+                    </button>
+                </div>
+            </div>
+
+            <!-- GIF Generator Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🎬 Timelapse Generator</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Duration (Hours)</label>
+                    <input type="number" class="form-input" id="gif-hours" value="2" min="0.5" max="6" step="0.5">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frame Interval (Min)</label>
+                    <input type="number" class="form-input" id="gif-interval" value="1" min="1" max="60">
+                </div>
+                <button class="btn btn-primary btn-full" id="generate-gif-btn" onclick="generateGif()">
+                    Generate Animation
+                </button>
+                <div class="progress-container" id="gif-progress">
+                    <div class="progress-bar" id="gif-progress-bar"></div>
+                </div>
+                <p id="gif-status-text" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); text-align: center;"></p>
+            </div>
+        </aside>
+    </main>
+
+    <footer>
+        <p>Data provided by NOAA Space Weather Prediction Center</p>
+        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2025 Aurora Dashboard</p>
+    </footer>
+
+    <div class="toast" id="toast">
+        <span id="toast-icon">✅</span>
+        <span id="toast-message">Operation successful</span>
+    </div>
+
+    <script>
+        // State
+        let nextRefreshTime = Date.now() + 60000;
+        let refreshTimer;
+        let countdownTimer;
+
+        // Elements
+        const mapImage = document.getElementById('map-image');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const downloadBtn = document.getElementById('download-btn');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshDashboard();
+            startTimers();
+            updateUtcTime();
+            setInterval(updateUtcTime, 1000);
+        });
+
+        function updateUtcTime() {
+            const now = new Date();
+            document.getElementById('utc-time').textContent = now.toISOString().slice(11, 16) + ' UTC';
+        }
+
+        function startTimers() {
+            // Countdown timer
+            countdownTimer = setInterval(() => {
+                const now = Date.now();
+                const diff = Math.ceil((nextRefreshTime - now) / 1000);
+                
+                if (diff <= 0) {
+                    document.getElementById('countdown').textContent = 'Refreshing...';
+                } else {
+                    document.getElementById('countdown').textContent = `${diff}s`;
+                }
+            }, 1000);
+
+            // Auto refresh timer
+            refreshTimer = setInterval(refreshDashboard, 60000);
+        }
+
+        async function refreshDashboard() {
+            loadingOverlay.classList.add('active');
+            document.getElementById('data-spinner').style.opacity = '1';
+
+            try {
+                // 1. Fetch Data
+                const dataResponse = await fetch('/api/aurora-data');
+                const data = await dataResponse.json();
+                
+                // 2. Update UI
+                updateDataCard(data);
+                renderCharts(data);
+
+                // 3. Refresh Map Image
+                const timestamp = new Date().getTime();
+                const newSrc = `/aurora-map.png?t=${timestamp}`;
+                
+                // Preload image
+                const tempImg = new Image();
+                tempImg.onload = () => {
+                    mapImage.src = newSrc;
+                    loadingOverlay.classList.remove('active');
+                    document.getElementById('data-spinner').style.opacity = '0';
+                    nextRefreshTime = Date.now() + 60000;
+                };
+                tempImg.src = newSrc;
+                
+                // Update download link to full image
+                downloadBtn.href = `/aurora-image.png?t=${timestamp}`;
+
+            } catch (error) {
+                console.error('Error refreshing dashboard:', error);
+                showToast('Failed to refresh data', 'error');
+                loadingOverlay.classList.remove('active');
+                document.getElementById('data-spinner').style.opacity = '0';
+            }
+        }
+
+        function renderCharts(data) {
+            const commonLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#94a3b8', family: 'Inter, sans-serif' },
+                margin: { t: 40, r: 10, b: 30, l: 40 },
+                xaxis: { showgrid: false, zeroline: false, tickfont: { size: 10 } },
+                yaxis: { showgrid: true, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, tickfont: { size: 10 } },
+                showlegend: false,
+                autosize: true
+            };
+
+            const config = { displayModeBar: false, responsive: true };
+
+            // Helper for traces
+            const createTrace = (x, y, color, fill = 'tozeroy') => ({
+                x: x, y: y,
+                type: 'scatter',
+                mode: 'lines',
+                fill: fill,
+                line: { color: color, width: 2 },
+                fillcolor: color + '33' // 20% opacity
+            });
+
+            // 1. Solar Wind Speed with Gradient Fill
+            if (data.solar_wind_history) {
+                const hist = data.solar_wind_history;
+                
+                // Dynamic Y-axis range
+                const speeds = hist.speeds.filter(s => s !== null);
+                const maxSpeed = Math.max(...speeds, 400);
+                const minSpeed = Math.min(...speeds, 200);
+                const yMin = Math.max(0, minSpeed - 50);
+                const yMax = maxSpeed + 100;
+                
+                const traces = [];
+                
+                // Create 200 ultra-thin layers for silky smooth gradient
+                const steps = 200;
+                
+                for (let i = 0; i < steps; i++) {
+                    const yBottom = yMin + (i / steps) * (yMax - yMin);
+                    const yTop = yMin + ((i + 1) / steps) * (yMax - yMin);
+                    const yMid = (yBottom + yTop) / 2;
+                    
+                    // Get color for this Y value
+                    let r, g, b;
+                    if (yMid < 350) {
+                        r = 74; g = 222; b = 128;
+                    } else if (yMid < 450) {
+                        const t = (yMid - 350) / 100;
+                        r = 74 + (217 - 74) * t;
+                        g = 222 + (249 - 222) * t;
+                        b = 128 + (157 - 128) * t;
+                    } else if (yMid < 600) {
+                        const t = (yMid - 450) / 150;
+                        r = 217 + (250 - 217) * t;
+                        g = 249 + (204 - 249) * t;
+                        b = 157 + (21 - 157) * t;
+                    } else if (yMid < 750) {
+                        const t = (yMid - 600) / 150;
+                        r = 250 + (251 - 250) * t;
+                        g = 204 + (146 - 204) * t;
+                        b = 21 + (60 - 21) * t;
+                    } else if (yMid < 850) {
+                        const t = (yMid - 750) / 100;
+                        r = 251 + (239 - 251) * t;
+                        g = 146 + (68 - 146) * t;
+                        b = 60 + (68 - 60) * t;
+                    } else if (yMid < 1000) {
+                        const t = (yMid - 850) / 150;
+                        r = 239 + (236 - 239) * t;
+                        g = 68 + (72 - 68) * t;
+                        b = 68 + (153 - 68) * t;
+                    } else {
+                        const t = Math.min((yMid - 1000) / 200, 1);
+                        r = 236 + (255 - 236) * t;
+                        g = 72 + (255 - 72) * t;
+                        b = 153 + (255 - 153) * t;
+                    }
+                    
+                    // Very low opacity - 200 layers × 0.01 = visible gradient
+                    const color = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0.60)`;
+                    
+                    // Build filled polygon for this horizontal band
+                    const xFill = [...hist.times, ...hist.times.slice().reverse()];
+                    const yFillTop = hist.speeds.map(s => s === null ? yMin : Math.min(Math.max(s, yBottom), yTop));
+                    const yFillBottom = new Array(hist.times.length).fill(yBottom);
+                    const yFill = [...yFillTop, ...yFillBottom.reverse()];
+                    
+                    traces.push({
+                        x: xFill,
+                        y: yFill,
+                        type: 'scatter',
+                        mode: 'none',
+                        fill: 'toself',
+                        fillcolor: color,
+                        line: { width: 0 },
+                        hoverinfo: 'skip',
+                        showlegend: false
+                    });
+                }
+                
+                // White line on top
+                traces.push({
+                    x: hist.times, 
+                    y: hist.speeds,
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { 
+                        color: '#f8fafc',
+                        width: 2.5,
+                        shape: 'spline',
+                        smoothing: 1.3
+                    },
+                    hovertemplate: '%{y:.0f} km/s<extra></extra>',
+                    name: 'Speed'
+                });
+
+                const layout = { 
+                    ...commonLayout, 
+                    yaxis: { ...commonLayout.yaxis, title: '', range: [yMin, yMax] }
+                };
+                
+                Plotly.newPlot('chart-speed', traces, layout, config);
+                
+                const lastVal = hist.speeds[hist.speeds.length - 1];
+                const valElem = document.getElementById('chart-val-speed');
+                if (lastVal) {
+                    valElem.textContent = Math.round(lastVal) + ' km/s';
+                    if (lastVal >= 1000) valElem.style.color = '#ffffff';
+                    else if (lastVal >= 850) valElem.style.color = '#ec4899';
+                    else if (lastVal >= 750) valElem.style.color = '#ef4444';
+                    else if (lastVal >= 600) valElem.style.color = '#fb923c';
+                    else if (lastVal >= 450) valElem.style.color = '#facc15';
+                    else if (lastVal >= 350) valElem.style.color = '#d9f99d';
+                    else valElem.style.color = '#4ade80';
+                }
+            }
+
+            // 2. Density
+            if (data.solar_wind_history) {
+                const hist = data.solar_wind_history;
+                const trace = createTrace(hist.times, hist.densities, '#fb923c');
+                Plotly.newPlot('chart-density', [trace], commonLayout, config);
+                
+                const lastVal = hist.densities[hist.densities.length - 1];
+                document.getElementById('chart-val-density').textContent = lastVal ? lastVal.toFixed(1) : '--';
+            }
+
+            // 3. Bt
+            if (data.solar_wind_history) {
+                const hist = data.solar_wind_history;
+                const trace = createTrace(hist.times, hist.bts, '#c084fc');
+                Plotly.newPlot('chart-bt', [trace], commonLayout, config);
+                
+                const lastVal = hist.bts[hist.bts.length - 1];
+                document.getElementById('chart-val-bt').textContent = lastVal ? lastVal.toFixed(1) + ' nT' : '--';
+            }
+
+            // 4. Bz
+            if (data.solar_wind_history) {
+                const hist = data.solar_wind_history;
+                
+                // Split data for coloring
+                const bz_pos = hist.bzs.map(v => v >= 0 ? v : 0);
+                const bz_neg = hist.bzs.map(v => v < 0 ? v : 0);
+                
+                // Trace 1: Positive (Green) Fill
+                const tracePos = {
+                    x: hist.times, y: bz_pos,
+                    type: 'scatter', mode: 'none',
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(74, 222, 128, 0.2)',
+                    hoverinfo: 'skip'
+                };
+                
+                // Trace 2: Negative (Red) Fill
+                const traceNeg = {
+                    x: hist.times, y: bz_neg,
+                    type: 'scatter', mode: 'none',
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(248, 113, 113, 0.2)',
+                    hoverinfo: 'skip'
+                };
+                
+                // Trace 3: The Line (White)
+                const traceLine = {
+                    x: hist.times, y: hist.bzs,
+                    type: 'scatter', mode: 'lines',
+                    line: { color: '#ffffff', width: 2 },
+                    hoverinfo: 'y+x'
+                };
+
+                const layout = { 
+                    ...commonLayout, 
+                    shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 0, y1: 0, line: { color: 'rgba(255,255,255,0.3)', width: 1 } }]
+                };
+                Plotly.newPlot('chart-bz', [tracePos, traceNeg, traceLine], layout, config);
+                
+                const lastVal = hist.bzs[hist.bzs.length - 1];
+                const valElem = document.getElementById('chart-val-bz');
+                if (lastVal !== null) {
+                    valElem.textContent = lastVal.toFixed(1) + ' nT';
+                    valElem.style.color = lastVal < 0 ? '#ff4444' : '#4ade80';
+                }
+            }
+
+            // 5. Magnetometer
+            if (data.goes_magnetometer) {
+                const mag = data.goes_magnetometer;
+                const trace18 = {
+                    x: mag.goes18_times, y: mag.goes18_hp,
+                    name: 'GOES-18', type: 'scatter', mode: 'lines',
+                    line: { color: '#4477ff', width: 2 }
+                };
+                const trace19 = {
+                    x: mag.goes19_times, y: mag.goes19_hp,
+                    name: 'GOES-19', type: 'scatter', mode: 'lines',
+                    line: { color: '#ff4444', width: 2 }
+                };
+                
+                const layout = { 
+                    ...commonLayout, 
+                    showlegend: true,
+                    legend: { x: 0, y: 1, font: { color: '#fff' }, bgcolor: 'rgba(0,0,0,0)' }
+                };
+                Plotly.newPlot('chart-mag', [trace18, trace19], layout, config);
+            }
+
+            // 6. Hemispheric Power
+            if (data.hemispheric_power) {
+                const power = data.hemispheric_power;
+                const count = 20;
+                const times = power.times.slice(-count);
+                const values = power.powers.slice(-count);
+                
+                const colors = values.map(v => {
+                    if (v < 30) return '#888888';
+                    if (v < 50) return '#00ff00';
+                    if (v < 100) return '#ffaa00';
+                    return '#ff0000';
+                });
+
+                const trace = {
+                    x: times, y: values,
+                    type: 'bar',
+                    marker: { color: colors }
+                };
+                
+                Plotly.newPlot('chart-power', [trace], commonLayout, config);
+                
+                const lastVal = values[values.length - 1];
+                document.getElementById('chart-val-power').textContent = lastVal ? Math.round(lastVal) + ' GW' : '--';
+            }
+        }
+
+        function updateDataCard(data) {
+            const safeVal = (val, decimals = 1) => val !== null && val !== undefined ? Number(val).toFixed(decimals) : '--';
+            
+            const kp = data.kp_index?.kp || 0;
+            document.getElementById('kp-value-text').textContent = safeVal(kp);
+            const kpFill = document.getElementById('kp-fill');
+            const kpPercent = Math.min((kp / 9) * 100, 100);
+            kpFill.style.width = `${kpPercent}%`;
+            
+            if (kp >= 5) kpFill.style.background = 'var(--danger)';
+            else if (kp >= 4) kpFill.style.background = 'var(--warning)';
+            else kpFill.style.background = 'var(--success)';
+
+
+
+
+        }
+
+        async function copyImageToClipboard() {
+            try {
+                const response = await fetch(downloadBtn.href);
+                const blob = await response.blob();
+                await navigator.clipboard.write([
+                    new ClipboardItem({ [blob.type]: blob })
+                ]);
+                showToast('Full dashboard copied to clipboard', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to copy image', 'error');
+            }
+        }
+
+        async function generateGif() {
+            const btn = document.getElementById('generate-gif-btn');
+            const progressBar = document.getElementById('gif-progress');
+            const progressFill = document.getElementById('gif-progress-bar');
+            const statusText = document.getElementById('gif-status-text');
+            
+            const hours = document.getElementById('gif-hours').value;
+            const interval = document.getElementById('gif-interval').value;
+
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            progressBar.style.display = 'block';
+            progressFill.style.width = '0%';
+            statusText.textContent = 'Capturing frames... This may take a while.';
+
+            let progress = 0;
+            const progressAnim = setInterval(() => {
+                if (progress < 90) {
+                    progress += 1;
+                    progressFill.style.width = `${progress}%`;
+                }
+            }, 500);
+
+            try {
+                const response = await fetch(`/generate-gif?hours=${hours}&interval=${interval}&duration=500`);
+                
+                if (!response.ok) throw new Error('Generation failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `aurora_timelapse_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.gif`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                clearInterval(progressAnim);
+                progressFill.style.width = '100%';
+                statusText.textContent = 'Download started!';
+                showToast('GIF generated successfully', 'success');
+
+            } catch (error) {
+                console.error(error);
+                showToast('Failed to generate GIF', 'error');
+                statusText.textContent = 'Error generating GIF';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Animation';
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    statusText.textContent = '';
+                }, 5000);
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+
+            msg.textContent = message;
+            icon.textContent = type === 'success' ? '✅' : '❌';
+            toast.className = `toast toast-${type} show`;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,3187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-panel: #1e293b;
+            --bg-panel-hover: #283548;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-primary: #fbbf24;
+            --accent-blue: #38bdf8;
+            --success: #4ade80;
+            --warning: #fb923c;
+            --danger: #ef4444;
+            --border: #334155;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        [data-theme="light"] {
+            --bg-dark: #f8fafc;
+            --bg-panel: #ffffff;
+            --bg-panel-hover: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border: #e2e8f0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            transition: background-color 0.3s;
+        }
+
+        .brand {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--accent-primary);
+        }
+
+        .theme-toggle {
+            background: var(--bg-panel-hover);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-panel);
+            border-color: var(--accent-primary);
+        }
+
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0.9rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        /* Stats Row */
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        .stat-card:hover {
+            background: var(--bg-panel-hover);
+            transform: translateY(-2px);
+        }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.75rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-panel-hover);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-primary);
+            background: var(--bg-panel-hover);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Update Indicator */
+        .update-indicator {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .update-time {
+            color: var(--text-secondary);
+        }
+
+        .next-refresh {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .refresh-btn, .action-btn {
+            background: var(--bg-panel-hover);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+
+        .refresh-btn:hover, .action-btn:hover {
+            background: var(--bg-panel);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 250px;
+            background-color: var(--bg-panel);
+            color: var(--text-primary);
+            text-align: left;
+            border-radius: 4px;
+            padding: 0.75rem;
+            position: absolute;
+            z-index: 1001;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .help-icon {
+            color: var(--text-secondary);
+            cursor: help;
+            font-size: 0.9rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .help-icon:hover {
+            opacity: 1;
+        }
+
+        /* Notification Banner */
+        .notification-banner {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #000;
+            padding: 1rem;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .notification-banner button {
+            background: #000;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .notification-banner button:hover {
+            background: #1e293b;
+        }
+
+        /* CME Timeline */
+        .cme-timeline {
+            position: relative;
+            padding: 1rem 0;
+        }
+
+        .cme-event {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .cme-event::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 30px;
+            bottom: -15px;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .cme-event:last-child::before {
+            display: none;
+        }
+
+        .cme-marker {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            border: 3px solid var(--bg-panel);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            z-index: 1;
+        }
+
+        .cme-content {
+            flex: 1;
+            background: var(--bg-panel-hover);
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .cme-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .cme-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .cme-badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .cme-badge.high {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .cme-badge.moderate {
+            background: rgba(251, 146, 60, 0.2);
+            color: var(--warning);
+        }
+
+        .cme-badge.low {
+            background: rgba(74, 222, 128, 0.2);
+            color: var(--success);
+        }
+
+        .cme-details {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 4px;
+            color: var(--success);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Grid Layout */
+        .content-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 0.85rem;
+            align-items: start;
+        }
+
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.4rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.4rem;
+            margin-top: 0.3rem;
+            padding: 0.3rem 0.2rem 0.2rem;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .mini-stat {
+            text-align: center;
+        }
+
+        .mini-stat .label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.15rem;
+        }
+
+        .mini-stat .value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            line-height: 1.2;
+        }
+
+        .proton-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 0.3rem;
+            padding: 0.3rem 0.2rem 0.2rem;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .proton-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .proton-toggle input {
+            cursor: pointer;
+        }
+
+        .proton-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        /* Time Range Selector */
+        .time-range-selector {
+            display: flex;
+            gap: 0.25rem;
+            background: var(--bg-dark);
+            padding: 0.25rem;
+            border-radius: 4px;
+        }
+
+        .time-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.35rem 0.7rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+
+        .time-btn:hover {
+            background: var(--bg-panel-hover);
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        .time-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-dark);
+            border-color: var(--accent-primary);
+        }
+
+        .chart-container {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            min-height: 320px;
+        }
+
+        #proton-chart {
+            min-height: 340px;
+        }
+
+        .solar-image-container {
+            width: 100%;
+            flex: 1; /* Fill available vertical space */
+            background: #000;
+            border-radius: 2px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+        }
+
+        .solar-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Ensure full sun is visible */
+            cursor: zoom-in;
+            transition: transform 0.2s;
+        }
+        .solar-image-container img:hover {
+            transform: scale(1.02);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.25rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+            min-height: 28px;
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 0.02em;
+        }
+
+        .sunspot-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .sunspot-table th {
+            text-align: left;
+            padding: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sunspot-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sunspot-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .sunspot-table tbody tr:hover {
+            background-color: var(--bg-panel-hover);
+        }
+
+        .mag-type {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .mag-alpha { color: #93c5fd; }
+        .mag-beta { color: #86efac; }
+        .mag-gamma { color: #fca5a5; }
+        .mag-delta { color: #fcd34d; }
+
+        .flare-badge {
+            display: inline-block;
+            padding: 0.1rem 0.3rem;
+            border-radius: 2px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+            color: #000;
+        }
+        .flare-x { background-color: #ef4444; color: white; }
+        .flare-m { background-color: #f59e0b; color: black; }
+        .flare-c { background-color: #fbbf24; color: black; }
+
+        .btn-view {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+        .btn-view:hover {
+            background: var(--bg-panel-hover);
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .modal-close:hover { color: var(--text-primary); }
+        .modal-body {
+            padding: 1rem;
+        }
+        .region-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .detail-item label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.2rem;
+        }
+        .detail-item span {
+            font-size: 1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .region-image-placeholder {
+            width: 100%;
+            aspect-ratio: 1;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            margin-top: 1rem;
+            position: relative;
+        }
+        .region-image-placeholder img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .external-link {
+            display: block;
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .external-link:hover { text-decoration: underline; }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            line-height: 1.2;
+        }
+
+        /* Image Lightbox */
+        .lightbox-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(5px);
+        }
+        .lightbox-content {
+            max-width: 95vw;
+            max-height: 95vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .lightbox-content img {
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            border: 1px solid var(--border);
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+        .lightbox-caption {
+            margin-top: 1rem;
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: var(--text-primary);
+            font-size: 3rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            z-index: 2001;
+            line-height: 1;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .lightbox-close:hover {
+            opacity: 1;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .content-row {
+                grid-template-columns: 1fr;
+            }
+            .stats-overview {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .stats-overview {
+                grid-template-columns: 1fr;
+            }
+            .dashboard-container {
+                padding: 1rem;
+            }
+        }
+
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="brand">
+            <span>🌌</span> Aurora Dashboard
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Dashboard</a>
+            <a href="/solar" class="nav-link active">Solar Activity</a>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span>
+                <span id="theme-text">Dark</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="dashboard-container">
+        
+        <!-- Page Header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 0.25rem;">
+            <div>
+                <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0; color: var(--text-primary);">Solar Activity</h1>
+                <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.9rem;">Real-time space weather monitoring</p>
+            </div>
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                Live Data
+            </div>
+        </div>
+
+        <!-- Update Indicator -->
+        <div class="update-indicator">
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                Live
+            </div>
+            <div class="update-time">
+                Last updated: <span id="last-update-time">--</span>
+            </div>
+            <div class="next-refresh">
+                Next refresh: <span id="refresh-countdown">--</span>
+            </div>
+            <button class="refresh-btn" onclick="refreshAllData()">↻ Refresh</button>
+            <button class="action-btn" onclick="shareCurrentData()">📤 Share</button>
+            <button class="action-btn" onclick="exportData()">💾 Export</button>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+            <button class="tab-btn" onclick="switchTab('earth-impact')">🌍 Earth Impact & CMEs</button>
+            <button class="tab-btn" onclick="switchTab('solar-cycle')">☀️ Solar Cycle & Research</button>
+            <button class="tab-btn" onclick="switchTab('solar-imagery')">🛰️ Solar Imagery</button>
+        </div>
+
+        <!-- Tab: Overview (existing content) -->
+        <div id="tab-overview" class="tab-content active">
+
+        <!-- Row 1: X-Ray & GOES -->
+        <div class="content-row">
+            <!-- X-Ray Flux Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">GOES X-Ray Flux</div>
+                    <div class="time-range-selector">
+                        <button class="time-btn active" data-range="2h" onclick="setXrayRange('2h')">2h</button>
+                        <button class="time-btn" data-range="6h" onclick="setXrayRange('6h')">6h</button>
+                        <button class="time-btn" data-range="12h" onclick="setXrayRange('12h')">12h</button>
+                        <button class="time-btn" data-range="24h" onclick="setXrayRange('24h')">24h</button>
+                        <button class="time-btn" data-range="2d" onclick="setXrayRange('2d')">2d</button>
+                        <button class="time-btn" data-range="5d" onclick="setXrayRange('5d')">5d</button>
+                        <button class="time-btn" data-range="7d" onclick="setXrayRange('7d')">7d</button>
+                    </div>
+                </div>
+                <div class="chart-container" id="xray-chart"></div>
+                
+                <!-- Integrated Stats -->
+                <div class="chart-stats-grid">
+                    <div class="mini-stat">
+                        <div class="label">Current Flux</div>
+                        <div class="value" id="xray-current">--</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="label">6-Hour Peak</div>
+                        <div class="value" id="xray-6h-peak">--</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="label">Today's Peak</div>
+                        <div class="value" id="xray-today-peak">--</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="label">24-Hour Peak</div>
+                        <div class="value" id="xray-24h-peak">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GOES Image -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">GOES SUVI 131Å (Solar Flares)</div>
+                </div>
+                <div class="solar-image-container">
+                    <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png" alt="GOES SUVI 131Å" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                </div>
+            </div>
+
+            <!-- GOES CCOR-1 Image -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">GOES-19 CCOR-1 Coronagraph</div>
+                </div>
+                <div class="solar-image-container">
+                    <img src="https://services.swpc.noaa.gov/images/animations/ccor1/latest.jpg" alt="GOES-19 CCOR-1" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Proton & SDO -->
+        <div class="content-row">
+            <!-- Proton Flux Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">GOES Proton Flux</div>
+                    <div class="time-range-selector">
+                        <button class="time-btn" data-range="2h" onclick="setProtonRange('2h')">2h</button>
+                        <button class="time-btn" data-range="6h" onclick="setProtonRange('6h')">6h</button>
+                        <button class="time-btn" data-range="12h" onclick="setProtonRange('12h')">12h</button>
+                        <button class="time-btn active" data-range="24h" onclick="setProtonRange('24h')">24h</button>
+                        <button class="time-btn" data-range="2d" onclick="setProtonRange('2d')">2d</button>
+                        <button class="time-btn" data-range="5d" onclick="setProtonRange('5d')">5d</button>
+                        <button class="time-btn" data-range="7d" onclick="setProtonRange('7d')">7d</button>
+                    </div>
+                </div>
+                <div class="chart-container" id="proton-chart"></div>
+                
+                <!-- Proton Controls -->
+                <div class="proton-controls">
+                    <label class="proton-toggle">
+                        <input type="checkbox" id="p10-toggle" checked onchange="toggleProtonTrace(0)">
+                        <span style="color: #fbbf24">●</span> >= 10 MeV
+                    </label>
+                    <label class="proton-toggle">
+                        <input type="checkbox" id="p50-toggle" checked onchange="toggleProtonTrace(1)">
+                        <span style="color: #38bdf8">●</span> >= 50 MeV
+                    </label>
+                    <label class="proton-toggle">
+                        <input type="checkbox" id="p100-toggle" checked onchange="toggleProtonTrace(2)">
+                        <span style="color: #a78bfa">●</span> >= 100 MeV
+                    </label>
+                </div>
+            </div>
+
+            <!-- SDO Image -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Sunspots</div>
+                </div>
+                <div class="solar-image-container">
+                    <img src="https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg" alt="SDO HMI Magnetogram" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                </div>
+            </div>
+
+            <!-- SDO AIA 193 Image -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Coronal Holes</div>
+                </div>
+                <div class="solar-image-container">
+                    <img src="https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg" alt="SDO AIA 193 Coronal Holes" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Sunspots -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Active Regions</div>
+            </div>
+            <div style="overflow-y: auto; max-height: 300px;">
+                <table class="sunspot-table">
+                    <thead>
+                        <tr>
+                            <th>Region</th>
+                            <th>Loc</th>
+                            <th>Class</th>
+                            <th>Mag</th>
+                            <th>View</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sunspot-body">
+                        <tr><td colspan="5" style="text-align: center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        </div>
+        <!-- End Tab: Overview -->
+
+        <!-- Tab: Earth Impact & CMEs -->
+        <div id="tab-earth-impact" class="tab-content">
+            
+            <!-- Notification Banner -->
+            <div id="notification-banner" class="notification-banner" style="display: none;">
+                <div>
+                    <strong>🔔 Enable Notifications</strong>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Get alerts for M5+ and X-class solar flares</p>
+                </div>
+                <button onclick="requestNotificationPermission()">Enable Alerts</button>
+            </div>
+
+            <!-- NOAA Space Weather Scales -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        NOAA Space Weather Scales
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">R=Radio Blackouts (flares), S=Solar Radiation Storms (protons), G=Geomagnetic Storms (Kp)</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="grid-3">
+                    <div>
+                        <h4 style="margin: 0 0 1rem 0; color: #ef4444;">R - Radio Blackouts</h4>
+                        <div style="margin-bottom: 1rem;">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Current</div>
+                            <div style="font-size: 2rem; font-weight: 700; font-family: var(--font-mono);" id="r-scale-now">R0</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0 0 1rem 0; color: #fb923c;">S - Radiation Storms</h4>
+                        <div style="margin-bottom: 1rem;">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Current</div>
+                            <div style="font-size: 2rem; font-weight: 700; font-family: var(--font-mono);" id="s-scale-now">S0</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0 0 1rem 0; color: #4ade80;">G - Geomagnetic Storms</h4>
+                        <div style="margin-bottom: 1rem;">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Current</div>
+                            <div style="font-size: 2rem; font-weight: 700; font-family: var(--font-mono);" id="g-scale-now">G0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CME Tracker -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        CME Tracker - Earth-Directed Events
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Coronal Mass Ejections (CMEs) are large clouds of solar plasma. When they reach Earth, they can cause geomagnetic storms and auroras.</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="cme-timeline" class="cme-timeline">
+                    <p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">Loading CME data...</p>
+                </div>
+            </div>
+
+            <!-- Planetary Kp Index History -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        Planetary K-index (48 Hours)
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">The K-index measures disturbances in Earth's magnetic field. Values 5+ indicate geomagnetic storms and increased aurora activity.</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="kp-chart" style="width: 100%; height: 300px;"></div>
+            </div>
+
+            <!-- LASCO Coronagraphs -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            SOHO LASCO C2
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Inner coronagraph (2-6 solar radii) - best for detecting CMEs near the sun.</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://soho.nascom.nasa.gov/data/realtime/c2/1024/latest.jpg" 
+                             alt="LASCO C2" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SOHO LASCO C2 Coronagraph')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            SOHO LASCO C3
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Outer coronagraph (4-30 solar radii) - tracks CMEs as they travel toward Earth.</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://soho.nascom.nasa.gov/data/realtime/c3/1024/latest.jpg" 
+                             alt="LASCO C3" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SOHO LASCO C3 Coronagraph')"
+                             loading="lazy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solar Wind Forecast (3-Day) with Animation Controls -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        WSA-ENLIL Solar Wind Forecast
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">3-day prediction model showing solar wind density and CME propagation from the Sun to Earth.</span>
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="time-btn" onclick="playENLIL()" id="enlil-play-btn">▶ Play</button>
+                        <button class="time-btn" onclick="pauseENLIL()" id="enlil-pause-btn" style="display: none;">⏸ Pause</button>
+                        <select id="enlil-speed" class="time-btn" style="width: auto; padding: 0.35rem 0.5rem;">
+                            <option value="1000">1x Speed</option>
+                            <option value="500" selected>2x Speed</option>
+                            <option value="250">4x Speed</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="width: 100%; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); position: relative;">
+                    <img id="enlil-image" src="https://services.swpc.noaa.gov/images/animations/enlil/latest.jpg" 
+                         alt="WSA-ENLIL Solar Wind Prediction" 
+                         style="width: 100%; height: auto; cursor: pointer;"
+                         onclick="openImageModal(this.src, 'WSA-ENLIL Solar Wind Prediction Model')"
+                         loading="lazy">
+                    <div id="enlil-frame-info" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 0.5rem; border-radius: 4px; font-size: 0.85rem; font-family: var(--font-mono);">Frame: 1</div>
+                </div>
+            </div>
+
+            <!-- D-Region Absorption Predictions -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        D-Region Absorption (Radio Blackout) Predictions
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Predictions for high-frequency radio absorption caused by solar flares affecting communications.</span>
+                        </span>
+                    </div>
+                </div>
+                <div style="width: 100%; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                    <img src="https://services.swpc.noaa.gov/images/animations/d-rap/global/d-rap/latest.png" 
+                         alt="D-RAP Model" 
+                         style="width: 100%; height: auto; cursor: pointer;"
+                         onclick="openImageModal(this.src, 'D-Region Absorption Predictions (D-RAP)')"
+                         loading="lazy">
+                </div>
+            </div>
+
+        </div>
+        <!-- End Tab: Earth Impact & CMEs -->
+
+        <!-- Tab: Solar Cycle & Research -->
+        <div id="tab-solar-cycle" class="tab-content">
+            
+            <!-- F10.7 Solar Radio Flux -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        F10.7 Solar Radio Flux
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">10.7 cm radio emission from the sun. Higher values indicate increased solar activity. Measured in Solar Flux Units (SFU). Key indicator of the solar cycle.</span>
+                        </span>
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="font-size: 3rem; font-weight: 700; font-family: var(--font-mono); color: var(--accent-primary);" id="f107-flux">--</div>
+                    <div style="font-size: 1rem; color: var(--text-secondary); margin-top: 0.5rem;">SFU (10⁻²² W/m²/Hz)</div>
+                </div>
+            </div>
+
+            <!-- Region Evolution Heat Map -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        Active Region Evolution (7 Days)
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Shows how active regions have evolved over the past week - growth, decay, and flare production patterns.</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="region-heatmap" style="width: 100%; height: 400px;"></div>
+            </div>
+
+            <!-- Electron Flux -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        GOES Electron Flux (>2 MeV)
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">High-energy electrons in Earth's radiation belts. Elevated levels can damage satellites and spacecraft electronics. Important for space weather research.</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="electron-flux-chart" style="width: 100%; height: 300px;"></div>
+            </div>
+
+            <!-- Sunspot Number & Solar Cycle -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        Solar Cycle 25 Progression
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Current solar cycle showing sunspot number trends. Solar cycles average 11 years from minimum to minimum.</span>
+                        </span>
+                    </div>
+                </div>
+                <div style="width: 100%; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                    <img src="https://services.swpc.noaa.gov/images/solar-cycle-sunspot-number.gif" 
+                         alt="Solar Cycle Sunspot Number" 
+                         style="width: 100%; height: auto; cursor: pointer;"
+                         onclick="openImageModal(this.src, 'Solar Cycle 25 Sunspot Number Progression')"
+                         loading="lazy">
+                </div>
+            </div>
+
+            <!-- Historical Events -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        On This Day in Solar History
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Notable solar events that occurred on this date in previous years.</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="historical-events">
+                    <p style="color: var(--text-secondary); font-style: italic;">Loading historical data...</p>
+                </div>
+            </div>
+
+        </div>
+        <!-- End Tab: Solar Cycle & Research -->
+
+        <!-- Tab: Solar Imagery -->
+        <div id="tab-solar-imagery" class="tab-content">
+            
+            <!-- SDO Full Disk Composite -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        SDO Full Disk Multi-Wavelength Composite
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Composite view showing different layers of the solar atmosphere simultaneously (AIA 211Å, 193Å, 171Å combined).</span>
+                        </span>
+                    </div>
+                </div>
+                <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                    <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_211193171.jpg" 
+                         alt="SDO Composite" 
+                         style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                         onclick="openImageModal(this.src, 'SDO Multi-Wavelength Composite')"
+                         loading="lazy">
+                </div>
+            </div>
+
+            <!-- Magnetogram & Continuum -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            SDO HMI Magnetogram
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Shows magnetic field strength and polarity on the solar surface. Red/white = positive polarity, blue/black = negative polarity.</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg" 
+                             alt="HMI Magnetogram" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO HMI Magnetogram')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            SDO HMI Continuum (Visible Light)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Visible light image showing sunspot regions as dark areas on the solar photosphere.</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg" 
+                             alt="HMI Continuum" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO HMI Continuum (Visible Light)')"
+                             loading="lazy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- SDO AIA Extreme UV - Temperature Range -->
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 304Å (Chromosphere)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">He II emission showing chromosphere and prominences (~60,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg" 
+                             alt="AIA 304" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 304Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 171Å (Quiet Corona)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe IX emission showing quiet corona and coronal loops (~600,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg" 
+                             alt="AIA 171" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 171Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 193Å (Hot Corona)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XII emission showing hot coronal loops and flare plasma (~1,000,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg" 
+                             alt="AIA 193" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 193Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- More AIA Wavelengths -->
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 211Å (Active Regions)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XIV emission showing active regions and flaring areas (~2,000,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0211.jpg" 
+                             alt="AIA 211" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 211Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 131Å (Flaring Regions)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe VIII/XXI emission best for observing solar flare material (~400,000K & ~10,000,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0131.jpg" 
+                             alt="AIA 131" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 131Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 335Å (Very Hot Plasma)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XVI emission showing very hot active region plasma (~2,500,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0335.jpg" 
+                             alt="AIA 335" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 335Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- GOES SUVI Images -->
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            GOES SUVI 94Å
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XVIII emission showing hot flare plasma (~6,000,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/094/latest.png" 
+                             alt="GOES SUVI 94" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'GOES SUVI 94Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            GOES SUVI 195Å
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XII emission showing active regions and coronal holes (~1,500,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/195/latest.png" 
+                             alt="GOES SUVI 195" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'GOES SUVI 195Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            GOES SUVI 284Å
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XV emission showing active regions and filaments (~2,000,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/284/latest.png" 
+                             alt="GOES SUVI 284" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'GOES SUVI 284Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional SDO Wavelengths -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 94Å (Extremely Hot Regions)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">Fe XVIII emission showing hottest regions, flaring plasma (~6,000,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0094.jpg" 
+                             alt="AIA 94" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 94Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            AIA 1600Å (Transition Region)
+                            <span class="tooltip help-icon">ℹ️
+                                <span class="tooltiptext">C IV emission showing transition region and upper photosphere (~100,000K).</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_1600.jpg" 
+                             alt="AIA 1600" 
+                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                             onclick="openImageModal(this.src, 'SDO AIA 1600Å')"
+                             loading="lazy">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <!-- End Tab: Solar Imagery -->
+
+    </main>
+
+    <footer>
+        <p>Data provided by NOAA Space Weather Prediction Center</p>
+        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2025 Aurora Dashboard</p>
+    </footer>
+
+    <!-- Region Details Modal -->
+    <div id="region-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Region <span id="modal-region-number"></span></div>
+                <button class="modal-close" onclick="closeRegionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="region-detail-grid">
+                    <div class="detail-item">
+                        <label>Location</label>
+                        <span id="modal-location"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Magnetic Class</label>
+                        <span id="modal-mag-type"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Spot Class</label>
+                        <span id="modal-spot-class"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Area (millionths)</label>
+                        <span id="modal-area"></span>
+                    </div>
+                    <div class="detail-item" style="grid-column: span 2;">
+                        <label>Recent Flares (Today)</label>
+                        <span id="modal-flares"></span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <h3 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-primary);">HMI Close-Up Imagery</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div style="background: var(--bg-dark); padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border);">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Intensitygram (Visible Light)</div>
+                            <div id="hmi-intensitygram" style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                Loading...
+                            </div>
+                        </div>
+                        <div style="background: var(--bg-dark); padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border);">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Magnetogram (Magnetic Field)</div>
+                            <div id="hmi-magnetogram" style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
+                        Images from NASA SDO/HMI • Click to enlarge
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--text-primary);">Region Flare Activity</h3>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                        C-class and above flares from this region (past ~2 weeks).
+                    </div>
+                    <div id="region-flare-chart" style="width: 100%; height: 200px; background: var(--bg-dark); border-radius: 4px; border: 1px solid var(--border);">
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">
+                            Loading flare data...
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="flare-probabilities" style="background: var(--bg-dark); padding: 1rem; border-radius: 4px; border: 1px solid var(--border); margin-top: 1rem;">
+                    <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--text-primary);">24-Hour Flare Probabilities</h3>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">C-Class</div>
+                            <div id="prob-c-class" style="font-size: 1.25rem; font-weight: 600; color: #fbbf24;">--%</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">M-Class</div>
+                            <div id="prob-m-class" style="font-size: 1.25rem; font-weight: 600; color: #f97316;">--%</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">X-Class</div>
+                            <div id="prob-x-class" style="font-size: 1.25rem; font-weight: 600; color: #dc2626;">--%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-secondary); text-align: center;">Data from SWPC</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Lightbox -->
+    <div id="image-lightbox" class="lightbox-overlay" onclick="closeImageModal()">
+        <button class="lightbox-close" onclick="closeImageModal()">&times;</button>
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <img id="lightbox-img" src="" alt="">
+            <div id="lightbox-caption" class="lightbox-caption"></div>
+        </div>
+    </div>
+
+    <script>
+        // Time range state
+        let currentXrayRange = '2h';
+        let currentProtonRange = '24h';
+        let xrayData = null;
+        let protonData = null;
+
+        async function fetchSolarData() {
+            try {
+                // Fetch sunspot data from original endpoint
+                const solarResponse = await fetch('/api/solar-data');
+                const solarData = await solarResponse.json();
+                if (solarData && solarData.sunspots) {
+                    updateSunspots(solarData.sunspots);
+                }
+                
+                // Fetch X-ray data with current range
+                const xrayResponse = await fetch(`/api/xray-data?range=${currentXrayRange || '2h'}`);
+                xrayData = await xrayResponse.json();
+                if (Array.isArray(xrayData)) {
+                    updateXrayChart(xrayData);
+                    
+                    // Fetch 1-day X-ray data for stats (always use 24h for stats)
+                    const xray24hResponse = await fetch(`/api/xray-data?range=24h`);
+                    const xray24hData = await xray24hResponse.json();
+                    if (Array.isArray(xray24hData)) {
+                        updateXrayStats(xrayData, xray24hData);
+                    }
+                } else {
+                    console.error('X-ray data is not an array:', xrayData);
+                }
+                
+                // Fetch proton data with current range
+                const protonResponse = await fetch(`/api/proton-data?range=${currentProtonRange || '24h'}`);
+                protonData = await protonResponse.json();
+                if (Array.isArray(protonData)) {
+                    updateProtonChart(protonData);
+                } else {
+                    console.error('Proton data is not an array:', protonData);
+                }
+            } catch (error) {
+                console.error('Error fetching solar data:', error);
+            }
+        }
+
+        function getFlareClass(flux) {
+            if (flux < 1e-7) return 'A' + (flux * 1e8).toFixed(2);
+            if (flux < 1e-6) return 'B' + (flux * 1e7).toFixed(2);
+            if (flux < 1e-5) return 'C' + (flux * 1e6).toFixed(2);
+            if (flux < 1e-4) return 'M' + (flux * 1e5).toFixed(2);
+            return 'X' + (flux * 1e4).toFixed(2);
+        }
+
+        function getFlareColor(flux) {
+            if (flux >= 1e-3) return 'rgba(232, 121, 249, 0.8)'; // X10+ opacity: 0.8;
+            if (flux >= 1e-4) return 'rgba(239, 68, 68, 0.8)'; // X opacity: 0.8;
+            if (flux >= 1e-5) return 'rgba(251, 146, 60, 0.8)'; // M opacity: 0.8;
+            if (flux >= 1e-6) return 'rgba(251, 191, 36, 0.8)'; // C opacity: 0.8;
+            return 'rgba(74, 222, 128, 0.8)'; // A/B opacity: 0.8;
+        }
+
+        function detectFlares(data) {
+            const flares = [];
+            // Window size for local maximum detection (in data points)
+            // Reduced to 15 points (+/- 15 mins) to catch more peaks
+            const window = 15; 
+            
+            for (let i = 0; i < data.length; i++) {
+                const val = data[i].flux;
+                
+                // 1. Threshold check (C1.0)
+                if (val < 1e-6) continue;
+                
+                // 2. Local maximum check
+                let isMax = true;
+                const start = Math.max(0, i - window);
+                const end = Math.min(data.length - 1, i + window);
+                
+                for (let j = start; j <= end; j++) {
+                    if (j === i) continue;
+                    if (data[j].flux > val) {
+                        isMax = false;
+                        break;
+                    }
+                }
+                
+                if (isMax) {
+                    flares.push(data[i]);
+                    // Fast forward to avoid checking the immediate neighborhood again
+                    i = Math.min(data.length - 1, i + 10); 
+                }
+            }
+            return flares;
+        }
+
+        function updateXrayChart(data) {
+            if (!data || data.length === 0) {
+                console.warn('No X-ray data available');
+                return;
+            }
+
+            // Filter for primary satellite and long channel only
+            const long = data.filter(d => d.energy === '0.1-0.8nm');
+            
+            if (long.length === 0) {
+                console.warn('No X-ray long wavelength data available');
+                return;
+            }
+            
+            console.log(`X-ray data points: ${long.length}, range: ${currentXrayRange}`);
+            
+            const xValues = long.map(d => d.time_tag);
+            const yValues = long.map(d => d.flux);
+            const textValues = yValues.map(y => getFlareClass(y));
+
+            const trace = {
+                x: xValues,
+                y: yValues,
+                text: textValues,
+                hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} W/m²<br><b>%{text}</b><extra></extra>`,
+                name: 'X-Ray Flux',
+                type: 'scatter',
+                mode: 'lines',
+                line: { 
+                    color: '#ffffff', 
+                    width: 2,
+                    shape: 'spline'
+                }
+            };
+            
+            console.log('X-ray trace data:', {
+                points: xValues.length,
+                firstX: xValues[0],
+                lastX: xValues[xValues.length - 1],
+                minY: Math.min(...yValues),
+                maxY: Math.max(...yValues)
+            });
+
+            // Detect flares for annotations
+            const flares = detectFlares(long);
+            const flareAnnotations = flares.map(flare => {
+                const flareClass = getFlareClass(flare.flux);
+                const color = getFlareColor(flare.flux);
+                return {
+                    x: flare.time_tag,
+                    y: flare.flux,
+                    xref: 'x',
+                    yref: 'y',
+                    text: `<b>${flareClass}</b>`,
+                    showarrow: true,
+                    arrowhead: 2,
+                    arrowsize: 1,
+                    arrowwidth: 2,
+                    arrowcolor: color,
+                    ax: 0,
+                    ay: -20,
+                    bgcolor: color,
+                    bordercolor: color,
+                    borderwidth: 1,
+                    borderpad: 4,
+                    font: {
+                        color: '#0f172a', // Dark text on colored background
+                        size: 12,
+                        family: 'JetBrains Mono',
+                        weight: 'bold'
+                    },
+                    captureevents: true
+                };
+            });
+
+            // Calculate time range - use actual data range, not theoretical range
+            const now = new Date();
+            let timeStart, timeEnd;
+            
+            if (xValues.length > 0) {
+                // Use actual data timestamps - no buffer
+                timeStart = new Date(xValues[0]);
+                timeEnd = new Date(xValues[xValues.length - 1]);
+                
+                // Extend left side to show full requested range if needed
+                const rangeHours = {
+                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
+                    '2d': 48, '5d': 120, '7d': 168
+                };
+                const hours = rangeHours[currentXrayRange] || 6;
+                const theoreticalStart = new Date(now - hours * 60 * 60 * 1000);
+                
+                // Use the earlier of actual data start or theoretical start
+                if (theoreticalStart < timeStart) {
+                    timeStart = theoreticalStart;
+                }
+            } else {
+                // Fallback if no data
+                const rangeHours = {
+                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
+                    '2d': 48, '5d': 120, '7d': 168
+                };
+                const hours = rangeHours[currentXrayRange] || 6;
+                timeStart = new Date(now - hours * 60 * 60 * 1000);
+                timeEnd = now;
+            }
+            
+            console.log('X-ray time range:', {start: timeStart, end: timeEnd});
+            
+            // Set appropriate time range for x-axis
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#94a3b8' },
+                hoverlabel: {
+                    bgcolor: '#1e293b',
+                    bordercolor: '#334155',
+                    font: { family: 'Inter, sans-serif', size: 13, color: '#f8fafc' }
+                },
+                xaxis: { 
+                    gridcolor: 'rgba(255, 255, 255, 0.05)',
+                    showgrid: true,
+                    zeroline: false,
+                    range: [timeStart.toISOString(), timeEnd.toISOString()]
+                },
+                yaxis: { 
+                    gridcolor: 'rgba(255, 255, 255, 0.05)', 
+                    type: 'log',
+                    title: 'Watts/m²',
+                    range: [-8, -2], // A to X100
+                    fixedrange: true,
+                    tickvals: [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
+                    ticktext: ['A', 'B', 'C', 'M', 'X', 'X10', 'X100']
+                },
+                margin: { t: 5, r: 5, b: 30, l: 40 },
+                shapes: [
+                    // A/B Class Zone (Green)
+                    {
+                        type: 'rect',
+                        y0: 1e-9, y1: 1e-6,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(74, 222, 128, 0.1)',
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // C Class Zone (Yellow)
+                    {
+                        type: 'rect',
+                        y0: 1e-6, y1: 1e-5,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(251, 191, 36, 0.1)',
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // M Class Zone (Orange)
+                    {
+                        type: 'rect',
+                        y0: 1e-5, y1: 1e-4,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(251, 146, 60, 0.1)',
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // X Class Zone (Red)
+                    {
+                        type: 'rect',
+                        y0: 1e-4, y1: 1e-3,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(248, 113, 113, 0.1)',
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // X10 Class Zone (Pink)
+                    {
+                        type: 'rect',
+                        y0: 1e-3, y1: 1,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(232, 121, 249, 0.1)',
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // Threshold Lines
+                    { type: 'line', y0: 1e-6, y1: 1e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.3)', width: 1, dash: 'dot' } },
+                    { type: 'line', y0: 1e-5, y1: 1e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.4)', width: 1, dash: 'dot' } },
+                    { type: 'line', y0: 1e-4, y1: 1e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.5)', width: 1, dash: 'dot' } },
+                    { type: 'line', y0: 1e-3, y1: 1e-3, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(232, 121, 249, 0.6)', width: 1, dash: 'dot' } }
+                ],
+                annotations: [
+                    ...flareAnnotations,
+                    { x: 1, y: 1e-6, xref: 'paper', yref: 'y', text: 'C', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fbbf24', size: 12}, xshift: -5, yshift: 2 },
+                    { x: 1, y: 1e-5, xref: 'paper', yref: 'y', text: 'M', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fb923c', size: 12}, xshift: -5, yshift: 2 },
+                    { x: 1, y: 1e-4, xref: 'paper', yref: 'y', text: 'X', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#f87171', size: 12}, xshift: -5, yshift: 2 },
+                    { x: 1, y: 1e-3, xref: 'paper', yref: 'y', text: 'X10', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#e879f9', size: 12}, xshift: -5, yshift: 2 }
+                ]
+            };
+
+            // Purge and recreate for clean render
+            Plotly.purge('xray-chart');
+            Plotly.newPlot('xray-chart', [trace], layout, {responsive: true, displayModeBar: false});
+        }
+
+        function updateProtonChart(data) {
+            if (!data || data.length === 0) {
+                console.warn('No proton data available');
+                return;
+            }
+            protonData = data; // Store for toggling
+            
+            console.log(`Proton data points: ${data.length}, range: ${currentProtonRange}`);
+
+            const p10 = data.filter(d => d.energy === '>=10 MeV');
+            const p50 = data.filter(d => d.energy === '>=50 MeV'); // Assuming this exists or similar
+            const p100 = data.filter(d => d.energy === '>=100 MeV');
+
+            const traces = [];
+
+            if (document.getElementById('p10-toggle').checked) {
+                traces.push({
+                    x: p10.map(d => d.time_tag),
+                    y: p10.map(d => d.flux),
+                    name: '>= 10 MeV',
+                    type: 'scatter',
+                    line: { color: '#fbbf24', width: 2 },
+                    hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 10 MeV</extra>`
+                });
+            }
+
+            if (document.getElementById('p50-toggle').checked) {
+                // Note: API might not return 50 MeV, check data structure if empty
+                traces.push({
+                    x: p50.map(d => d.time_tag),
+                    y: p50.map(d => d.flux),
+                    name: '>= 50 MeV',
+                    type: 'scatter',
+                    line: { color: '#38bdf8', width: 2 },
+                    hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 50 MeV</extra>`
+                });
+            }
+
+            if (document.getElementById('p100-toggle').checked) {
+                traces.push({
+                    x: p100.map(d => d.time_tag),
+                    y: p100.map(d => d.flux),
+                    name: '>= 100 MeV',
+                    type: 'scatter',
+                    line: { color: '#a78bfa', width: 2 },
+                    hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 100 MeV</extra>`
+                });
+            }
+
+            // Calculate time range - use actual data range
+            const now = new Date();
+            let timeStart, timeEnd;
+            
+            if (traces.length > 0 && traces[0].x && traces[0].x.length > 0) {
+                // Find min/max from all traces - no buffer
+                let minTime = new Date(traces[0].x[0]);
+                let maxTime = new Date(traces[0].x[0]);
+                
+                traces.forEach(trace => {
+                    if (trace.x && trace.x.length > 0) {
+                        const traceMin = new Date(trace.x[0]);
+                        const traceMax = new Date(trace.x[trace.x.length - 1]);
+                        if (traceMin < minTime) minTime = traceMin;
+                        if (traceMax > maxTime) maxTime = traceMax;
+                    }
+                });
+                
+                timeStart = minTime;
+                timeEnd = maxTime;
+                
+                // Extend left side to show full requested range if needed
+                const rangeHours = {
+                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
+                    '2d': 48, '5d': 120, '7d': 168
+                };
+                const hours = rangeHours[currentProtonRange] || 24;
+                const theoreticalStart = new Date(now - hours * 60 * 60 * 1000);
+                
+                if (theoreticalStart < timeStart) {
+                    timeStart = theoreticalStart;
+                }
+            } else {
+                // Fallback
+                const rangeHours = {
+                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
+                    '2d': 48, '5d': 120, '7d': 168
+                };
+                const hours = rangeHours[currentProtonRange] || 24;
+                timeStart = new Date(now - hours * 60 * 60 * 1000);
+                timeEnd = now;
+            }
+            
+            console.log('Proton time range:', {start: timeStart, end: timeEnd});
+
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#94a3b8' },
+                showlegend: false,
+                hoverlabel: {
+                    bgcolor: '#1e293b',
+                    bordercolor: '#334155',
+                    font: { family: 'Inter, sans-serif', size: 13, color: '#f8fafc' }
+                },
+                xaxis: { 
+                    gridcolor: 'rgba(255, 255, 255, 0.05)',
+                    range: [timeStart.toISOString(), timeEnd.toISOString()]
+                },
+                yaxis: { 
+                    gridcolor: 'rgba(255, 255, 255, 0.05)', 
+                    type: 'log',
+                    title: 'Particles/cm²-s-ster',
+                    range: [-1, 5], // 0.1 to 100,000
+                    tickvals: [1e0, 1e1, 1e2, 1e3, 1e4, 1e5],
+                    ticktext: ['10⁰', '10¹', '10²', '10³', '10⁴', '10⁵']
+                },
+                margin: { t: 5, r: 5, b: 30, l: 40 },
+                shapes: [
+                    // S1 (Minor) > 10
+                    {
+                        type: 'rect',
+                        y0: 10, y1: 100,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(251, 191, 36, 0.1)', // Yellow
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // S2 (Moderate) > 100
+                    {
+                        type: 'rect',
+                        y0: 100, y1: 1000,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(251, 146, 60, 0.1)', // Orange
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // S3 (Strong) > 1000
+                    {
+                        type: 'rect',
+                        y0: 1000, y1: 10000,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(248, 113, 113, 0.1)', // Red
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // S4 (Severe) > 10000
+                    {
+                        type: 'rect',
+                        y0: 10000, y1: 100000,
+                        x0: 0, x1: 1, xref: 'paper',
+                        fillcolor: 'rgba(232, 121, 249, 0.1)', // Pink
+                        line: { width: 0 },
+                        layer: 'below'
+                    },
+                    // Threshold Lines
+                    { type: 'line', y0: 10, y1: 10, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.3)', width: 1, dash: 'dot' } },
+                    { type: 'line', y0: 100, y1: 100, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.4)', width: 1, dash: 'dot' } },
+                    { type: 'line', y0: 1000, y1: 1000, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.5)', width: 1, dash: 'dot' } },
+                    { type: 'line', y0: 10000, y1: 10000, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(232, 121, 249, 0.6)', width: 1, dash: 'dot' } }
+                ],
+                annotations: [
+                    { x: 1, y: 10, xref: 'paper', yref: 'y', text: 'S1', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fbbf24', size: 12}, xshift: -5, yshift: 2 },
+                    { x: 1, y: 100, xref: 'paper', yref: 'y', text: 'S2', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fb923c', size: 12}, xshift: -5, yshift: 2 },
+                    { x: 1, y: 1000, xref: 'paper', yref: 'y', text: 'S3', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#f87171', size: 12}, xshift: -5, yshift: 2 },
+                    { x: 1, y: 10000, xref: 'paper', yref: 'y', text: 'S4', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#e879f9', size: 12}, xshift: -5, yshift: 2 }
+                ]
+            };
+
+            // Purge and recreate for clean render
+            Plotly.purge('proton-chart');
+            Plotly.newPlot('proton-chart', traces, layout, {responsive: true, displayModeBar: false});
+        }
+
+        function toggleProtonTrace(index) {
+            if (protonData) updateProtonChart(protonData);
+        }
+
+        async function setXrayRange(range) {
+            currentXrayRange = range;
+            console.log(`Setting X-ray range to: ${range}`);
+            
+            // Update button states
+            const card = document.querySelector('#xray-chart').parentElement;
+            card.querySelectorAll('.time-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.range === range);
+            });
+            
+            // Fetch and update data
+            try {
+                const response = await fetch(`/api/xray-data?range=${range}`);
+                xrayData = await response.json();
+                console.log(`Received X-ray data:`, xrayData.length, 'items');
+                updateXrayChart(xrayData);
+            } catch (error) {
+                console.error('Error fetching X-ray data:', error);
+            }
+        }
+
+        async function setProtonRange(range) {
+            currentProtonRange = range;
+            console.log(`Setting proton range to: ${range}`);
+            
+            // Update button states
+            const card = document.querySelector('#proton-chart').parentElement;
+            card.querySelectorAll('.time-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.range === range);
+            });
+            
+            // Fetch and update data
+            try {
+                const response = await fetch(`/api/proton-data?range=${range}`);
+                protonData = await response.json();
+                console.log(`Received proton data:`, protonData.length, 'items');
+                updateProtonChart(protonData);
+            } catch (error) {
+                console.error('Error fetching proton data:', error);
+            }
+        }
+
+        function updateSunspots(regions) {
+            const tbody = document.getElementById('sunspot-body');
+            tbody.innerHTML = '';
+
+            if (!regions || regions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No active regions found</td></tr>';
+                return;
+            }
+
+            regions.forEach(region => {
+                const tr = document.createElement('tr');
+                
+                // Determine mag type class
+                let magClass = '';
+                const magType = region.mag_type.toLowerCase();
+                if (magType.includes('beta-gamma-delta')) magClass = 'mag-delta';
+                else if (magType.includes('beta-gamma')) magClass = 'mag-gamma';
+                else if (magType.includes('beta')) magClass = 'mag-beta';
+                else magClass = 'mag-alpha';
+
+                // Determine flare badge
+                let flareBadge = '';
+                if (region.x_flares > 0) flareBadge = '<span class="flare-badge flare-x">X</span>';
+                else if (region.m_flares > 0) flareBadge = '<span class="flare-badge flare-m">M</span>';
+                else if (region.c_flares > 0) flareBadge = '<span class="flare-badge flare-c">C</span>';
+
+                tr.innerHTML = `
+                    <td>${region.number}${flareBadge}</td>
+                    <td>${region.location}</td>
+                    <td>${region.z}</td>
+                    <td><span class="mag-type ${magClass}">${region.mag_type}</span></td>
+                    <td><button class="btn-view" onclick="openRegionModal('${region.number}', '${region.location}', '${region.mag_type}', '${region.z}', '${region.area}', ${region.x_flares}, ${region.m_flares}, ${region.c_flares})">View</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openRegionModal(number, location, magType, spotClass, area, xFlares, mFlares, cFlares) {
+            document.getElementById('modal-region-number').textContent = number;
+            document.getElementById('modal-location').textContent = location;
+            
+            // Magnetic Class with color coding
+            const magTypeEl = document.getElementById('modal-mag-type');
+            magTypeEl.textContent = magType;
+            if (magType.includes('Alpha') || magType.includes('Beta') && !magType.includes('Gamma')) {
+                magTypeEl.style.color = '#22c55e'; // green
+            } else if (magType.includes('Beta-Gamma') && !magType.includes('Delta')) {
+                magTypeEl.style.color = '#fbbf24'; // yellow
+            } else if (magType.includes('Beta-Gamma-Delta') || magType.includes('Gamma-Delta')) {
+                magTypeEl.style.color = '#dc2626'; // red
+            } else {
+                magTypeEl.style.color = 'var(--text-primary)';
+            }
+            
+            document.getElementById('modal-spot-class').textContent = spotClass;
+            
+            // Area with color coding
+            const areaEl = document.getElementById('modal-area');
+            areaEl.textContent = area;
+            const areaNum = parseInt(area);
+            if (!isNaN(areaNum)) {
+                if (areaNum >= 1200) {
+                    areaEl.style.color = '#ec4899'; // pink
+                } else if (areaNum >= 900) {
+                    areaEl.style.color = '#dc2626'; // red
+                } else if (areaNum >= 650) {
+                    areaEl.style.color = '#f97316'; // orange
+                } else if (areaNum >= 300) {
+                    areaEl.style.color = '#fbbf24'; // yellow
+                } else if (areaNum >= 80) {
+                    areaEl.style.color = '#22c55e'; // green
+                } else {
+                    areaEl.style.color = 'var(--text-primary)';
+                }
+            } else {
+                areaEl.style.color = 'var(--text-primary)';
+            }
+            
+            // Flare stats
+            let flareText = [];
+            if (xFlares > 0) flareText.push(`${xFlares} X-Class`);
+            if (mFlares > 0) flareText.push(`${mFlares} M-Class`);
+            if (cFlares > 0) flareText.push(`${cFlares} C-Class`);
+            document.getElementById('modal-flares').textContent = flareText.length > 0 ? flareText.join(', ') : 'None';
+
+            // Load flare probabilities from SWPC
+            loadFlareProbabilities(number);
+
+            // Load HMI images
+            loadHMIImages(number, location);
+            
+            // Load flare activity chart
+            loadRegionFlares(number);
+
+            // Show modal
+            document.getElementById('region-modal').style.display = 'flex';
+        }
+
+        function closeRegionModal() {
+            document.getElementById('region-modal').style.display = 'none';
+        }
+
+        async function loadFlareProbabilities(regionNumber) {
+            try {
+                const response = await fetch('https://services.swpc.noaa.gov/json/solar_regions.json');
+                const data = await response.json();
+                
+                // Find the most recent entry for this region
+                const regionData = data.find(r => r.region == regionNumber && r.c_flare_probability !== null);
+                
+                if (regionData) {
+                    document.getElementById('prob-c-class').textContent = regionData.c_flare_probability + '%';
+                    document.getElementById('prob-m-class').textContent = regionData.m_flare_probability + '%';
+                    document.getElementById('prob-x-class').textContent = regionData.x_flare_probability + '%';
+                } else {
+                    document.getElementById('prob-c-class').textContent = 'N/A';
+                    document.getElementById('prob-m-class').textContent = 'N/A';
+                    document.getElementById('prob-x-class').textContent = 'N/A';
+                }
+            } catch (error) {
+                console.error('Error fetching flare probabilities:', error);
+                document.getElementById('prob-c-class').textContent = 'Error';
+                document.getElementById('prob-m-class').textContent = 'Error';
+                document.getElementById('prob-x-class').textContent = 'Error';
+            }
+        }
+
+        // Auto-refresh solar data every 5 minutes
+        setInterval(fetchSolarData, 5 * 60 * 1000);
+
+        async function loadHMIImages(regionNumber, location) {
+            const intensitygramDiv = document.getElementById('hmi-intensitygram');
+            const magnetogramDiv = document.getElementById('hmi-magnetogram');
+            
+            // Reset to loading state
+            intensitygramDiv.innerHTML = 'Loading...';
+            magnetogramDiv.innerHTML = 'Loading...';
+            
+            try {
+                // Parse location to get heliographic coordinates
+                // Location format is like "S14W15" or "N20E10"
+                const match = location.match(/([NS])(\d+)([EW])(\d+)/);
+                if (!match) {
+                    throw new Error('Invalid location format');
+                }
+                
+                const latDir = match[1];
+                const lat = parseInt(match[2]) * (latDir === 'S' ? -1 : 1);
+                const lonDir = match[3];
+                const lon = parseInt(match[4]) * (lonDir === 'W' ? -1 : 1);
+                
+                // Convert to helioprojective coordinates with proper spherical projection
+                const now = new Date();
+                // Request imagery from 1 hour ago to ensure data availability
+                const imageTime = new Date(now - 60 * 60 * 1000);
+                const isoDate = imageTime.toISOString();
+                
+                // Proper spherical projection for helioprojective coordinates
+                const latRad = lat * Math.PI / 180;
+                const lonRad = lon * Math.PI / 180;
+                
+                // Solar radius in arcseconds
+                const solarRadius = 960;
+                
+                // Helioprojective Cartesian coordinates (arcseconds from disk center)
+                // x = R * sin(lon) * cos(lat)
+                // y = R * sin(lat)
+                // For our coordinate system: negate both to match Helioviewer's convention
+                const x0 = -solarRadius * Math.sin(lonRad) * Math.cos(latRad);
+                const y0 = -solarRadius * Math.sin(latRad);
+                
+                const fovSize = 300; // Reduced from 600 for closer zoom
+                const pixelSize = 512;
+                const imageScale = fovSize / pixelSize;
+                
+                // Use better wavelengths for active region visibility
+                // HMI Continuum for white light photosphere
+                const hmiContinuumLayers = encodeURIComponent('[SDO,HMI,HMI,continuum,1,100]');
+                const hmiContinuumUrl = `https://api.helioviewer.org/v2/takeScreenshot/?date=${isoDate}&imageScale=${imageScale}&layers=${hmiContinuumLayers}&x0=${x0}&y0=${y0}&width=${pixelSize}&height=${pixelSize}&display=true&watermark=false`;
+                
+                // HMI Magnetogram for magnetic field
+                const hmiMagLayers = encodeURIComponent('[SDO,HMI,HMI,magnetogram,1,100]');
+                const hmiMagUrl = `https://api.helioviewer.org/v2/takeScreenshot/?date=${isoDate}&imageScale=${imageScale}&layers=${hmiMagLayers}&x0=${x0}&y0=${y0}&width=${pixelSize}&height=${pixelSize}&display=true&watermark=false`;
+                
+                console.log(`HMI for ${regionNumber} at ${location}: x0=${x0}", y0=${y0}"`);
+                console.log(`Continuum URL: ${hmiContinuumUrl}`);
+                
+                // Create HMI continuum intensitygram
+                const intensityImg = document.createElement('img');
+                intensityImg.style.width = '100%';
+                intensityImg.style.height = '100%';
+                intensityImg.style.objectFit = 'contain';
+                intensityImg.style.cursor = 'pointer';
+                intensityImg.onclick = () => openImageModal(hmiContinuumUrl, `HMI Continuum - Region ${regionNumber} at ${location}`);
+                intensityImg.onerror = () => {
+                    console.error('Failed to load HMI Continuum');
+                    intensitygramDiv.innerHTML = 'Image unavailable';
+                };
+                intensityImg.src = hmiContinuumUrl;
+                
+                // Create colorized HMI magnetogram
+                const magImg = document.createElement('img');
+                magImg.style.width = '100%';
+                magImg.style.height = '100%';
+                magImg.style.objectFit = 'contain';
+                magImg.style.cursor = 'pointer';
+                magImg.onclick = () => openImageModal(hmiMagUrl, `HMI Magnetogram - Region ${regionNumber} at ${location}`);
+                magImg.onerror = () => {
+                    console.error('Failed to load HMI Magnetogram');
+                    magnetogramDiv.innerHTML = 'Image unavailable';
+                };
+                magImg.src = hmiMagUrl;
+                
+                // Clear and add images
+                intensitygramDiv.innerHTML = '';
+                intensitygramDiv.appendChild(intensityImg);
+                
+                magnetogramDiv.innerHTML = '';
+                magnetogramDiv.appendChild(magImg);
+                
+            } catch (error) {
+                console.error('Error loading HMI images:', error);
+                intensitygramDiv.innerHTML = 'Error loading image';
+                magnetogramDiv.innerHTML = 'Error loading image';
+            }
+        }
+
+        function openImageModal(src, caption) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox-caption').textContent = caption;
+            document.getElementById('image-lightbox').style.display = 'flex';
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-lightbox').style.display = 'none';
+        }
+
+        async function loadRegionFlares(regionNumber) {
+            const chartDiv = document.getElementById('region-flare-chart');
+            chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">Loading flare data...</div>';
+            
+            try {
+                const response = await fetch(`/api/region-flares/${regionNumber}`);
+                const data = await response.json();
+                
+                if (data.flares && data.flares.length > 0) {
+                    plotFlareActivity(data.flares);
+                } else {
+                    chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">No flares detected in past 7 days</div>';
+                }
+            } catch (error) {
+                console.error('Error loading flare data:', error);
+                chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">Error loading flare data</div>';
+            }
+        }
+
+        function plotFlareActivity(flares) {
+            // Clear the chart area first
+            const chartDiv = document.getElementById('region-flare-chart');
+            chartDiv.innerHTML = '';
+            
+            // Group flares by class and time
+            const xFlares = [];
+            const mFlares = [];
+            const cFlares = [];
+            
+            flares.forEach(flare => {
+                const time = new Date(flare.max_time || flare.begin_time);
+                const flareClass = flare.max_class || flare.class || '';
+                
+                const dataPoint = {
+                    x: time,
+                    y: parseFlareIntensity(flareClass),
+                    text: flareClass
+                };
+                
+                if (flareClass.startsWith('X')) {
+                    xFlares.push(dataPoint);
+                } else if (flareClass.startsWith('M')) {
+                    mFlares.push(dataPoint);
+                } else if (flareClass.startsWith('C')) {
+                    cFlares.push(dataPoint);
+                }
+            });
+            
+            const traces = [];
+            
+            if (cFlares.length > 0) {
+                traces.push({
+                    x: cFlares.map(f => f.x),
+                    y: cFlares.map(f => f.y),
+                    text: cFlares.map(f => f.text),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: 'C-Class',
+                    marker: { color: '#fbbf24', size: 8 },
+                    hovertemplate: '%{text}<br>%{x|%b %d, %H:%M UTC}<extra></extra>'
+                });
+            }
+            
+            if (mFlares.length > 0) {
+                traces.push({
+                    x: mFlares.map(f => f.x),
+                    y: mFlares.map(f => f.y),
+                    text: mFlares.map(f => f.text),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: 'M-Class',
+                    marker: { color: '#f97316', size: 10 },
+                    hovertemplate: '%{text}<br>%{x|%b %d, %H:%M UTC}<extra></extra>'
+                });
+            }
+            
+            if (xFlares.length > 0) {
+                traces.push({
+                    x: xFlares.map(f => f.x),
+                    y: xFlares.map(f => f.y),
+                    text: xFlares.map(f => f.text),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: 'X-Class',
+                    marker: { color: '#dc2626', size: 12 },
+                    hovertemplate: '%{text}<br>%{x|%b %d, %H:%M UTC}<extra></extra>'
+                });
+            }
+            
+            const layout = {
+                margin: { t: 10, r: 10, b: 40, l: 50 },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#94a3b8' },
+                xaxis: {
+                    gridcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#94a3b8',
+                    showgrid: true,
+                    zeroline: false
+                },
+                yaxis: {
+                    type: 'log',
+                    gridcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#94a3b8',
+                    title: 'Watts/m²',
+                    showgrid: true,
+                    range: [-7, -3],
+                    tickvals: [1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
+                    ticktext: ['B', 'C', 'M', 'X', 'X10']
+                },
+                showlegend: true,
+                legend: {
+                    x: 1,
+                    xanchor: 'right',
+                    y: 1,
+                    font: { color: '#94a3b8', size: 11 }
+                },
+                hovermode: 'closest'
+            };
+            
+            const config = { responsive: true, displayModeBar: false };
+            
+            Plotly.newPlot('region-flare-chart', traces, layout, config);
+        }
+        
+        function parseFlareIntensity(flareClass) {
+            // Extract numeric value from flare class (e.g., "M5.2" -> 5.2e-5)
+            if (!flareClass) return 1e-7;
+            
+            const match = flareClass.match(/([XMCBA])([0-9.]+)/);
+            if (!match) return 1e-7;
+            
+            const classLetter = match[1];
+            const magnitude = parseFloat(match[2]);
+            
+            // Convert to watts/m^2 - each class is 10x the previous
+            const basePowers = {
+                'X': -4,  // 1e-4
+                'M': -5,  // 1e-5
+                'C': -6,  // 1e-6
+                'B': -7,  // 1e-7
+                'A': -8   // 1e-8
+            };
+            
+            const basePower = basePowers[classLetter];
+            if (basePower === undefined) return 1e-7;
+            
+            // Calculate the actual power: base * magnitude
+            // e.g., M5.2 = 10^-5 * 5.2 = 5.2e-5
+            return Math.pow(10, basePower) * magnitude;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('region-modal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function updateXrayStats(data6h, data1d) {
+            if (!data6h || !data1d) return;
+
+            const long6h = data6h.filter(d => d.energy === '0.1-0.8nm');
+            const long1d = data1d.filter(d => d.energy === '0.1-0.8nm');
+
+            if (long6h.length === 0 || long1d.length === 0) return;
+
+            // 1. Current Flux
+            const current = long6h[long6h.length - 1].flux;
+            updateStat('xray-current', current);
+
+            // 2. 6-Hour Peak
+            const peak6h = Math.max(...long6h.map(d => d.flux));
+            updateStat('xray-6h-peak', peak6h);
+
+            // 3. Today's Peak (UTC)
+            // Get current UTC date string YYYY-MM-DD
+            const now = new Date();
+            const year = now.getUTCFullYear();
+            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(now.getUTCDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+            
+            const todayData = long1d.filter(d => d.time_tag.startsWith(todayStr));
+            const peakToday = todayData.length > 0 ? Math.max(...todayData.map(d => d.flux)) : 0;
+            updateStat('xray-today-peak', peakToday);
+
+            // 4. 24-Hour Peak
+            const peak24h = Math.max(...long1d.map(d => d.flux));
+            updateStat('xray-24h-peak', peak24h);
+        }
+
+        function updateStat(id, flux) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            
+            const card = el.closest('.stat-card');
+
+            if (flux <= 0) {
+                el.innerHTML = '--';
+                el.style.color = 'var(--text-secondary)';
+                if (card) card.style.backgroundColor = 'var(--bg-panel)';
+                return;
+            }
+            
+            const cls = getFlareClass(flux);
+            const color = getFlareColor(flux);
+            
+            el.innerHTML = cls;
+            el.style.color = color;
+            
+            // Remove glow effect, keep flat color
+            el.style.textShadow = 'none';
+        }
+
+        // Initial fetch
+        fetchSolarData();
+        // Refresh every 5 minutes
+        setInterval(fetchSolarData, 300000);
+
+        // Handle window resize for charts
+        window.addEventListener('resize', function() {
+            const xray = document.getElementById('xray-chart');
+            const proton = document.getElementById('proton-chart');
+            if (xray) Plotly.Plots.resize(xray);
+            if (proton) Plotly.Plots.resize(proton);
+        });
+
+        // Image Lightbox
+        function openLightbox(imageUrl, caption) {
+            const lightbox = document.getElementById('image-lightbox');
+            const lightboxImage = document.getElementById('lightbox-img');
+            const lightboxCaption = document.getElementById('lightbox-caption');
+
+            lightboxImage.src = imageUrl;
+            lightboxCaption.textContent = caption || '';
+
+            lightbox.style.display = 'flex';
+        }
+
+        function closeLightbox() {
+            document.getElementById('image-lightbox').style.display = 'none';
+        }
+
+        // Open lightbox on image click
+        document.querySelectorAll('.solar-image-container img').forEach(img => {
+            img.addEventListener('click', function() {
+                const src = this.src;
+                const caption = this.alt;
+                openLightbox(src, caption);
+            });
+        });
+
+        function openImageModal(src, alt) {
+            const lightbox = document.getElementById('image-lightbox');
+            const img = document.getElementById('lightbox-img');
+            const caption = document.getElementById('lightbox-caption');
+            
+            // Use high-res version if available (some sources have specific patterns)
+            // For now, just use the source image
+            img.src = src;
+            caption.textContent = alt;
+            lightbox.style.display = 'flex';
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-lightbox').style.display = 'none';
+        }
+        
+        // Close on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeImageModal();
+                closeRegionModal();
+            }
+        });
+
+        // ===== NEW FEATURES =====
+
+        // Theme Management
+        let currentTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        updateThemeButton();
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            localStorage.setItem('theme', currentTheme);
+            updateThemeButton();
+        }
+
+        function updateThemeButton() {
+            const icon = document.getElementById('theme-icon');
+            const text = document.getElementById('theme-text');
+            if (currentTheme === 'dark') {
+                icon.textContent = '🌙';
+                text.textContent = 'Dark';
+            } else {
+                icon.textContent = '☀️';
+                text.textContent = 'Light';
+            }
+        }
+
+        // Tab Management
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            localStorage.setItem('activeTab', tabName);
+        }
+
+        // Restore last active tab
+        const lastTab = localStorage.getItem('activeTab');
+        if (lastTab && lastTab !== 'overview') {
+            const tabBtn = document.querySelector(`[onclick="switchTab('${lastTab}')"]`);
+            if (tabBtn) {
+                setTimeout(() => tabBtn.click(), 100);
+            }
+        }
+
+        // Auto-refresh countdown
+        let refreshInterval = 300; // 5 minutes
+        let countdown = refreshInterval;
+        let lastUpdateTime = new Date();
+
+        function updateRefreshCountdown() {
+            countdown--;
+            if (countdown <= 0) {
+                countdown = refreshInterval;
+                refreshAllData();
+            }
+            
+            const minutes = Math.floor(countdown / 60);
+            const seconds = countdown % 60;
+            const countdownEl = document.getElementById('refresh-countdown');
+            if (countdownEl) {
+                countdownEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function updateLastUpdateTime() {
+            const el = document.getElementById('last-update-time');
+            if (el) {
+                el.textContent = lastUpdateTime.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+        }
+
+        setInterval(updateRefreshCountdown, 1000);
+        updateLastUpdateTime();
+
+        // ENLIL Animation Controls
+        let enlilAnimationInterval = null;
+        let enlilCurrentFrame = 1;
+        const enlilTotalFrames = 30; // Approximate frame count for ENLIL animation
+        const enlilBaseUrl = 'https://services.swpc.noaa.gov/images/animations/enlil/';
+
+        function playENLIL() {
+            const speed = parseInt(document.getElementById('enlil-speed').value) || 500;
+            const playBtn = document.getElementById('enlil-play-btn');
+            const pauseBtn = document.getElementById('enlil-pause-btn');
+            
+            playBtn.style.display = 'none';
+            pauseBtn.style.display = 'inline-block';
+            
+            if (!enlilAnimationInterval) {
+                enlilAnimationInterval = setInterval(() => {
+                    enlilCurrentFrame++;
+                    if (enlilCurrentFrame > enlilTotalFrames) {
+                        enlilCurrentFrame = 1;
+                    }
+                    updateENLILFrame();
+                }, speed);
+            }
+        }
+
+        function pauseENLIL() {
+            const playBtn = document.getElementById('enlil-play-btn');
+            const pauseBtn = document.getElementById('enlil-pause-btn');
+            
+            playBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+            
+            if (enlilAnimationInterval) {
+                clearInterval(enlilAnimationInterval);
+                enlilAnimationInterval = null;
+            }
+        }
+
+        function updateENLILFrame() {
+            const img = document.getElementById('enlil-image');
+            const frameInfo = document.getElementById('enlil-frame-info');
+            
+            // ENLIL animation frames are numbered (try different patterns)
+            // Pattern 1: Try YYYYMMDD_HHMM format with incrementing hours
+            // Pattern 2: Try sequential frame numbers
+            // For simplicity, we'll cycle through the latest animation with frame indicator
+            
+            // Most ENLIL animations are delivered as GIF or sequential images
+            // We'll update the frame counter and try to load sequential frames
+            const frameStr = enlilCurrentFrame.toString().padStart(3, '0');
+            
+            // Try loading numbered frames if available, otherwise show frame counter
+            // NOAA typically provides a GIF - browsers auto-animate
+            // We'll show frame counter for user feedback
+            frameInfo.textContent = `Frame: ${enlilCurrentFrame}/${enlilTotalFrames}`;
+            
+            // Optional: If NOAA provides individual frames, update src:
+            // img.src = `${enlilBaseUrl}${frameStr}.jpg`;
+        }
+
+        // Refresh all data
+        async function refreshAllData() {
+            countdown = refreshInterval;
+            lastUpdateTime = new Date();
+            updateLastUpdateTime();
+            
+            // Refresh existing data
+            fetchSolarData();
+            
+            // Fetch new data
+            await Promise.all([
+                fetchKpHistory(),
+                fetchF107Data(),
+                fetchCMEData(),
+                fetchElectronFlux(),
+                fetchRegionHeatmap(),
+                fetchNOAAScales(),
+                fetchHistoricalEvents()
+            ]);
+        }
+
+        // Fetch Kp History
+        async function fetchKpHistory() {
+            try {
+                const response = await fetch('/api/kp-history');
+                const data = await response.json();
+                
+                if (data.times && data.kp_values) {
+                    plotKpChart(data.times, data.kp_values);
+                }
+            } catch (error) {
+                console.error('Error fetching Kp history:', error);
+            }
+        }
+
+        function plotKpChart(times, values) {
+            const trace = {
+                x: times,
+                y: values,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#fbbf24', width: 2 },
+                marker: { size: 6, color: '#fbbf24' },
+                hovertemplate: '<b>%{x}</b><br>Kp: %{y:.1f}<extra></extra>'
+            };
+
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: currentTheme === 'dark' ? '#94a3b8' : '#475569' },
+                margin: { t: 10, r: 10, b: 40, l: 40 },
+                xaxis: { 
+                    gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',
+                    showgrid: true
+                },
+                yaxis: { 
+                    gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',
+                    title: 'Kp Index',
+                    range: [0, 9]
+                },
+                shapes: [{
+                    type: 'line',
+                    y0: 5, y1: 5,
+                    x0: 0, x1: 1,
+                    xref: 'paper',
+                    line: { color: '#ef4444', width: 1, dash: 'dot' }
+                }]
+            };
+
+            Plotly.newPlot('kp-chart', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        // Fetch F10.7 Data
+        async function fetchF107Data() {
+            try {
+                const response = await fetch('/api/f107');
+                const data = await response.json();
+                
+                const el = document.getElementById('f107-flux');
+                if (el && data.flux) {
+                    el.textContent = Math.round(data.flux);
+                }
+            } catch (error) {
+                console.error('Error fetching F10.7:', error);
+            }
+        }
+
+        // Fetch CME Data
+        async function fetchCMEData() {
+            try {
+                const response = await fetch('/api/cme-events');
+                const data = await response.json();
+                
+                const container = document.getElementById('cme-timeline');
+                if (!container) return;
+                
+                if (!data.events || data.events.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">No Earth-directed CMEs detected in the past 7 days.</p>';
+                    return;
+                }
+
+                container.innerHTML = data.events.map((event, index) => {
+                    const impactBadge = event.probability === 'High' ? 'high' : 
+                                       event.probability === 'Moderate' ? 'moderate' : 'low';
+                    
+                    return `
+                        <div class="cme-event">
+                            <div class="cme-marker">${index + 1}</div>
+                            <div class="cme-content">
+                                <div class="cme-header">
+                                    <div class="cme-title">CME ${event.id}</div>
+                                    <div class="cme-badge ${impactBadge}">${event.probability} Impact</div>
+                                </div>
+                                <div class="cme-details">
+                                    <div><strong>Launch:</strong> ${event.launch_time}</div>
+                                    <div><strong>Speed:</strong> ${event.speed} km/s</div>
+                                    <div><strong>Expected Arrival:</strong> ${event.arrival || 'TBD'}</div>
+                                    <div><strong>Source:</strong> ${event.source || 'Unknown'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error fetching CME data:', error);
+            }
+        }
+
+        // Fetch Electron Flux
+        async function fetchElectronFlux() {
+            try {
+                const response = await fetch('/api/electron-flux');
+                const data = await response.json();
+                
+                if (data.times && data.flux && data.times.length > 0) {
+                    plotElectronFlux(data.times, data.flux);
+                }
+            } catch (error) {
+                console.error('Error fetching electron flux:', error);
+            }
+        }
+
+        function plotElectronFlux(times, flux) {
+            const trace = {
+                x: times,
+                y: flux,
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#a78bfa', width: 2 },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(167, 139, 250, 0.2)',
+                hovertemplate: '<b>%{x}</b><br>%{y:.2e} e/cm²-s-sr<extra></extra>'
+            };
+
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: currentTheme === 'dark' ? '#94a3b8' : '#475569' },
+                margin: { t: 10, r: 10, b: 40, l: 60 },
+                xaxis: { gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)' },
+                yaxis: { 
+                    type: 'log',
+                    gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',
+                    title: 'Electrons/cm²-s-sr'
+                }
+            };
+
+            Plotly.newPlot('electron-flux-chart', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        // Fetch Region Heatmap
+        async function fetchRegionHeatmap() {
+            try {
+                const response = await fetch('/api/region-heatmap');
+                const data = await response.json();
+                
+                if (data.regions && data.days && data.regions.length > 0) {
+                    plotRegionHeatmap(data);
+                }
+            } catch (error) {
+                console.error('Error fetching region heatmap:', error);
+            }
+        }
+
+        function plotRegionHeatmap(data) {
+            const trace = {
+                x: data.days,
+                y: data.regions,
+                z: data.activity,
+                type: 'heatmap',
+                colorscale: [
+                    [0, '#1e293b'],
+                    [0.3, '#fbbf24'],
+                    [0.6, '#fb923c'],
+                    [1, '#ef4444']
+                ],
+                hovertemplate: '<b>Region %{y}</b><br>%{x}<br>Activity: %{z}<extra></extra>'
+            };
+
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: currentTheme === 'dark' ? '#94a3b8' : '#475569' },
+                margin: { t: 10, r: 10, b: 60, l: 60 },
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Active Region' }
+            };
+
+            Plotly.newPlot('region-heatmap', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        // Fetch NOAA Scales
+        async function fetchNOAAScales() {
+            try {
+                const response = await fetch('/api/noaa-scales');
+                const data = await response.json();
+                
+                const rEl = document.getElementById('r-scale-now');
+                const sEl = document.getElementById('s-scale-now');
+                const gEl = document.getElementById('g-scale-now');
+                
+                if (rEl) rEl.textContent = `R${data.r_current || 0}`;
+                if (sEl) sEl.textContent = `S${data.s_current || 0}`;
+                if (gEl) gEl.textContent = `G${data.g_current || 0}`;
+            } catch (error) {
+                console.error('Error fetching NOAA scales:', error);
+            }
+        }
+
+        // Fetch Historical Events
+        async function fetchHistoricalEvents() {
+            try {
+                const response = await fetch('/api/historical-events');
+                const data = await response.json();
+                
+                const container = document.getElementById('historical-events');
+                if (!container) return;
+                
+                if (!data.events || data.events.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">No notable events recorded for this date.</p>';
+                    return;
+                }
+
+                container.innerHTML = data.events.map(event => `
+                    <div style="padding: 0.75rem; background: var(--bg-panel-hover); border-left: 3px solid var(--accent-primary); margin-bottom: 0.75rem; border-radius: 4px;">
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">${event.date} - ${event.title}</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">${event.description}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching historical events:', error);
+            }
+        }
+
+        // Notification Management
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        document.getElementById('notification-banner').style.display = 'none';
+                        localStorage.setItem('notificationsEnabled', 'true');
+                        new Notification('Alerts Enabled', {
+                            body: 'You will now receive notifications for significant solar events.'
+                        });
+                    }
+                });
+            }
+        }
+
+        // Check notification permission on load
+        if ('Notification' in window && Notification.permission === 'default') {
+            const banner = document.getElementById('notification-banner');
+            if (banner) banner.style.display = 'flex';
+        }
+
+        // Share/Export Functions
+        function shareCurrentData() {
+            const url = window.location.href;
+            const text = `Check out current solar activity conditions on Aurora Dashboard`;
+            
+            if (navigator.share) {
+                navigator.share({ title: 'Solar Activity Dashboard', text, url })
+                    .catch(err => console.log('Share failed', err));
+            } else {
+                navigator.clipboard.writeText(`${text}\\n${url}`).then(() => {
+                    alert('Link copied to clipboard!');
+                });
+            }
+        }
+
+        function exportData() {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                f107: document.getElementById('f107-flux')?.textContent || 'N/A',
+                rScale: document.getElementById('r-scale-now')?.textContent || 'N/A',
+                sScale: document.getElementById('s-scale-now')?.textContent || 'N/A',
+                gScale: document.getElementById('g-scale-now')?.textContent || 'N/A'
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `solar-data-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Touch gestures for mobile (swipe between tabs)
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            const tabs = ['overview', 'earth-impact', 'solar-cycle', 'solar-imagery'];
+            const activeTab = document.querySelector('.tab-content.active')?.id.replace('tab-', '');
+            const currentIndex = tabs.indexOf(activeTab);
+            
+            if (touchEndX < touchStartX - 50 && currentIndex < tabs.length - 1) {
+                // Swipe left - next tab
+                document.querySelector(`[onclick="switchTab('${tabs[currentIndex + 1]}')"]`)?.click();
+            }
+            
+            if (touchEndX > touchStartX + 50 && currentIndex > 0) {
+                // Swipe right - previous tab
+                document.querySelector(`[onclick="switchTab('${tabs[currentIndex - 1]}')"]`)?.click();
+            }
+        }
+
+        // Initialize new features on page load
+        window.addEventListener('load', () => {
+            refreshAllData();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.key === 'r' && e.ctrlKey) {
+                e.preventDefault();
+                refreshAllData();
+            }
+        });
+    </script>
+</body>
+</html>
