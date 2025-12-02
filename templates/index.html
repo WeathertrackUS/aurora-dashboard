@@ -906,8 +906,19 @@
                 gap: 0.5rem;
             }
             
-            .chart-panel, .map-panel {
+            .chart-panel {
                 border-radius: 4px;
+                min-height: 180px;
+                padding: 0.5rem;
+            }
+            
+            .map-panel {
+                border-radius: 4px;
+                min-height: 300px;
+            }
+            
+            .chart-container {
+                min-height: 140px;
             }
             
             .chart-title {
@@ -920,6 +931,7 @@
                 font-size: 1rem;
                 top: 6px;
                 right: 8px;
+                padding: 0.1rem 0.3rem;
             }
         }
         
@@ -955,12 +967,30 @@
                 gap: 0.25rem;
             }
             
+            .chart-panel {
+                min-height: 160px;
+                padding: 0.5rem 0.25rem;
+            }
+            
+            .chart-container {
+                min-height: 120px;
+                height: auto;
+            }
+            
             .geomag-forecast-container {
                 padding: 0.5rem;
             }
             
             .forecast-day {
                 padding: 0.25rem;
+            }
+            
+            .chart-title {
+                font-size: 0.6rem;
+            }
+            
+            .chart-value {
+                font-size: 0.9rem;
             }
         }
     </style>
@@ -1271,14 +1301,15 @@
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 font: { color: '#94a3b8', family: 'Inter, sans-serif' },
-                margin: { t: 30, r: 10, b: 30, l: 40 },
-                xaxis: { showgrid: false, zeroline: false, tickfont: { size: 10 } },
-                yaxis: { showgrid: true, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, tickfont: { size: 10 } },
+                margin: { t: 25, r: 8, b: 25, l: 35 },
+                xaxis: { showgrid: false, zeroline: false, tickfont: { size: 10 }, fixedrange: true },
+                yaxis: { showgrid: true, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, tickfont: { size: 10 }, fixedrange: true },
                 showlegend: false,
-                autosize: true
+                autosize: true,
+                responsive: true
             };
 
-            const config = { displayModeBar: false, responsive: true };
+            const config = { displayModeBar: false, responsive: true, autosizable: true };
 
             // Helper for traces
             const createTrace = (x, y, color, fill = 'tozeroy') => ({
@@ -1651,7 +1682,9 @@
                 const layout = { 
                     ...commonLayout,
                     yaxis: { ...commonLayout.yaxis, range: [yMin, yMax] },
-                    shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 0, y1: 0, line: { color: 'rgba(255,255,255,0.3)', width: 1 } }]
+                    shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 0, y1: 0, line: { color: 'rgba(255,255,255,0.3)', width: 1 } }],
+                    autosize: true,
+                    margin: { l: 35, r: 10, t: 10, b: 25 }
                 };
                 Plotly.newPlot('chart-bz', traces, layout, config);
                 
