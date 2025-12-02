@@ -2181,8 +2181,6 @@ def get_geomagnetic_alerts():
             for i in range(3)
         ]
         return jsonify({'forecast': placeholder})
-        print(f"Error fetching geomagnetic alerts: {e}")
-        return jsonify({'alerts': []}), 500
 
 @app.route('/api/region-flares/<region_number>')
 def get_region_flares(region_number):
