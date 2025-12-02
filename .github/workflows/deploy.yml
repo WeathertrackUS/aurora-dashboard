@@ -38,6 +38,10 @@ jobs:
             --exclude 'venv' \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
+            --exclude '.env' \
+            --exclude '.env.local' \
+            --exclude '*.log' \
+            --exclude 'aurora_animations/*.gif' \
             ./ $VPS_USER@$VPS_HOST:$TARGET_DIR/
 
           # 3. Remote Setup (Install Requirements & Restart)
