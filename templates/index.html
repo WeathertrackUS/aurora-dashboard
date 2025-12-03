@@ -1152,31 +1152,31 @@
         </div>
     </nav>
 
+    <!-- System Alert Banner (for known issues - hidden by default) -->
+    <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span id="system-alert-icon" style="font-size: 1.5rem;">ℹ️</span>
+            <div style="flex: 1;">
+                <div id="system-alert-title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
+                <div id="system-alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+            </div>
+            <button id="system-alert-close" onclick="dismissSystemAlert()" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+        </div>
+    </div>
+
+    <!-- Geomagnetic Storm Alert Banner (hidden by default) -->
+    <div id="alert-banner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem 1rem; animation: pulse 2s ease-in-out infinite;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.5rem;">⚠️</span>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; color: #ef4444; margin-bottom: 0.25rem;">Geomagnetic Storm Alert</div>
+                <div id="alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+            </div>
+            <button onclick="document.getElementById('alert-banner').style.display='none'" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+        </div>
+    </div>
+
     <main class="main-container">
-        <!-- System Alert Banner (for known issues - hidden by default) -->
-        <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <span id="system-alert-icon" style="font-size: 1.5rem;">ℹ️</span>
-                <div style="flex: 1;">
-                    <div id="system-alert-title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
-                    <div id="system-alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
-                </div>
-                <button id="system-alert-close" onclick="dismissSystemAlert()" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
-            </div>
-        </div>
-
-        <!-- Alert Banner (hidden by default) -->
-        <div id="alert-banner" style="display: none; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15)); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem; animation: pulse 2s ease-in-out infinite;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <span style="font-size: 1.5rem;">⚠️</span>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600; color: #fca5a5; margin-bottom: 0.25rem;">Geomagnetic Storm Alert</div>
-                    <div id="alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
-                </div>
-                <button onclick="document.getElementById('alert-banner').style.display='none'" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
-            </div>
-        </div>
-
         <!-- Left Column: Main Visualization -->
         <div class="dashboard-grid">
             <!-- Map Panel -->
@@ -2776,37 +2776,37 @@
             // Set alert content
             message.textContent = config.message;
             
-            // Style based on type
-            let bgColor, borderColor, iconText, titleText;
+            // Flat design - solid colors instead of gradients
+            let bgColor, borderColor, iconText, titleText, titleColor;
             switch (config.type) {
                 case 'warning':
-                    bgColor = 'linear-gradient(135deg, rgba(251, 146, 60, 0.15), rgba(249, 115, 22, 0.15))';
-                    borderColor = 'rgba(251, 146, 60, 0.4)';
+                    bgColor = 'rgba(251, 146, 60, 0.12)';  // Flat orange/yellow
+                    borderColor = '#fb923c';
                     iconText = '⚠️';
                     titleText = 'Warning';
-                    title.style.color = '#fdba74';
+                    titleColor = '#fb923c';
                     break;
                 case 'error':
-                    bgColor = 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15))';
-                    borderColor = 'rgba(239, 68, 68, 0.4)';
+                    bgColor = 'rgba(239, 68, 68, 0.12)';  // Flat red
+                    borderColor = '#ef4444';
                     iconText = '❌';
                     titleText = 'Important Notice';
-                    title.style.color = '#fca5a5';
+                    titleColor = '#ef4444';
                     break;
                 case 'success':
-                    bgColor = 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.15))';
-                    borderColor = 'rgba(34, 197, 94, 0.4)';
+                    bgColor = 'rgba(34, 197, 94, 0.12)';  // Flat green
+                    borderColor = '#22c55e';
                     iconText = '✅';
                     titleText = 'System Update';
-                    title.style.color = '#86efac';
+                    titleColor = '#22c55e';
                     break;
                 case 'info':
                 default:
-                    bgColor = 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.15))';
-                    borderColor = 'rgba(59, 130, 246, 0.4)';
+                    bgColor = 'rgba(59, 130, 246, 0.12)';  // Flat blue
+                    borderColor = '#3b82f6';
                     iconText = 'ℹ️';
                     titleText = 'System Notice';
-                    title.style.color = '#93c5fd';
+                    titleColor = '#3b82f6';
                     break;
             }
             
@@ -2814,6 +2814,7 @@
             banner.style.border = `1px solid ${borderColor}`;
             icon.textContent = iconText;
             title.textContent = titleText;
+            title.style.color = titleColor;
             
             // Show/hide close button based on dismissible setting
             closeBtn.style.display = config.dismissible ? 'block' : 'none';
