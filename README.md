@@ -23,6 +23,12 @@ A real-time aurora monitoring dashboard that displays current space weather cond
   - Real-time calculation based on current conditions
   - Overall condition status (Poor/Fair/Good/Excellent)
 
+- **System Alert Banner**
+  - Display important notices about known issues or maintenance
+  - Easily configurable via `alert_config.json`
+  - Multiple alert types (info, warning, error, success)
+  - User-dismissible alerts with persistent state
+
 ## Installation
 
 1. Install required packages:
@@ -43,6 +49,37 @@ http://localhost:5000
 ```
 
 The dashboard will automatically refresh every 60 seconds with the latest data.
+
+## System Alerts Configuration
+
+The dashboard supports displaying system-wide alerts for communicating known issues or maintenance windows to users.
+
+### Enabling/Disabling Alerts
+
+Edit the `alert_config.json` file in the root directory:
+
+```json
+{
+  "enabled": true,
+  "message": "System maintenance scheduled for December 5th, 2025. Some features may be temporarily unavailable.",
+  "type": "info",
+  "dismissible": true
+}
+```
+
+**Configuration Options:**
+- `enabled` (boolean): Set to `true` to show the alert, `false` to hide it
+- `message` (string): The message to display to users
+- `type` (string): Alert style - `"info"`, `"warning"`, `"error"`, or `"success"`
+- `dismissible` (boolean): Allow users to dismiss the alert
+
+**Alert Types:**
+- `info` - Blue banner for general information
+- `warning` - Orange banner for warnings
+- `error` - Red banner for critical issues
+- `success` - Green banner for positive updates
+
+**Note:** The alert configuration is checked every 5 minutes. Changes to `alert_config.json` will be reflected automatically without restarting the server.
 
 ## Data Sources
 

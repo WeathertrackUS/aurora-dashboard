@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "message": "System maintenance scheduled for December 5th, 2025. Some features may be temporarily unavailable.",
+  "type": "info",
+  "dismissible": true
+}

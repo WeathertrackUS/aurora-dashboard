@@ -1153,6 +1153,18 @@
     </nav>
 
     <main class="main-container">
+        <!-- System Alert Banner (for known issues - hidden by default) -->
+        <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span id="system-alert-icon" style="font-size: 1.5rem;">ℹ️</span>
+                <div style="flex: 1;">
+                    <div id="system-alert-title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
+                    <div id="system-alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+                </div>
+                <button id="system-alert-close" onclick="dismissSystemAlert()" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+            </div>
+        </div>
+
         <!-- Alert Banner (hidden by default) -->
         <div id="alert-banner" style="display: none; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15)); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem; animation: pulse 2s ease-in-out infinite;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -1371,6 +1383,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             refreshDashboard();
             startTimers();
+            
+            // Check for system alerts
+            checkSystemAlert();
+            // Re-check system alerts every 5 minutes
+            setInterval(checkSystemAlert, 5 * 60 * 1000);
             
             // Load saved settings
             const savedLat = localStorage.getItem('userLatitude');
@@ -2721,6 +2738,112 @@
             } else {
                 alertBanner.style.display = 'none';
             }
+        }
+
+        // System Alert functions
+        async function checkSystemAlert() {
+            try {
+                const response = await fetch('/api/system-alert');
+                const config = await response.json();
+                
+                if (config.enabled) {
+                    showSystemAlert(config);
+                } else {
+                    hideSystemAlert();
+                }
+            } catch (error) {
+                console.error('Error fetching system alert:', error);
+                // Hide alert on error
+                hideSystemAlert();
+            }
+        }
+
+        function showSystemAlert(config) {
+            const banner = document.getElementById('system-alert-banner');
+            const icon = document.getElementById('system-alert-icon');
+            const title = document.getElementById('system-alert-title');
+            const message = document.getElementById('system-alert-message');
+            const closeBtn = document.getElementById('system-alert-close');
+            
+            // Check if user has dismissed this specific alert message
+            const dismissedKey = `dismissed_alert_${hashString(config.message)}`;
+            if (config.dismissible && localStorage.getItem(dismissedKey) === 'true') {
+                hideSystemAlert();
+                return;
+            }
+            
+            // Set alert content
+            message.textContent = config.message;
+            
+            // Style based on type
+            let bgColor, borderColor, iconText, titleText;
+            switch (config.type) {
+                case 'warning':
+                    bgColor = 'linear-gradient(135deg, rgba(251, 146, 60, 0.15), rgba(249, 115, 22, 0.15))';
+                    borderColor = 'rgba(251, 146, 60, 0.4)';
+                    iconText = '⚠️';
+                    titleText = 'Warning';
+                    title.style.color = '#fdba74';
+                    break;
+                case 'error':
+                    bgColor = 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15))';
+                    borderColor = 'rgba(239, 68, 68, 0.4)';
+                    iconText = '❌';
+                    titleText = 'Important Notice';
+                    title.style.color = '#fca5a5';
+                    break;
+                case 'success':
+                    bgColor = 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.15))';
+                    borderColor = 'rgba(34, 197, 94, 0.4)';
+                    iconText = '✅';
+                    titleText = 'System Update';
+                    title.style.color = '#86efac';
+                    break;
+                case 'info':
+                default:
+                    bgColor = 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.15))';
+                    borderColor = 'rgba(59, 130, 246, 0.4)';
+                    iconText = 'ℹ️';
+                    titleText = 'System Notice';
+                    title.style.color = '#93c5fd';
+                    break;
+            }
+            
+            banner.style.background = bgColor;
+            banner.style.border = `1px solid ${borderColor}`;
+            icon.textContent = iconText;
+            title.textContent = titleText;
+            
+            // Show/hide close button based on dismissible setting
+            closeBtn.style.display = config.dismissible ? 'block' : 'none';
+            
+            banner.style.display = 'block';
+        }
+
+        function hideSystemAlert() {
+            const banner = document.getElementById('system-alert-banner');
+            banner.style.display = 'none';
+        }
+
+        function dismissSystemAlert() {
+            const message = document.getElementById('system-alert-message').textContent;
+            const dismissedKey = `dismissed_alert_${hashString(message)}`;
+            
+            // Store dismissed state in localStorage
+            localStorage.setItem(dismissedKey, 'true');
+            
+            hideSystemAlert();
+        }
+
+        // Simple string hash function for generating consistent keys
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash).toString(36);
         }
 
         function showToast(message, type = 'success') {

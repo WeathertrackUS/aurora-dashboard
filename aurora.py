@@ -2989,6 +2989,47 @@ def get_dst_index():
         traceback.print_exc()
         return jsonify({'error': str(e), 'dst_values': []}), 500
 
+@app.route('/api/system-alert')
+def get_system_alert():
+    """Get system-wide alert configuration for displaying known issues"""
+    try:
+        import os
+        config_path = os.path.join(os.path.dirname(__file__), 'alert_config.json')
+        
+        # Check if config file exists
+        if not os.path.exists(config_path):
+            # Return default disabled state if config doesn't exist
+            return jsonify({
+                'enabled': False,
+                'message': '',
+                'type': 'info',
+                'dismissible': True
+            })
+        
+        # Read and return the config
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            
+        # Validate config structure
+        required_keys = ['enabled', 'message', 'type', 'dismissible']
+        for key in required_keys:
+            if key not in config:
+                config[key] = False if key == 'enabled' else ('' if key == 'message' else ('info' if key == 'type' else True))
+        
+        return jsonify(config)
+        
+    except Exception as e:
+        print(f"Error reading system alert config: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return disabled state on error
+        return jsonify({
+            'enabled': False,
+            'message': '',
+            'type': 'info',
+            'dismissible': True
+        })
+
 if __name__ == '__main__':
     import sys
     
