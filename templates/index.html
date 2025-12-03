@@ -1599,6 +1599,11 @@
                     return;
                 }
                 
+                // Find the maximum Kp and G-scale values across all forecast periods
+                // Store the max forecast Kp globally so updateDataCard can use it
+                window.forecastMaxKp = Math.max(...data.forecast.map(f => f.max_kp));
+                window.forecastMaxGScale = Math.max(...data.forecast.map(f => f.g_scale));
+                
                 // Build the forecast chart
                 let html = '<div class="forecast-grid">';
                 
@@ -2163,7 +2168,15 @@
         function updateDataCard(data) {
             const safeVal = (val, decimals = 1) => val !== null && val !== undefined ? Number(val).toFixed(decimals) : '--';
             
-            const kp = data.kp_index?.kp || 0;
+            // Get observed Kp (current/historical)
+            let kp = data.kp_index?.kp || 0;
+            
+            // Check if we have forecast data with higher Kp values
+            // This will be set by fetchGeomagneticAlerts()
+            if (window.forecastMaxKp && window.forecastMaxKp > kp) {
+                kp = window.forecastMaxKp;
+            }
+            
             document.getElementById('kp-value-text').textContent = formatKp(kp);
             const kpFill = document.getElementById('kp-fill');
             const kpPercent = Math.min((kp / 9) * 100, 100);
