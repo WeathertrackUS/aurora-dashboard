@@ -2182,6 +2182,16 @@
             const kpPercent = Math.min((kp / 9) * 100, 100);
             kpFill.style.width = `${kpPercent}%`;
             
+            // Apply Kp color scale
+            if (kp >= 9) kpFill.style.background = '#ec4899';      // Kp9 (G5): Pink
+            else if (kp >= 8) kpFill.style.background = '#a855f7'; // Kp8 (G4): Purple
+            else if (kp >= 7) kpFill.style.background = '#ef4444'; // Kp7 (G3): Red
+            else if (kp >= 6) kpFill.style.background = '#fb923c'; // Kp6 (G2): Orange
+            else if (kp >= 5) kpFill.style.background = '#fbbf24'; // Kp5 (G1): Yellow
+            else if (kp >= 4) kpFill.style.background = '#84cc16'; // Kp4: Light Green
+            else if (kp >= 3) kpFill.style.background = '#166534'; // Kp3: Dark Green
+            else kpFill.style.background = '#6b7280';              // Kp0-2: Gray
+            
             // G-Scale Calculation
             let gScale = 0;
             if (kp >= 9) gScale = 5;
@@ -2206,10 +2216,6 @@
                 gElem.style.opacity = '0.5';
                 gElem.style.textShadow = 'none';
             }
-            
-            if (kp >= 5) kpFill.style.background = 'var(--danger)';
-            else if (kp >= 4) kpFill.style.background = 'var(--warning)';
-            else kpFill.style.background = 'var(--success)';
 
 
 
