@@ -1211,6 +1211,30 @@
         </div>
     </nav>
 
+    <!-- System Alert Banner (for known issues - hidden by default) -->
+    <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span id="system-alert-icon" style="font-size: 1.5rem;">ℹ️</span>
+            <div style="flex: 1;">
+                <div id="system-alert-title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
+                <div id="system-alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+            </div>
+            <button id="system-alert-close" onclick="dismissSystemAlert()" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+        </div>
+    </div>
+
+    <!-- Geomagnetic Storm Alert Banner (hidden by default) -->
+    <div id="alert-banner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem 1rem; animation: pulse 2s ease-in-out infinite;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.5rem;">⚠️</span>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; color: #ef4444; margin-bottom: 0.25rem;">Geomagnetic Storm Alert</div>
+                <div id="alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+            </div>
+            <button onclick="document.getElementById('alert-banner').style.display='none'" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+        </div>
+    </div>
+
     <main class="dashboard-container">
         
         <!-- Page Header -->
@@ -4128,6 +4152,9 @@
             loadSolarFlares();
             initializeImageryTimeline();
             loadCoronalHoles();
+            checkSystemAlert();
+            // Re-check system alerts every 5 minutes
+            setInterval(checkSystemAlert, 5 * 60 * 1000);
         });
 
         // Coronal Holes Display
@@ -4431,6 +4458,114 @@
         function toggleMobileMenu() {
             const navLinks = document.getElementById('nav-links');
             navLinks.classList.toggle('active');
+        }
+
+        // System Alert Functions
+        async function checkSystemAlert() {
+            try {
+                const response = await fetch('/api/system-alert');
+                const config = await response.json();
+                
+                if (config.enabled) {
+                    showSystemAlert(config);
+                } else {
+                    hideSystemAlert();
+                }
+            } catch (error) {
+                console.warn('Unable to fetch system alert configuration. Alerts will not be displayed.', error);
+                // Hide alert on error - this prevents showing stale/incorrect alerts
+                // The error is logged for debugging but doesn't interrupt the user experience
+                hideSystemAlert();
+            }
+        }
+
+        function showSystemAlert(config) {
+            const banner = document.getElementById('system-alert-banner');
+            const icon = document.getElementById('system-alert-icon');
+            const title = document.getElementById('system-alert-title');
+            const message = document.getElementById('system-alert-message');
+            const closeBtn = document.getElementById('system-alert-close');
+            
+            // Check if user has dismissed this specific alert message
+            const dismissedKey = `dismissed_alert_${hashString(config.message)}`;
+            if (config.dismissible && localStorage.getItem(dismissedKey) === 'true') {
+                hideSystemAlert();
+                return;
+            }
+            
+            // Set alert content
+            message.textContent = config.message;
+            
+            // Flat design - solid colors instead of gradients
+            let bgColor, borderColor, iconText, titleText, titleColor;
+            switch (config.type) {
+                case 'warning':
+                    bgColor = 'rgba(251, 146, 60, 0.12)';  // Flat orange/yellow
+                    borderColor = '#fb923c';
+                    iconText = '⚠️';
+                    titleText = 'Warning';
+                    titleColor = '#fb923c';
+                    break;
+                case 'error':
+                    bgColor = 'rgba(239, 68, 68, 0.12)';  // Flat red
+                    borderColor = '#ef4444';
+                    iconText = '❌';
+                    titleText = 'Important Notice';
+                    titleColor = '#ef4444';
+                    break;
+                case 'success':
+                    bgColor = 'rgba(34, 197, 94, 0.12)';  // Flat green
+                    borderColor = '#22c55e';
+                    iconText = '✅';
+                    titleText = 'System Update';
+                    titleColor = '#22c55e';
+                    break;
+                case 'info':
+                default:
+                    bgColor = 'rgba(59, 130, 246, 0.12)';  // Flat blue
+                    borderColor = '#3b82f6';
+                    iconText = 'ℹ️';
+                    titleText = 'System Notice';
+                    titleColor = '#3b82f6';
+                    break;
+            }
+            
+            banner.style.background = bgColor;
+            banner.style.border = `1px solid ${borderColor}`;
+            icon.textContent = iconText;
+            title.textContent = titleText;
+            title.style.color = titleColor;
+            
+            // Show/hide close button based on dismissible setting
+            closeBtn.style.display = config.dismissible ? 'block' : 'none';
+            
+            banner.style.display = 'block';
+        }
+
+        function hideSystemAlert() {
+            const banner = document.getElementById('system-alert-banner');
+            banner.style.display = 'none';
+        }
+
+        function dismissSystemAlert() {
+            const message = document.getElementById('system-alert-message').textContent;
+            const dismissedKey = `dismissed_alert_${hashString(message)}`;
+            
+            // Store dismissed state in localStorage
+            localStorage.setItem(dismissedKey, 'true');
+            
+            hideSystemAlert();
+        }
+
+        // Simple string hash function for generating consistent keys
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash | 0; // Convert to 32bit integer
+            }
+            return Math.abs(hash).toString(36);
         }
     </script>
 </body>
