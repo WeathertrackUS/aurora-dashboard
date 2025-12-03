@@ -2306,30 +2306,41 @@ def get_region_flares(region_number):
 
 @app.route('/api/kp-history')
 def get_kp_history():
-    """Get 3-day Kp index history"""
+    """Get 3-day Kp index history with observed and forecast data"""
     try:
         KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
         response = requests.get(KP_FORECAST_URL, timeout=10)
         data = response.json()
         
-        times = []
         kp_values = []
+        current_time = datetime.now(timezone.utc)
         
         for row in data[1:]:  # Skip header
             try:
                 time_str = row[0]
-                kp = float(row[1]) if row[1] else None
-                if kp is not None:
-                    dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                    times.append(dt.isoformat())
-                    kp_values.append(kp)
-            except:
+                kp_str = row[1]
+                obs_pred = row[2] if len(row) > 2 else 'predicted'  # 'observed' or 'predicted'
+                
+                if not kp_str:
+                    continue
+                    
+                kp = float(kp_str)
+                dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                
+                # Include last 48 hours of observed + 72 hours forecast
+                if dt >= current_time - timedelta(hours=48):
+                    kp_values.append({
+                        'time': dt.isoformat(),
+                        'kp': kp,
+                        'observed': obs_pred == 'observed'
+                    })
+            except Exception as e:
                 continue
         
-        return jsonify({'times': times, 'kp_values': kp_values})
+        return jsonify({'kp_values': kp_values})
     except Exception as e:
         print(f"Error fetching Kp history: {e}")
-        return jsonify({'times': [], 'kp_values': []}), 500
+        return jsonify({'kp_values': []}), 500
 
 @app.route('/api/f107')
 def get_f107():
@@ -2847,6 +2858,136 @@ def get_coronal_holes():
     except Exception as e:
         print(f"Error fetching coronal holes: {e}")
         return jsonify({'coronal_holes': [], 'error': str(e)})
+
+@app.route('/api/historical-data')
+def get_historical_data():
+    """Get historical solar data for a specific date"""
+    try:
+        date_str = request.args.get('date')
+        if not date_str:
+            return jsonify({'error': 'Date parameter required'}), 400
+        
+        # Parse the date
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        
+        # NOAA archives X-ray and proton data for past dates
+        # Format: https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json returns last 24h
+        # For historical data, we need to construct URLs for that specific date
+        
+        # For simplicity, we'll fetch the most recent archived data
+        # Note: NOAA's JSON endpoints typically only have recent data (last few days)
+        # For true historical data, you'd need to access their archive FTP servers
+        
+        xray_data = []
+        proton_data = []
+        kp_data = []
+        
+        # Try to fetch X-ray data (NOAA keeps ~7 days of JSON data)
+        try:
+            xray_url = "https://services.swpc.noaa.gov/json/goes/primary/xrays-7-day.json"
+            response = requests.get(xray_url, timeout=10)
+            if response.status_code == 200:
+                all_xray = response.json()
+                # Filter for the target date
+                for entry in all_xray:
+                    entry_time = datetime.strptime(entry['time_tag'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                    if entry_time.date() == target_date.date():
+                        xray_data.append(entry)
+        except Exception as e:
+            print(f"Error fetching historical X-ray data: {e}")
+        
+        # Try to fetch proton data
+        try:
+            proton_url = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-7-day.json"
+            response = requests.get(proton_url, timeout=10)
+            if response.status_code == 200:
+                all_proton = response.json()
+                # Filter for the target date
+                for entry in all_proton:
+                    entry_time = datetime.strptime(entry['time_tag'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                    if entry_time.date() == target_date.date():
+                        proton_data.append(entry)
+        except Exception as e:
+            print(f"Error fetching historical proton data: {e}")
+        
+        # For Kp data, construct historical values from forecast endpoint
+        try:
+            kp_url = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
+            response = requests.get(kp_url, timeout=10)
+            if response.status_code == 200:
+                all_kp = response.json()[1:]  # Skip header
+                for row in all_kp:
+                    try:
+                        kp_time = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        if kp_time.date() == target_date.date() and row[2] == 'observed':
+                            kp_data.append({
+                                'time': kp_time.isoformat(),
+                                'kp': float(row[1]),
+                                'observed': True
+                            })
+                    except:
+                        continue
+        except Exception as e:
+            print(f"Error fetching historical Kp data: {e}")
+        
+        # Check if we have any data
+        if not xray_data and not proton_data and not kp_data:
+            return jsonify({
+                'error': f'No archived data available for {date_str}. NOAA JSON archives typically contain only the last 7 days.'
+            }), 404
+        
+        return jsonify({
+            'date': date_str,
+            'xray': xray_data,
+            'proton': proton_data,
+            'kp': kp_data,
+            'note': 'Data retrieved from NOAA archives (last 7 days available)'
+        })
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+    except Exception as e:
+        print(f"Error fetching historical data: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dst-index')
+def get_dst_index():
+    """Get Dst (Disturbance Storm Time) index from Kyoto WDC"""
+    try:
+        # NOAA provides estimated Dst values
+        DST_URL = "https://services.swpc.noaa.gov/products/kyoto-dst.json"
+        response = requests.get(DST_URL, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Skip header row and convert to structured format
+            dst_values = []
+            for row in data[1:]:  # Skip header
+                if len(row) >= 2:
+                    try:
+                        dst_values.append({
+                            'time': row[0],  # ISO timestamp
+                            'dst': float(row[1])  # Dst value in nT
+                        })
+                    except (ValueError, IndexError):
+                        continue
+            
+            return jsonify({
+                'dst_values': dst_values,
+                'count': len(dst_values),
+                'source': 'NOAA SWPC / Kyoto WDC',
+                'unit': 'nT'
+            })
+        else:
+            return jsonify({'error': 'Failed to fetch Dst data', 'dst_values': []}), 500
+            
+    except Exception as e:
+        print(f"Error fetching Dst index: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'dst_values': []}), 500
 
 if __name__ == '__main__':
     import sys

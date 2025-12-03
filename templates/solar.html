@@ -856,6 +856,92 @@
             opacity: 1;
         }
         
+        /* Live Activity Indicator */
+        .activity-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.75rem;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .activity-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        
+        .activity-indicator.quiet {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        
+        .activity-indicator.quiet .activity-dot {
+            background: #22c55e;
+            animation: none;
+        }
+        
+        /* Compare Dates Controls */
+        .compare-controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+        
+        .compare-controls input[type="date"],
+        .compare-controls input[type="time"] {
+            padding: 0.5rem;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+        
+        .compare-controls button {
+            padding: 0.5rem 1rem;
+            background: var(--accent-blue);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            color: var(--text-primary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .compare-controls button:hover {
+            background: var(--accent-primary);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .compare-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: rgba(251, 146, 60, 0.2);
+            border: 1px solid rgba(251, 146, 60, 0.4);
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #fb923c;
+        }
+        
         /* Mobile Menu Toggle */
         .mobile-menu-toggle {
             display: none;
@@ -979,6 +1065,31 @@
             }
             .dashboard-container {
                 padding: 0.5rem;
+            }
+            
+            /* Enhanced modal mobile styles */
+            .modal-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+            
+            .modal-body {
+                padding: 0.75rem;
+            }
+            
+            .region-detail-grid {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+            
+            #flare-list-items > div {
+                grid-template-columns: 70px 1fr 80px 50px !important;
+                font-size: 0.75rem !important;
+                padding: 0.5rem !important;
+            }
+            
+            #flare-list-container {
+                max-height: 250px;
             }
         }
         
@@ -1325,6 +1436,23 @@
                 </div>
             </div>
 
+            <!-- K-index Charts - Combined -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        Planetary K-index History & Forecast
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Shows past 48 hours of observed K-index values plus 72-hour forecast. Green bars = historical data, colored bars with patterns = predictions.</span>
+                        </span>
+                    </div>
+                    <div id="xray-activity-status" class="activity-indicator quiet">
+                        <span class="activity-dot"></span>
+                        <span id="activity-text">QUIET</span>
+                    </div>
+                </div>
+                <div id="kp-history-chart" style="width: 100%; height: 400px; padding: 1rem;"></div>
+            </div>
+
             <!-- CME Tracker -->
             <div class="card">
                 <div class="card-header">
@@ -1338,19 +1466,6 @@
                 <div id="cme-timeline" class="cme-timeline">
                     <p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">Loading CME data...</p>
                 </div>
-            </div>
-
-            <!-- Planetary Kp Index History -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        Planetary K-index (48 Hours)
-                        <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">The K-index measures disturbances in Earth's magnetic field. Values 5+ indicate geomagnetic storms and increased aurora activity.</span>
-                        </span>
-                    </div>
-                </div>
-                <div id="kp-chart" style="width: 100%; height: 300px;"></div>
             </div>
 
             <!-- LASCO Coronagraphs -->
@@ -1437,6 +1552,37 @@
                          style="width: 100%; height: auto; cursor: pointer;"
                          onclick="openImageModal(this.src, 'D-Region Absorption Predictions (D-RAP)')"
                          loading="lazy">
+                </div>
+            </div>
+
+            <!-- Time Machine - Compare Historical Data -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        🕐 Time Machine - Compare Historical Conditions
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Load and compare solar activity from any past date. Useful for studying previous storms and events.</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="compare-controls">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label style="color: var(--text-secondary); font-size: 0.9rem;">Select Date:</label>
+                        <input type="date" id="compare-date" max="" />
+                    </div>
+                    <button onclick="loadHistoricalData()" style="background: #3b82f6; border-color: #60a5fa;">
+                        📅 Load Historical Data
+                    </button>
+                    <button onclick="resetToLive()" style="background: #22c55e; border-color: #4ade80;">
+                        🔄 Back to Live Data
+                    </button>
+                    <div id="compare-mode-indicator" style="display: none;">
+                        <span class="compare-badge">VIEWING HISTORICAL DATA</span>
+                    </div>
+                </div>
+                <div id="compare-info" style="padding: 1rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
+                    <p style="margin: 0;">💡 <strong>Tip:</strong> Select a date to view historical solar activity, X-ray flux, and geomagnetic conditions. Great for comparing current activity to past storms.</p>
+                    <p style="margin: 0.5rem 0 0 0;"><strong>Notable Events:</strong> May 10-11, 2024 (Extreme G5 storm) • Oct 10-11, 2024 (G4 storm) • Mar 24-25, 2024 (G4 storm)</p>
                 </div>
             </div>
 
@@ -1860,6 +2006,21 @@
                     <div id="region-flare-chart" style="width: 100%; height: 200px; background: var(--bg-dark); border-radius: 4px; border: 1px solid var(--border);">
                         <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">
                             Loading flare data...
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Flare List -->
+                    <div id="flare-list-container" style="margin-top: 1rem; max-height: 300px; overflow-y: auto; display: none;">
+                        <div style="background: var(--bg-dark); border-radius: 4px; border: 1px solid var(--border);">
+                            <div style="padding: 0.75rem; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 80px 1fr 100px 60px; gap: 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">
+                                <div>Class</div>
+                                <div>Time (UTC)</div>
+                                <div>Duration</div>
+                                <div>CME</div>
+                            </div>
+                            <div id="flare-list-items" style="max-height: 240px; overflow-y: auto;">
+                                <!-- Flare items will be inserted here -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2649,7 +2810,12 @@
 
         async function loadRegionFlares(regionNumber) {
             const chartDiv = document.getElementById('region-flare-chart');
+            const flareListContainer = document.getElementById('flare-list-container');
+            const flareListItems = document.getElementById('flare-list-items');
+            
             chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">Loading flare data...</div>';
+            flareListContainer.style.display = 'none';
+            flareListItems.innerHTML = '';
             
             try {
                 const response = await fetch(`/api/region-flares/${regionNumber}`);
@@ -2657,6 +2823,8 @@
                 
                 if (data.flares && data.flares.length > 0) {
                     plotFlareActivity(data.flares);
+                    populateFlareList(data.flares);
+                    flareListContainer.style.display = 'block';
                 } else {
                     chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">No flares detected in past 7 days</div>';
                 }
@@ -2664,6 +2832,72 @@
                 console.error('Error loading flare data:', error);
                 chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">Error loading flare data</div>';
             }
+        }
+        
+        function populateFlareList(flares) {
+            const listContainer = document.getElementById('flare-list-items');
+            listContainer.innerHTML = '';
+            
+            // Sort flares by time (most recent first)
+            const sortedFlares = [...flares].sort((a, b) => {
+                const timeA = new Date(a.max_time || a.begin_time);
+                const timeB = new Date(b.max_time || b.begin_time);
+                return timeB - timeA;
+            });
+            
+            sortedFlares.forEach(flare => {
+                const flareClass = flare.max_class || flare.class || 'Unknown';
+                const beginTime = new Date(flare.begin_time);
+                const maxTime = new Date(flare.max_time || flare.begin_time);
+                const endTime = flare.end_time ? new Date(flare.end_time) : null;
+                
+                // Calculate duration
+                let duration = 'N/A';
+                if (endTime && flare.begin_time) {
+                    const durationMinutes = Math.round((endTime - beginTime) / 60000);
+                    if (durationMinutes < 60) {
+                        duration = `${durationMinutes}m`;
+                    } else {
+                        const hours = Math.floor(durationMinutes / 60);
+                        const mins = durationMinutes % 60;
+                        duration = `${hours}h ${mins}m`;
+                    }
+                }
+                
+                // Determine flare color
+                let flareColor = '#94a3b8';
+                if (flareClass.startsWith('X')) flareColor = '#dc2626';
+                else if (flareClass.startsWith('M')) flareColor = '#f97316';
+                else if (flareClass.startsWith('C')) flareColor = '#fbbf24';
+                
+                // CME indicator (if available in future data)
+                const hasCME = flare.linked_cme || flare.has_cme || false;
+                const cmeIndicator = hasCME 
+                    ? '<span style="color: #22c55e; font-weight: 600;">✓</span>' 
+                    : '<span style="color: var(--text-secondary);">—</span>';
+                
+                // Format time
+                const timeStr = maxTime.toISOString().slice(0, 16).replace('T', ' ');
+                
+                const flareRow = document.createElement('div');
+                flareRow.style.cssText = 'padding: 0.75rem; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 80px 1fr 100px 60px; gap: 0.5rem; font-size: 0.8rem; transition: background 0.2s;';
+                flareRow.innerHTML = `
+                    <div style="font-weight: 600; color: ${flareColor};">${flareClass}</div>
+                    <div style="color: var(--text-primary);">${timeStr}</div>
+                    <div style="color: var(--text-secondary);">${duration}</div>
+                    <div style="text-align: center;">${cmeIndicator}</div>
+                `;
+                
+                // Add hover effect
+                flareRow.addEventListener('mouseenter', () => {
+                    flareRow.style.background = 'rgba(255, 255, 255, 0.03)';
+                });
+                flareRow.addEventListener('mouseleave', () => {
+                    flareRow.style.background = 'transparent';
+                });
+                
+                listContainer.appendChild(flareRow);
+            });
         }
 
         function plotFlareActivity(flares) {
@@ -2679,11 +2913,13 @@
             flares.forEach(flare => {
                 const time = new Date(flare.max_time || flare.begin_time);
                 const flareClass = flare.max_class || flare.class || '';
+                const hasCME = flare.linked_cme || flare.has_cme || false;
                 
                 const dataPoint = {
                     x: time,
                     y: parseFlareIntensity(flareClass),
-                    text: flareClass
+                    text: flareClass,
+                    customdata: hasCME ? 'CME Linked' : 'No CME Data'
                 };
                 
                 if (flareClass.startsWith('X')) {
@@ -2702,11 +2938,16 @@
                     x: cFlares.map(f => f.x),
                     y: cFlares.map(f => f.y),
                     text: cFlares.map(f => f.text),
+                    customdata: cFlares.map(f => f.customdata),
                     mode: 'markers',
                     type: 'scatter',
                     name: 'C-Class',
-                    marker: { color: '#fbbf24', size: 8 },
-                    hovertemplate: '%{text}<br>%{x|%b %d, %H:%M UTC}<extra></extra>'
+                    marker: { 
+                        color: '#fbbf24', 
+                        size: 10,
+                        line: { width: 1, color: 'rgba(251, 191, 36, 0.5)' }
+                    },
+                    hovertemplate: '<b>%{text}</b><br>%{x|%b %d, %H:%M UTC}<br>%{customdata}<extra></extra>'
                 });
             }
             
@@ -2715,11 +2956,16 @@
                     x: mFlares.map(f => f.x),
                     y: mFlares.map(f => f.y),
                     text: mFlares.map(f => f.text),
+                    customdata: mFlares.map(f => f.customdata),
                     mode: 'markers',
                     type: 'scatter',
                     name: 'M-Class',
-                    marker: { color: '#f97316', size: 10 },
-                    hovertemplate: '%{text}<br>%{x|%b %d, %H:%M UTC}<extra></extra>'
+                    marker: { 
+                        color: '#f97316', 
+                        size: 12,
+                        line: { width: 1, color: 'rgba(249, 115, 22, 0.5)' }
+                    },
+                    hovertemplate: '<b>%{text}</b><br>%{x|%b %d, %H:%M UTC}<br>%{customdata}<extra></extra>'
                 });
             }
             
@@ -2728,46 +2974,61 @@
                     x: xFlares.map(f => f.x),
                     y: xFlares.map(f => f.y),
                     text: xFlares.map(f => f.text),
+                    customdata: xFlares.map(f => f.customdata),
                     mode: 'markers',
                     type: 'scatter',
                     name: 'X-Class',
-                    marker: { color: '#dc2626', size: 12 },
-                    hovertemplate: '%{text}<br>%{x|%b %d, %H:%M UTC}<extra></extra>'
+                    marker: { 
+                        color: '#dc2626', 
+                        size: 14,
+                        symbol: 'star',
+                        line: { width: 1, color: 'rgba(220, 38, 38, 0.5)' }
+                    },
+                    hovertemplate: '<b>%{text}</b><br>%{x|%b %d, %H:%M UTC}<br>%{customdata}<extra></extra>'
                 });
             }
             
             const layout = {
-                margin: { t: 10, r: 10, b: 40, l: 50 },
+                margin: { t: 20, r: 10, b: 50, l: 50 },
                 paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#94a3b8' },
+                plot_bgcolor: 'rgba(0,0,0,0.2)',
+                font: { color: '#94a3b8', size: 11 },
                 xaxis: {
                     gridcolor: 'rgba(255, 255, 255, 0.05)',
                     color: '#94a3b8',
                     showgrid: true,
-                    zeroline: false
+                    zeroline: false,
+                    title: { text: 'Date & Time (UTC)', font: { size: 10 } }
                 },
                 yaxis: {
                     type: 'log',
                     gridcolor: 'rgba(255, 255, 255, 0.05)',
                     color: '#94a3b8',
-                    title: 'Watts/m²',
+                    title: { text: 'X-ray Flux (Watts/m²)', font: { size: 10 } },
                     showgrid: true,
                     range: [-7, -3],
                     tickvals: [1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
-                    ticktext: ['B', 'C', 'M', 'X', 'X10']
+                    ticktext: ['B1.0', 'C1.0', 'M1.0', 'X1.0', 'X10']
                 },
                 showlegend: true,
                 legend: {
-                    x: 1,
-                    xanchor: 'right',
-                    y: 1,
-                    font: { color: '#94a3b8', size: 11 }
+                    x: 0,
+                    xanchor: 'left',
+                    y: 1.1,
+                    yanchor: 'top',
+                    orientation: 'h',
+                    font: { color: '#94a3b8', size: 10 },
+                    bgcolor: 'rgba(0,0,0,0.3)',
+                    bordercolor: 'rgba(255,255,255,0.1)',
+                    borderwidth: 1
                 },
                 hovermode: 'closest'
             };
             
-            const config = { responsive: true, displayModeBar: false };
+            const config = { 
+                responsive: true, 
+                displayModeBar: false 
+            };
             
             Plotly.newPlot('region-flare-chart', traces, layout, config);
         }
@@ -2865,8 +3126,12 @@
 
         // Initial fetch
         fetchSolarData();
+        fetchKpHistoryExtended();
+        initializeCompareDates();
+        
         // Refresh every 5 minutes
         setInterval(fetchSolarData, 300000);
+        setInterval(fetchKpHistoryExtended, 300000);
 
         // Handle window resize for charts
         window.addEventListener('resize', function() {
@@ -3142,6 +3407,11 @@
 
         // Refresh all data
         async function refreshAllData() {
+            if (historicalMode) {
+                alert('Currently viewing historical data. Click "Back to Live Data" to return to real-time monitoring.');
+                return;
+            }
+            
             countdown = refreshInterval;
             lastUpdateTime = new Date();
             updateLastUpdateTime();
@@ -3152,6 +3422,7 @@
             // Fetch new data
             await Promise.all([
                 fetchKpHistory(),
+                fetchKpHistoryExtended(),
                 fetchF107Data(),
                 fetchCMEData(),
                 fetchNOAAScales(),
@@ -3160,14 +3431,206 @@
             ]);
         }
 
-        // Fetch Kp History
+        // K-index Historical Chart with 3-day forecast
+        async function fetchKpHistoryExtended() {
+            try {
+                const response = await fetch('/api/kp-history');
+                const data = await response.json();
+                
+                if (data.kp_values && data.kp_values.length > 0) {
+                    plotKpHistoryChart(data.kp_values);
+                    updateActivityIndicator(data.kp_values);
+                }
+            } catch (error) {
+                console.error('Error fetching K-index history:', error);
+            }
+        }
+        
+        function formatKp(kp) {
+            // Convert decimal Kp to proper format with thirds (-, o, +)
+            // e.g., 4.7 -> "5-" (Kp5-), 4.3 -> "4o", 4.9 -> "5-"
+            if (kp === null || kp === undefined) return 'N/A';
+            
+            const whole = Math.floor(kp);
+            const fraction = kp - whole;
+            
+            // Determine third modifier
+            // 0.0-0.33: minus (-) -> rounds up to next whole, shows as that number minus
+            // 0.33-0.67: naught (o) -> shows as current whole number naught
+            // 0.67-1.0: plus (+) -> shows as current whole number plus
+            
+            if (fraction < 0.33) {
+                // Lower third - show as current number with 'o' or next number with '-'
+                if (fraction === 0) {
+                    return whole + 'o';
+                } else {
+                    // Anything above .0 in lower third rounds to next with minus
+                    return (whole + 1) + '-';
+                }
+            } else if (fraction < 0.67) {
+                // Middle third
+                return whole + 'o';
+            } else {
+                // Upper third
+                return whole + '+';
+            }
+        }
+        
+        function plotKpHistoryChart(kpData, isHistorical = false) {
+            const times = kpData.map(d => d.time);
+            const values = kpData.map(d => d.kp);
+            const observed = kpData.map(d => d.observed);
+            
+            // Split into observed and forecast
+            const observedTimes = [];
+            const observedValues = [];
+            const forecastTimes = [];
+            const forecastValues = [];
+            
+            kpData.forEach(d => {
+                if (d.observed) {
+                    observedTimes.push(d.time);
+                    observedValues.push(d.kp);
+                } else {
+                    forecastTimes.push(d.time);
+                    forecastValues.push(d.kp);
+                }
+            });
+            
+            const trace1 = {
+                x: observedTimes,
+                y: observedValues,
+                type: 'bar',
+                name: 'Observed',
+                text: observedValues.map(v => formatKp(v)),
+                hovertemplate: 'Kp %{text}<br>%{x}<extra></extra>',
+                marker: {
+                    color: observedValues.map(v => {
+                        if (v >= 5) return '#ef4444';
+                        if (v >= 4) return '#f97316';
+                        if (v >= 3) return '#fbbf24';
+                        return '#22c55e';
+                    })
+                }
+            };
+            
+            const trace2 = {
+                x: forecastTimes,
+                y: forecastValues,
+                type: 'bar',
+                name: 'Forecast',
+                text: forecastValues.map(v => formatKp(v)),
+                hovertemplate: 'Kp %{text}<br>%{x}<extra></extra>',
+                marker: {
+                    color: forecastValues.map(v => {
+                        if (v >= 5) return 'rgba(239, 68, 68, 0.6)';
+                        if (v >= 4) return 'rgba(249, 115, 22, 0.6)';
+                        if (v >= 3) return 'rgba(251, 191, 36, 0.6)';
+                        return 'rgba(34, 197, 94, 0.6)';
+                    })
+                }
+            };
+            
+            const layout = {
+                margin: { l: 50, r: 30, t: 20, b: 80 },
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                showlegend: true,
+                legend: {
+                    x: 0.02,
+                    y: 0.98,
+                    font: { color: '#e5e5e5', size: 11 }
+                },
+                xaxis: {
+                    color: '#8b8b8b',
+                    gridcolor: 'rgba(255,255,255,0.05)',
+                    tickangle: -45,
+                    tickfont: { size: 10 }
+                },
+                yaxis: {
+                    title: 'Kp Index',
+                    color: '#8b8b8b',
+                    gridcolor: 'rgba(255,255,255,0.1)',
+                    range: [0, 9]
+                },
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: times[0],
+                        x1: times[times.length - 1],
+                        y0: 5,
+                        y1: 5,
+                        line: {
+                            color: '#ef4444',
+                            width: 1,
+                            dash: 'dot'
+                        }
+                    }
+                ],
+                annotations: [
+                    {
+                        x: times[Math.floor(times.length / 2)],
+                        y: 5.2,
+                        text: 'G1 Storm Threshold',
+                        showarrow: false,
+                        font: { color: '#ef4444', size: 10 }
+                    },
+                    isHistorical ? {
+                        x: times[Math.floor(times.length / 4)],
+                        y: 8.5,
+                        text: '📅 HISTORICAL DATA',
+                        showarrow: false,
+                        font: { color: '#fb923c', size: 14, weight: 'bold' },
+                        opacity: 0.7
+                    } : null
+                ].filter(a => a !== null)
+            };
+            
+            Plotly.newPlot('kp-history-chart', [trace1, trace2], layout, { responsive: true, displayModeBar: false });
+        }
+        
+        function updateActivityIndicator(kpData) {
+            const indicator = document.getElementById('xray-activity-status');
+            const text = document.getElementById('activity-text');
+            
+            if (!indicator || !text) return;
+            
+            // Get most recent observed values
+            const recent = kpData.filter(d => d.observed).slice(-6);
+            if (recent.length === 0) return;
+            
+            const latestKp = recent[recent.length - 1].kp;
+            const trend = recent.length > 1 ? recent[recent.length - 1].kp - recent[recent.length - 2].kp : 0;
+            
+            if (latestKp >= 5) {
+                indicator.classList.remove('quiet');
+                text.textContent = trend > 0 ? 'ACTIVE & RISING' : 'ACTIVE';
+            } else if (latestKp >= 4) {
+                indicator.classList.remove('quiet');
+                indicator.style.background = 'rgba(251, 191, 36, 0.1)';
+                indicator.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+                const dot = indicator.querySelector('.activity-dot');
+                if (dot) dot.style.background = '#fbbf24';
+                text.textContent = trend > 0 ? 'ELEVATED & RISING' : 'ELEVATED';
+            } else {
+                indicator.classList.add('quiet');
+                text.textContent = trend > 0 ? 'QUIET (Rising)' : 'QUIET';
+            }
+        }
+
+        // Fetch Kp History (48-hour detail view)
         async function fetchKpHistory() {
             try {
                 const response = await fetch('/api/kp-history');
                 const data = await response.json();
                 
-                if (data.times && data.kp_values) {
-                    plotKpChart(data.times, data.kp_values);
+                if (data.kp_values && data.kp_values.length > 0) {
+                    // Filter to only observed data for 48-hour chart
+                    const observed = data.kp_values.filter(d => d.observed);
+                    const times = observed.map(d => d.time);
+                    const values = observed.map(d => d.kp);
+                    
+                    plotKpChart(times, values);
                 }
             } catch (error) {
                 console.error('Error fetching Kp history:', error);
@@ -3181,7 +3644,15 @@
                 type: 'scatter',
                 mode: 'lines+markers',
                 line: { color: '#fbbf24', width: 2 },
-                marker: { size: 6, color: '#fbbf24' },
+                marker: { 
+                    size: 6, 
+                    color: values.map(v => {
+                        if (v >= 5) return '#ef4444';
+                        if (v >= 4) return '#f97316';
+                        if (v >= 3) return '#fbbf24';
+                        return '#22c55e';
+                    })
+                },
                 hovertemplate: '<b>%{x}</b><br>Kp: %{y:.1f}<extra></extra>'
             };
 
@@ -3809,6 +4280,85 @@
             timeInput.value = currentImageDate.toISOString().slice(11, 16);
         }
 
+        // Compare Dates / Time Machine functionality
+        let historicalMode = false;
+        let selectedHistoricalDate = null;
+        
+        function initializeCompareDates() {
+            const dateInput = document.getElementById('compare-date');
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.max = today;
+            
+            // Set default to one week ago
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            dateInput.value = weekAgo.toISOString().split('T')[0];
+        }
+        
+        async function loadHistoricalData() {
+            const dateInput = document.getElementById('compare-date');
+            const selectedDate = dateInput.value;
+            
+            if (!selectedDate) {
+                alert('Please select a date first.');
+                return;
+            }
+            
+            historicalMode = true;
+            selectedHistoricalDate = selectedDate;
+            
+            // Show indicator
+            document.getElementById('compare-mode-indicator').style.display = 'block';
+            const indicator = document.querySelector('.compare-badge');
+            indicator.textContent = `VIEWING: ${selectedDate}`;
+            
+            try {
+                // Fetch historical data from backend
+                const response = await fetch(`/api/historical-data?date=${selectedDate}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(`Error loading historical data: ${data.error}`);
+                    resetToLive();
+                    return;
+                }
+                
+                // Update X-ray chart with historical data
+                if (data.xray && data.xray.length > 0) {
+                    const times = data.xray.map(d => d.time_tag);
+                    const shortVals = data.xray.map(d => parseFloat(d.short_channel));
+                    const longVals = data.xray.map(d => parseFloat(d.long_channel));
+                    plotXrayChart(times, shortVals, longVals, 'HISTORICAL');
+                }
+                
+                // Update Kp chart with historical data
+                if (data.kp && data.kp.length > 0) {
+                    plotKpHistoryChart(data.kp, true);
+                }
+                
+                // Update proton chart with historical data
+                if (data.proton && data.proton.length > 0) {
+                    plotProtonChart(data.proton, 'HISTORICAL');
+                }
+                
+                alert(`Historical data loaded for ${selectedDate}\n\n✓ X-ray flux data\n✓ K-index data\n✓ Proton flux data\n\nClick "Back to Live Data" to return to real-time monitoring.`);
+                
+            } catch (error) {
+                console.error('Error loading historical data:', error);
+                alert('Failed to load historical data. The selected date may not have archived data available.');
+                resetToLive();
+            }
+        }
+        
+        function resetToLive() {
+            historicalMode = false;
+            selectedHistoricalDate = null;
+            document.getElementById('compare-mode-indicator').style.display = 'none';
+            
+            // Reload all current data
+            refreshAllData();
+        }
+        
         // Keyboard shortcuts
         document.addEventListener('keydown', e => {
             if (e.key === 'r' && e.ctrlKey) {
