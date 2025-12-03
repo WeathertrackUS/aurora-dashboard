@@ -2349,6 +2349,60 @@ def get_f107():
         print(f"Error fetching F10.7: {e}")
         return jsonify({'flux': 0}), 500
 
+@app.route('/api/solar-cycle-data')
+def get_solar_cycle_data():
+    """Get solar cycle progression data (sunspot numbers over time)"""
+    try:
+        SOLAR_CYCLE_URL = "https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json"
+        PREDICTED_URL = "https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json"
+        
+        # Fetch observed data
+        obs_response = requests.get(SOLAR_CYCLE_URL, timeout=10)
+        obs_data = obs_response.json()
+        
+        # Fetch predicted data
+        pred_response = requests.get(PREDICTED_URL, timeout=10)
+        pred_data = pred_response.json()
+        
+        # Process observed data (all available data for full cycle view)
+        observed = {
+            'times': [],
+            'sunspot_numbers': [],
+            'smoothed_ssn': [],
+            'f107': []
+        }
+        
+        if obs_data and len(obs_data) > 0:
+            for entry in obs_data:
+                observed['times'].append(entry.get('time-tag', ''))
+                observed['sunspot_numbers'].append(entry.get('ssn', None))
+                observed['smoothed_ssn'].append(entry.get('smoothed_ssn', None))
+                observed['f107'].append(entry.get('f10.7', None))
+        
+        # Process predicted data
+        predicted = {
+            'times': [],
+            'smoothed_ssn': [],
+            'f107': []
+        }
+        
+        if pred_data and len(pred_data) > 0:
+            for entry in pred_data:
+                predicted['times'].append(entry.get('time-tag', ''))
+                predicted['smoothed_ssn'].append(entry.get('predicted_ssn', None))
+                predicted['f107'].append(entry.get('predicted_f10.7', None))
+        
+        return jsonify({
+            'observed': observed,
+            'predicted': predicted
+        })
+    except Exception as e:
+        print(f"Error fetching solar cycle data: {e}")
+        return jsonify({
+            'observed': {'times': [], 'sunspot_numbers': [], 'smoothed_ssn': [], 'f107': []},
+            'predicted': {'times': [], 'smoothed_ssn': [], 'f107': []}
+        }), 500
+
 @app.route('/api/cme-events')
 def get_cme_events():
     """Get CME events from NASA DONKI with improved Earth-direction detection"""
@@ -2356,7 +2410,7 @@ def get_cme_events():
         # NASA DONKI CME endpoint (last 7 days)
         start_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime('%Y-%m-%d')
         end_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-        CME_URL = f"https://api.nasa.gov/DONKI/CME?startDate={start_date}&endDate={end_date}&api_key=DEMO_KEY"
+        CME_URL = f"https://api.nasa.gov/DONKI/CME?startDate={start_date}&endDate={end_date}&api_key=bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm"
         
         response = requests.get(CME_URL, timeout=15)
         data = response.json()
@@ -2585,6 +2639,214 @@ def get_historical_events():
     except Exception as e:
         print(f"Error fetching historical events: {e}")
         return jsonify({'events': []}), 500
+
+@app.route('/api/solar-flares')
+def get_solar_flares():
+    """Get recent solar flares from NOAA DONKI API"""
+    try:
+        # DONKI API endpoint for flares (last 30 days)
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=7)
+        
+        url = f"https://api.nasa.gov/DONKI/FLR"
+        params = {
+            'startDate': start_date.strftime('%Y-%m-%d'),
+            'endDate': end_date.strftime('%Y-%m-%d'),
+            'api_key': 'bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        # Check if response is successful
+        if response.status_code != 200:
+            print(f"DONKI API error: {response.status_code}")
+            # Return empty array on API error
+            return jsonify({'flares': [], 'error': 'API quota exceeded or unavailable. Please add your own NASA API key.'})
+        
+        flares_data = response.json()
+        
+        # Filter for M and X class flares only
+        significant_flares = []
+        for flare in flares_data:
+            class_type = flare.get('classType', '')
+            if class_type and (class_type.startswith('M') or class_type.startswith('X')):
+                significant_flares.append({
+                    'time': flare.get('beginTime', 'N/A'),
+                    'class': class_type,
+                    'source': flare.get('sourceLocation', 'N/A'),
+                    'region': flare.get('activeRegionNum', 'N/A'),
+                    'peak_time': flare.get('peakTime', 'N/A'),
+                    'linked_events': flare.get('linkedEvents', [])
+                })
+        
+        # Sort by time (most recent first)
+        significant_flares.sort(key=lambda x: x['time'], reverse=True)
+        
+        return jsonify({'flares': significant_flares[:20]})  # Limit to 20 most recent
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching solar flares (network): {e}")
+        return jsonify({'flares': [], 'error': 'Network error. Check your connection or API key.'})
+    except Exception as e:
+        print(f"Error fetching solar flares: {e}")
+        return jsonify({'flares': [], 'error': str(e)})
+
+@app.route('/api/aurora-probability')
+def calculate_aurora_probability():
+    """Calculate aurora visibility probability based on latitude and current conditions"""
+    try:
+        latitude = float(request.args.get('lat', 0))
+        
+        # Fetch current Kp index
+        kp_data = fetch_kp_index()
+        current_kp = kp_data.get('kp_index', 0) if kp_data else 0
+        
+        # Aurora probability calculation based on Kp and latitude
+        # Reference: https://www.swpc.noaa.gov/products/aurora-30-minute-forecast
+        
+        if latitude < 0:
+            latitude = abs(latitude)  # Southern hemisphere
+        
+        # Probability matrix [Kp][latitude_band]
+        # Latitude bands: <50, 50-55, 55-60, 60-65, 65-70, >70
+        prob_matrix = {
+            0: [0, 0, 0, 5, 15, 40],
+            1: [0, 0, 0, 10, 25, 50],
+            2: [0, 0, 5, 20, 40, 65],
+            3: [0, 0, 15, 35, 55, 75],
+            4: [0, 5, 25, 50, 70, 85],
+            5: [5, 15, 40, 65, 80, 95],
+            6: [15, 30, 55, 75, 90, 95],
+            7: [25, 45, 70, 85, 95, 95],
+            8: [40, 60, 80, 90, 95, 95],
+            9: [55, 75, 90, 95, 95, 95]
+        }
+        
+        # Determine latitude band
+        if latitude < 50:
+            band = 0
+        elif latitude < 55:
+            band = 1
+        elif latitude < 60:
+            band = 2
+        elif latitude < 65:
+            band = 3
+        elif latitude < 70:
+            band = 4
+        else:
+            band = 5
+        
+        kp_rounded = min(9, max(0, round(current_kp)))
+        probability = prob_matrix.get(kp_rounded, [0]*6)[band]
+        
+        # Visibility message
+        if probability >= 75:
+            visibility = "Excellent"
+            color = "#22c55e"
+        elif probability >= 50:
+            visibility = "Good"
+            color = "#86efac"
+        elif probability >= 25:
+            visibility = "Moderate"
+            color = "#f59e0b"
+        elif probability >= 10:
+            visibility = "Low"
+            color = "#fb923c"
+        else:
+            visibility = "Very Low"
+            color = "#8b8b8b"
+        
+        return jsonify({
+            'probability': probability,
+            'visibility': visibility,
+            'color': color,
+            'kp': current_kp,
+            'latitude': latitude
+        })
+    except Exception as e:
+        print(f"Error calculating aurora probability: {e}")
+        return jsonify({'probability': 0, 'visibility': 'Unknown', 'color': '#8b8b8b', 'kp': 0}), 500
+
+@app.route('/api/magnetometer-stations')
+def get_magnetometer_data():
+    """Get magnetometer data from multiple ground stations"""
+    try:
+        # Fetch data from INTERMAGNET or USGS stations
+        # For now, using GOES magnetometer as primary source
+        goes_data = fetch_goes_magnetometer()
+        
+        if goes_data:
+            return jsonify({
+                'stations': [{
+                    'name': 'GOES Satellite',
+                    'data': goes_data,
+                    'location': 'Geostationary Orbit'
+                }]
+            })
+        
+        return jsonify({'stations': []}), 200
+    except Exception as e:
+        print(f"Error fetching magnetometer data: {e}")
+        return jsonify({'stations': []}), 500
+
+@app.route('/api/coronal-holes')
+def get_coronal_holes():
+    """Get coronal hole information and high-speed stream predictions"""
+    try:
+        # NASA DONKI Coronal Hole (CH) Analysis
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=7)
+        
+        url = "https://api.nasa.gov/DONKI/CH"
+        params = {
+            'startDate': start_date.strftime('%Y-%m-%d'),
+            'endDate': end_date.strftime('%Y-%m-%d'),
+            'api_key': 'bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        # Check if response is successful
+        if response.status_code != 200:
+            print(f"DONKI CH API error: {response.status_code}")
+            return jsonify({'coronal_holes': [], 'error': 'API quota exceeded or unavailable.'})
+        
+        ch_data = response.json()
+        
+        # Process coronal holes and HSS predictions
+        coronal_holes = []
+        for ch in ch_data:
+            # Calculate estimated arrival time of high-speed stream
+            # Typical solar wind transit time: 2-4 days
+            observed_date_str = ch.get('observedDate', '')
+            if not observed_date_str:
+                continue
+                
+            try:
+                observed_date = datetime.fromisoformat(observed_date_str.replace('Z', '+00:00'))
+            except:
+                continue
+            
+            # Estimate HSS arrival (simplified - real calculation would use solar rotation and CH location)
+            est_arrival = observed_date + timedelta(days=3)
+            
+            coronal_holes.append({
+                'id': ch.get('chID', 'Unknown'),
+                'observed_date': ch.get('observedDate', 'N/A'),
+                'latitude': ch.get('latitude', 0),
+                'longitude': ch.get('longitude', 0),
+                'area': ch.get('area', 0),
+                'hss_arrival_estimate': est_arrival.isoformat() if est_arrival > datetime.now(timezone.utc) else None,
+                'speed_estimate': '500-700 km/s',  # Typical HSS speed
+                'source': ch.get('observatory', 'SDO')
+            })
+        
+        return jsonify({'coronal_holes': coronal_holes})
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching coronal holes (network): {e}")
+        return jsonify({'coronal_holes': [], 'error': 'Network error'})
+    except Exception as e:
+        print(f"Error fetching coronal holes: {e}")
+        return jsonify({'coronal_holes': [], 'error': str(e)})
 
 if __name__ == '__main__':
     import sys

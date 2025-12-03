@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Solar Dashboard</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1047,7 +1050,7 @@
         <div class="tab-navigation">
             <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
             <button class="tab-btn" onclick="switchTab('earth-impact')">Earth Impact & CMEs</button>
-            <!-- <button class="tab-btn" onclick="switchTab('solar-cycle')">Solar Cycle & Research</button> -->
+            <button class="tab-btn" onclick="switchTab('solar-cycle')">Solar Cycle</button>
             <button class="tab-btn" onclick="switchTab('solar-imagery')">Solar Imagery</button>
         </div>
 
@@ -1199,6 +1202,21 @@
         <!-- Tab: Earth Impact & CMEs -->
         <div id="tab-earth-impact" class="tab-content">
             
+            <!-- Solar Flare Event Log -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        Recent Solar Flares (M & X Class)
+                        <span class="tooltip help-icon">ℹ️
+                            <span class="tooltiptext">Significant solar flares from the past 7 days. M-class flares can cause brief radio blackouts. X-class flares are the most intense.</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="flare-event-log" style="max-height: 400px; overflow-y: auto;">
+                    <p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">Loading solar flare data...</p>
+                </div>
+            </div>
+
             <!-- Notification Banner -->
             <div id="notification-banner" class="notification-banner" style="display: none;">
                 <div>
@@ -1368,9 +1386,9 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        F10.7 Solar Radio Flux
+                        F10.7 Solar Radio Flux (Current)
                         <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">10.7 cm radio emission from the sun. Higher values indicate increased solar activity. Measured in Solar Flux Units (SFU). Key indicator of the solar cycle.</span>
+                            <span class="tooltiptext">10.7 cm radio emission from the sun. Higher values indicate increased solar activity. Measured in Solar Flux Units (SFU).</span>
                         </span>
                     </div>
                 </div>
@@ -1380,64 +1398,30 @@
                 </div>
             </div>
 
-            <!-- Region Evolution Heat Map -->
+            <!-- Sunspot Number Chart -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        Active Region Evolution (7 Days)
+                        Solar Cycle 25 - Sunspot Number
                         <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">Shows how active regions have evolved over the past week - growth, decay, and flare production patterns.</span>
+                            <span class="tooltiptext">Monthly mean sunspot number (blue) and 13-month smoothed average (orange) with NOAA predictions (dashed).</span>
                         </span>
                     </div>
                 </div>
-                <div id="region-heatmap" style="width: 100%; height: 400px;"></div>
+                <div id="solar-cycle-ssn-chart" style="width: 100%; height: 400px;"></div>
             </div>
 
-            <!-- Electron Flux -->
+            <!-- F10.7 Flux Chart -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        GOES Electron Flux (>2 MeV)
+                        Solar Cycle 25 - F10.7cm Radio Flux
                         <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">High-energy electrons in Earth's radiation belts. Elevated levels can damage satellites and spacecraft electronics. Important for space weather research.</span>
+                            <span class="tooltiptext">Observed F10.7 flux (blue) with NOAA predictions (orange dashed).</span>
                         </span>
                     </div>
                 </div>
-                <div id="electron-flux-chart" style="width: 100%; height: 300px;"></div>
-            </div>
-
-            <!-- Sunspot Number & Solar Cycle -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        Solar Cycle 25 Progression
-                        <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">Current solar cycle showing sunspot number trends. Solar cycles average 11 years from minimum to minimum.</span>
-                        </span>
-                    </div>
-                </div>
-                <div style="width: 100%; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                    <img src="https://services.swpc.noaa.gov/images/solar-cycle-sunspot-number.gif" 
-                         alt="Solar Cycle Sunspot Number" 
-                         style="width: 100%; height: auto; cursor: pointer;"
-                         onclick="openImageModal(this.src, 'Solar Cycle 25 Sunspot Number Progression')"
-                         loading="lazy">
-                </div>
-            </div>
-
-            <!-- Historical Events -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        On This Day in Solar History
-                        <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">Notable solar events that occurred on this date in previous years.</span>
-                        </span>
-                    </div>
-                </div>
-                <div id="historical-events">
-                    <p style="color: var(--text-secondary); font-style: italic;">Loading historical data...</p>
-                </div>
+                <div id="solar-cycle-f107-chart" style="width: 100%; height: 400px;"></div>
             </div>
 
         </div>
@@ -1446,6 +1430,42 @@
         <!-- Tab: Solar Imagery -->
         <div id="tab-solar-imagery" class="tab-content">
             
+            <!-- Image Timeline Controls -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Image Timeline Controls</div>
+                </div>
+                <div style="padding: 1rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">Date</label>
+                            <input type="date" id="sdo-date-selector" 
+                                   style="width: 100%; padding: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono);">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">Time (UTC)</label>
+                            <input type="time" id="sdo-time-selector" 
+                                   style="width: 100%; padding: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono);">
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="loadHistoricalSDO()" class="btn btn-primary" style="padding: 0.5rem 1rem;">Load Images</button>
+                            <button onclick="resetToLatest()" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Latest</button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(139, 139, 139, 0.1); border-radius: 3px;">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Quick Navigation</div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button onclick="offsetTime(-24)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">-24h</button>
+                            <button onclick="offsetTime(-6)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">-6h</button>
+                            <button onclick="offsetTime(-1)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">-1h</button>
+                            <button onclick="offsetTime(1)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">+1h</button>
+                            <button onclick="offsetTime(6)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">+6h</button>
+                            <button onclick="offsetTime(24)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">+24h</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- SDO Full Disk Composite -->
             <div class="card">
                 <div class="card-header">
@@ -3070,10 +3090,9 @@
                 fetchKpHistory(),
                 fetchF107Data(),
                 fetchCMEData(),
-                fetchElectronFlux(),
-                fetchRegionHeatmap(),
                 fetchNOAAScales(),
-                fetchHistoricalEvents()
+                loadSolarFlares(),
+                fetchSolarCycleData()
             ]);
         }
 
@@ -3141,6 +3160,157 @@
             } catch (error) {
                 console.error('Error fetching F10.7:', error);
             }
+        }
+
+        // Fetch Solar Cycle Data
+        async function fetchSolarCycleData() {
+            try {
+                const response = await fetch('/api/solar-cycle-data');
+                const data = await response.json();
+                
+                if (data.observed && data.observed.times.length > 0) {
+                    plotSolarCycleCharts(data.observed, data.predicted);
+                }
+            } catch (error) {
+                console.error('Error fetching solar cycle data:', error);
+            }
+        }
+
+        function plotSolarCycleCharts(observed, predicted) {
+            const isDark = currentTheme === 'dark';
+            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)';
+            const textColor = isDark ? '#94a3b8' : '#475569';
+            
+            // Filter data from October 2004 onwards for F10.7 chart
+            const oct2004 = new Date('2004-10-01');
+            const filteredObserved = {
+                times: [],
+                f107: []
+            };
+            
+            observed.times.forEach((time, index) => {
+                const date = new Date(time);
+                if (date >= oct2004) {
+                    filteredObserved.times.push(time);
+                    filteredObserved.f107.push(observed.f107[index]);
+                }
+            });
+            
+            // Common layout settings
+            const commonLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: textColor, size: 11 },
+                margin: { t: 20, r: 20, b: 40, l: 50 },
+                xaxis: { 
+                    gridcolor: gridColor,
+                    showgrid: true,
+                    zeroline: false
+                },
+                yaxis: { 
+                    gridcolor: gridColor,
+                    showgrid: true,
+                    zeroline: false,
+                    rangemode: 'tozero'
+                },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'left',
+                    x: 0,
+                    font: { size: 10 }
+                }
+            };
+
+            // Chart 1: Sunspot Number with predictions
+            const ssnTraces = [
+                {
+                    x: observed.times,
+                    y: observed.sunspot_numbers,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Monthly SSN',
+                    line: { color: '#60a5fa', width: 1 },
+                    hovertemplate: 'SSN: %{y:.0f}<extra></extra>'
+                },
+                {
+                    x: observed.times,
+                    y: observed.smoothed_ssn,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Smoothed SSN',
+                    line: { color: '#fb923c', width: 2.5 },
+                    hovertemplate: 'Smoothed: %{y:.1f}<extra></extra>'
+                }
+            ];
+
+            // Add predicted smoothed SSN
+            if (predicted.times.length > 0) {
+                ssnTraces.push({
+                    x: predicted.times,
+                    y: predicted.smoothed_ssn,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Predicted SSN',
+                    line: { color: '#fbbf24', width: 2, dash: 'dash' },
+                    hovertemplate: 'Predicted: %{y:.1f}<extra></extra>'
+                });
+            }
+
+            const ssnLayout = {
+                ...commonLayout,
+                yaxis: { 
+                    ...commonLayout.yaxis,
+                    title: 'Sunspot Number'
+                }
+            };
+
+            Plotly.newPlot('solar-cycle-ssn-chart', ssnTraces, ssnLayout, { 
+                responsive: true, 
+                displayModeBar: false 
+            });
+
+            // Chart 2: F10.7 Flux with predictions (from Oct 2004)
+            const f107Traces = [
+                {
+                    x: filteredObserved.times,
+                    y: filteredObserved.f107,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Observed F10.7',
+                    line: { color: '#60a5fa', width: 2 },
+                    hovertemplate: 'F10.7: %{y:.1f} SFU<extra></extra>'
+                }
+            ];
+
+            // Add predicted F10.7
+            if (predicted.times.length > 0) {
+                f107Traces.push({
+                    x: predicted.times,
+                    y: predicted.f107,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Predicted F10.7',
+                    line: { color: '#fb923c', width: 2, dash: 'dash' },
+                    hovertemplate: 'Predicted: %{y:.1f} SFU<extra></extra>'
+                });
+            }
+
+            const f107Layout = {
+                ...commonLayout,
+                yaxis: { 
+                    ...commonLayout.yaxis,
+                    title: 'F10.7 Flux (SFU)'
+                }
+            };
+
+            Plotly.newPlot('solar-cycle-f107-chart', f107Traces, f107Layout, { 
+                responsive: true, 
+                displayModeBar: false 
+            });
         }
 
         // Fetch CME Data
@@ -3378,7 +3548,7 @@
         });
 
         function handleSwipe() {
-            const tabs = ['overview', 'earth-impact', 'solar-imagery'];
+            const tabs = ['overview', 'earth-impact', 'solar-cycle', 'solar-imagery'];
             const activeTab = document.querySelector('.tab-content.active')?.id.replace('tab-', '');
             const currentIndex = tabs.indexOf(activeTab);
             
@@ -3396,7 +3566,184 @@
         // Initialize new features on page load
         window.addEventListener('load', () => {
             refreshAllData();
+            loadSolarFlares();
+            initializeImageryTimeline();
+            loadCoronalHoles();
         });
+
+        // Coronal Holes Display
+        async function loadCoronalHoles() {
+            try {
+                const response = await fetch('/api/coronal-holes');
+                const data = await response.json();
+                
+                const container = document.getElementById('coronal-holes-display');
+                
+                if (data.error) {
+                    container.innerHTML = `
+                        <div style="padding: 2rem; text-align: center;">
+                            <div style="color: #fb923c; font-size: 1.2rem; margin-bottom: 0.5rem;">⚠️ API Access Limited</div>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">${data.error}</p>
+                            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+                                Get a free NASA API key at <a href="https://api.nasa.gov/" target="_blank" style="color: #86efac;">api.nasa.gov</a>
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (data.coronal_holes && data.coronal_holes.length > 0) {
+                    let html = '<div style="display: grid; gap: 1rem;">';
+                    
+                    data.coronal_holes.forEach(ch => {
+                        const observedDate = new Date(ch.observed_date).toLocaleDateString('en-US', { 
+                            month: 'short', day: 'numeric', year: 'numeric' 
+                        });
+                        
+                        const hasArrival = ch.hss_arrival_estimate !== null;
+                        const arrivalDate = hasArrival ? new Date(ch.hss_arrival_estimate).toLocaleDateString('en-US', { 
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                        }) : 'Past';
+                        
+                        html += `
+                            <div style="padding: 1rem; background: rgba(139, 139, 139, 0.05); border: 1px solid var(--border); border-radius: 3px;">
+                                <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center;">
+                                    <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.9rem; color: var(--accent-primary);">CH-${ch.id.slice(-4)}</div>
+                                    <div>
+                                        <div style="font-size: 0.9rem; color: var(--text-primary); margin-bottom: 0.25rem;">
+                                            Observed: ${observedDate} | Area: ${ch.area.toFixed(0)} sq deg
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                            Location: ${ch.latitude > 0 ? 'N' : 'S'}${Math.abs(ch.latitude).toFixed(0)}° ${ch.longitude > 0 ? 'E' : 'W'}${Math.abs(ch.longitude).toFixed(0)}°
+                                        </div>
+                                    </div>
+                                    ${hasArrival ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">HSS Arrival Est.</div>
+                                            <div style="font-size: 0.9rem; font-weight: 600; color: #86efac;">${arrivalDate}</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${ch.speed_estimate}</div>
+                                        </div>
+                                    ` : `
+                                        <div style="font-size: 0.85rem; color: #666666;">No active HSS</div>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">No coronal holes detected in the past 7 days</p>';
+                }
+            } catch (error) {
+                console.error('Error loading coronal holes:', error);
+                document.getElementById('coronal-holes-display').innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem;">Error loading coronal hole data. Check console for details.</p>';
+            }
+        }
+
+        // Solar Flare Event Log
+        async function loadSolarFlares() {
+            try {
+                const response = await fetch('/api/solar-flares');
+                const data = await response.json();
+                
+                const container = document.getElementById('flare-event-log');
+                
+                if (data.error) {
+                    container.innerHTML = `
+                        <div style="padding: 2rem; text-align: center;">
+                            <div style="color: #fb923c; font-size: 1.2rem; margin-bottom: 0.5rem;">⚠️ API Access Limited</div>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">${data.error}</p>
+                            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+                                To enable this feature, get a free NASA API key at 
+                                <a href="https://api.nasa.gov/" target="_blank" style="color: #86efac;">api.nasa.gov</a>
+                                and update the backend configuration.
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (data.flares && data.flares.length > 0) {
+                    let html = '<div style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem;">';
+                    
+                    data.flares.forEach(flare => {
+                        const isXClass = flare.class.startsWith('X');
+                        const bgColor = isXClass ? 'rgba(220, 38, 38, 0.1)' : 'rgba(251, 146, 60, 0.1)';
+                        const borderColor = isXClass ? '#dc2626' : '#fb923c';
+                        const timeStr = new Date(flare.time).toLocaleString('en-US', { 
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' 
+                        });
+                        
+                        html += `
+                            <div style="padding: 0.75rem; background: ${bgColor}; border-left: 3px solid ${borderColor}; border-radius: 3px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                    <div style="font-weight: 700; font-family: var(--font-mono); font-size: 1.1rem; color: ${borderColor};">${flare.class}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">${timeStr}</div>
+                                </div>
+                                <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                                    <strong>Source:</strong> ${flare.source} ${flare.region !== 'N/A' ? `(Region ${flare.region})` : ''}
+                                </div>
+                                ${flare.peak_time !== 'N/A' ? `<div style="font-size: 0.85rem; color: var(--text-secondary);">Peak: ${new Date(flare.peak_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                                ${flare.linked_events && flare.linked_events.length > 0 ? `<div style="font-size: 0.85rem; color: #86efac; margin-top: 0.25rem;">⚡ Linked to CME</div>` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">No significant flares in the past 7 days</p>';
+                }
+            } catch (error) {
+                console.error('Error loading solar flares:', error);
+                document.getElementById('flare-event-log').innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem;">Error loading flare data. Check console for details.</p>';
+            }
+        }
+
+        // Solar Imagery Timeline Controls
+        let currentImageDate = new Date();
+
+        function initializeImageryTimeline() {
+            const dateInput = document.getElementById('sdo-date-selector');
+            const timeInput = document.getElementById('sdo-time-selector');
+            
+            if (dateInput && timeInput) {
+                dateInput.value = currentImageDate.toISOString().split('T')[0];
+                timeInput.value = currentImageDate.toISOString().slice(11, 16);
+            }
+        }
+
+        function loadHistoricalSDO() {
+            const dateInput = document.getElementById('sdo-date-selector');
+            const timeInput = document.getElementById('sdo-time-selector');
+            
+            const selectedDate = new Date(`${dateInput.value}T${timeInput.value}:00Z`);
+            currentImageDate = selectedDate;
+            
+            const year = selectedDate.getUTCFullYear();
+            const month = String(selectedDate.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getUTCDate()).padStart(2, '0');
+            
+            alert(`Loading images from ${selectedDate.toUTCString()}\\n\\nNote: Historical image browsing requires SDO archive API integration. This feature will load the closest available images from the SDO archive.`);
+        }
+
+        function resetToLatest() {
+            currentImageDate = new Date();
+            initializeImageryTimeline();
+            location.reload();
+        }
+
+        function offsetTime(hours) {
+            currentImageDate.setHours(currentImageDate.getHours() + hours);
+            
+            const dateInput = document.getElementById('sdo-date-selector');
+            const timeInput = document.getElementById('sdo-time-selector');
+            
+            dateInput.value = currentImageDate.toISOString().split('T')[0];
+            timeInput.value = currentImageDate.toISOString().slice(11, 16);
+        }
 
         // Keyboard shortcuts
         document.addEventListener('keydown', e => {

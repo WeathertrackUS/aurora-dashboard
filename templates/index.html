@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>WTUS SpaceWx</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌌</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -891,6 +894,12 @@
             100% { opacity: 1; transform: scale(1); }
         }
 
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.85; }
+            100% { opacity: 1; }
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .navbar {
@@ -1043,13 +1052,25 @@
         </div>
         <div class="nav-stats">
             <div class="stat-item">
-                <span>UTC:</span>
+                <span>Time:</span>
                 <span class="stat-value" id="utc-time">--:--</span>
             </div>
         </div>
     </nav>
 
     <main class="main-container">
+        <!-- Alert Banner (hidden by default) -->
+        <div id="alert-banner" style="display: none; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15)); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem; animation: pulse 2s ease-in-out infinite;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.5rem;">⚠️</span>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #fca5a5; margin-bottom: 0.25rem;">Geomagnetic Storm Alert</div>
+                    <div id="alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+                </div>
+                <button onclick="document.getElementById('alert-banner').style.display='none'" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+            </div>
+        </div>
+
         <!-- Left Column: Main Visualization -->
         <div class="dashboard-grid">
             <!-- Map Panel -->
@@ -1141,6 +1162,59 @@
             <!-- Controls Card -->
             <div class="card">
                 <div class="card-header">
+                    <div class="card-title">Aurora Visibility</div>
+                </div>
+                <div style="padding: 0.75rem;">
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">Your Latitude</label>
+                        <input type="number" id="user-latitude" placeholder="e.g., 45.5" step="0.1" min="-90" max="90" 
+                               style="width: 100%; padding: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono);"
+                               onchange="updateAuroraProbability()">
+                    </div>
+                    <div id="aurora-prob-display" style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 3px; border: 1px solid var(--border);">
+                        <div style="font-size: 2rem; font-weight: 700; font-family: var(--font-mono); margin-bottom: 0.5rem;" id="prob-percentage">--%</div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);" id="prob-visibility">Enter your latitude</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timezone Selector Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Display Settings</div>
+                </div>
+                <div style="padding: 0.75rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">Timezone</label>
+                    <select id="timezone-selector" onchange="updateTimezone()" 
+                            style="width: 100%; padding: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-sans);">
+                        <option value="UTC">UTC (Universal Time)</option>
+                        <option value="local">Local Time</option>
+                        <option value="America/New_York">Eastern Time</option>
+                        <option value="America/Chicago">Central Time</option>
+                        <option value="America/Denver">Mountain Time</option>
+                        <option value="America/Los_Angeles">Pacific Time</option>
+                        <option value="America/Anchorage">Alaska Time</option>
+                        <option value="Pacific/Honolulu">Hawaii Time</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Moon Phase Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Current Moon Phase</div>
+                </div>
+                <div style="padding: 1.5rem; text-align: center;">
+                    <img id="moon-image" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23333' stroke='%23999' stroke-width='2'/></svg>" alt="Moon Phase" style="width: 120px; height: 120px; margin-bottom: 0.5rem;">
+                    <div style="font-weight: 600; margin-bottom: 0.25rem; color: var(--text-primary);" id="moon-phase-name">New Moon</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;" id="moon-illumination">0% illuminated</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 3px;" id="moon-visibility-impact"></div>
+                </div>
+            </div>
+
+            <!-- Controls Card -->
+            <div class="card">
+                <div class="card-header">
                     <div class="card-title">Controls</div>
                 </div>
                 <div class="control-grid">
@@ -1182,8 +1256,29 @@
         document.addEventListener('DOMContentLoaded', () => {
             refreshDashboard();
             startTimers();
+            
+            // Load saved settings
+            const savedLat = localStorage.getItem('userLatitude');
+            if (savedLat) {
+                document.getElementById('user-latitude').value = savedLat;
+                updateAuroraProbability();
+            }
+            
+            const savedTz = localStorage.getItem('timezone');
+            if (savedTz) {
+                document.getElementById('timezone-selector').value = savedTz;
+                currentTimezone = savedTz;
+            }
+            
+            // Initialize moon phase
+            calculateMoonPhase();
+            
+            // Update time displays
             updateUtcTime();
             setInterval(updateUtcTime, 1000);
+            
+            // Update moon phase daily
+            setInterval(calculateMoonPhase, 3600000); // Update every hour
         });
 
         function updateUtcTime() {
@@ -1219,8 +1314,16 @@
                 // 2. Update UI
                 updateDataCard(data);
                 renderCharts(data);
+                
+                // 3. Check for alerts
+                checkForAlerts(data);
+                
+                // 4. Update aurora probability if latitude is set
+                if (document.getElementById('user-latitude').value) {
+                    updateAuroraProbability();
+                }
 
-                // 3. Fetch Geomagnetic Alerts
+                // 5. Fetch Geomagnetic Alerts
                 fetchGeomagneticAlerts();
 
                 // 4. Refresh Map Image
@@ -2118,6 +2221,227 @@
                     progressBar.style.display = 'none';
                     statusText.textContent = '';
                 }, 5000);
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+
+            icon.textContent = type === 'success' ? '✅' : '❌';
+            msg.textContent = message;
+            
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Aurora Probability Calculator
+        async function updateAuroraProbability() {
+            const latitude = document.getElementById('user-latitude').value;
+            if (!latitude || latitude === '') {
+                document.getElementById('prob-percentage').textContent = '--%';
+                document.getElementById('prob-visibility').textContent = 'Enter your latitude';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/aurora-probability?lat=${latitude}`);
+                const data = await response.json();
+                
+                document.getElementById('prob-percentage').textContent = `${data.probability}%`;
+                document.getElementById('prob-visibility').textContent = data.visibility;
+                document.getElementById('prob-percentage').style.color = data.color;
+                
+                // Save to localStorage
+                localStorage.setItem('userLatitude', latitude);
+            } catch (error) {
+                console.error('Error fetching aurora probability:', error);
+            }
+        }
+
+        // Timezone functions
+        let currentTimezone = 'UTC';
+
+        function updateTimezone() {
+            currentTimezone = document.getElementById('timezone-selector').value;
+            localStorage.setItem('timezone', currentTimezone);
+            
+            // Update the UTC clock display immediately
+            updateUtcTime();
+        }
+
+        function updateUtcTime() {
+            const now = new Date();
+            const timeElem = document.getElementById('utc-time');
+            
+            if (currentTimezone === 'UTC') {
+                const hours = String(now.getUTCHours()).padStart(2, '0');
+                const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+                timeElem.textContent = `${hours}:${minutes} UTC`;
+            } else if (currentTimezone === 'local') {
+                const hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const hour12 = hours % 12 || 12;
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                
+                // Get timezone abbreviation
+                const tzString = now.toLocaleTimeString('en-US', { timeZoneName: 'short' });
+                const tzAbbr = tzString.split(' ').pop();
+                
+                timeElem.textContent = `${hour12}:${minutes} ${ampm} ${tzAbbr}`;
+            } else {
+                try {
+                    const tzDate = new Date(now.toLocaleString('en-US', { timeZone: currentTimezone }));
+                    const hours = tzDate.getHours();
+                    const minutes = String(tzDate.getMinutes()).padStart(2, '0');
+                    const hour12 = hours % 12 || 12;
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    
+                    // Get timezone abbreviation with DST support
+                    const tzString = now.toLocaleTimeString('en-US', { 
+                        timeZone: currentTimezone, 
+                        timeZoneName: 'short' 
+                    });
+                    const tzAbbr = tzString.split(' ').pop();
+                    
+                    timeElem.textContent = `${hour12}:${minutes} ${ampm} ${tzAbbr}`;
+                } catch (e) {
+                    const hours = String(now.getUTCHours()).padStart(2, '0');
+                    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+                    timeElem.textContent = `${hours}:${minutes} UTC`;
+                }
+            }
+        }
+
+        function formatTimeInTimezone(isoString) {
+            const date = new Date(isoString);
+            
+            if (currentTimezone === 'UTC') {
+                return date.toISOString().slice(11, 16) + ' UTC';
+            } else if (currentTimezone === 'local') {
+                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                try {
+                    return date.toLocaleString('en-US', { 
+                        timeZone: currentTimezone, 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                } catch (e) {
+                    return date.toISOString().slice(11, 16) + ' UTC';
+                }
+            }
+        }
+
+        // Moon Phase Calculator
+        function calculateMoonPhase() {
+            const now = new Date();
+            
+            // Known new moon: January 11, 2024 at 11:57 UTC
+            const knownNewMoon = new Date('2024-01-11T11:57:00Z');
+            const lunarCycle = 29.53058867; // days
+            
+            // Calculate days since known new moon
+            const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
+            const phase = ((daysSinceNew % lunarCycle) / lunarCycle);
+            
+            // Calculate illumination percentage
+            const illumination = Math.abs(Math.cos(phase * 2 * Math.PI));
+            const illuminationPercent = Math.round(illumination * 100);
+            
+            // Determine phase name and image
+            let phaseName, moonImage, visibilityImpact;
+            
+            if (phase < 0.033 || phase > 0.967) {
+                phaseName = 'New Moon';
+                moonImage = 'new-moon.png';
+                visibilityImpact = 'Excellent for aurora viewing - dark skies';
+            } else if (phase < 0.216) {
+                phaseName = 'Waxing Crescent';
+                moonImage = 'waxing-crescent.png';
+                visibilityImpact = 'Very good - minimal moonlight interference';
+            } else if (phase < 0.283) {
+                phaseName = 'First Quarter';
+                moonImage = 'first-quarter.png';
+                visibilityImpact = 'Good - moon sets around midnight';
+            } else if (phase < 0.466) {
+                phaseName = 'Waxing Gibbous';
+                moonImage = 'waxing-gibbous.png';
+                visibilityImpact = 'Fair - bright moon may reduce visibility';
+            } else if (phase < 0.533) {
+                phaseName = 'Full Moon';
+                moonImage = 'full-moon.png';
+                visibilityImpact = 'Poor - bright moonlight washes out aurora';
+            } else if (phase < 0.716) {
+                phaseName = 'Waning Gibbous';
+                moonImage = 'waning-gibbous.png';
+                visibilityImpact = 'Fair - moon rises late';
+            } else if (phase < 0.783) {
+                phaseName = 'Last Quarter';
+                moonImage = 'last-quarter.png';
+                visibilityImpact = 'Good - moon rises after midnight';
+            } else {
+                phaseName = 'Waning Crescent';
+                moonImage = 'waning-crescent.png';
+                visibilityImpact = 'Very good - moon rises near dawn';
+            }
+            
+            // Update display
+            const moonImgElem = document.getElementById('moon-image');
+            if (moonImgElem) {
+                // Use simple, reliable image URLs from a CDN
+                const moonIcons = {
+                    'new-moon.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/></svg>',
+                    'waxing-crescent.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,1 50,95 A35,35 0 0,0 50,5" fill="%23ddd"/></svg>',
+                    'first-quarter.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,1 50,95 Z" fill="%23ddd"/></svg>',
+                    'waxing-gibbous.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ddd" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,0 50,95 A15,15 0 0,1 50,5" fill="%23333"/></svg>',
+                    'full-moon.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ddd" stroke="%23999" stroke-width="2"/></svg>',
+                    'waning-gibbous.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ddd" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,1 50,95 A15,15 0 0,0 50,5" fill="%23333"/></svg>',
+                    'last-quarter.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,0 50,95 Z" fill="%23ddd"/></svg>',
+                    'waning-crescent.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,0 50,95 A35,35 0 0,1 50,5" fill="%23ddd"/></svg>'
+                };
+                moonImgElem.src = moonIcons[moonImage] || moonIcons['new-moon.png'];
+                moonImgElem.alt = phaseName;
+                moonImgElem.onerror = function() {
+                    console.error('Failed to load moon phase image');
+                    this.style.display = 'none';
+                };
+            }
+            document.getElementById('moon-phase-name').textContent = phaseName;
+            document.getElementById('moon-illumination').textContent = `${illuminationPercent}% illuminated`;
+            document.getElementById('moon-visibility-impact').textContent = visibilityImpact;
+        }
+
+        // Alert system
+        function checkForAlerts(data) {
+            const kp = data.kp_index || 0;
+            const alertBanner = document.getElementById('alert-banner');
+            const alertMessage = document.getElementById('alert-message');
+            
+            if (kp >= 5) {
+                let level = 'G1 (Minor)';
+                let color = '#f59e0b';
+                
+                if (kp >= 9) {
+                    level = 'G5 (Extreme)';
+                    color = '#dc2626';
+                } else if (kp >= 8) {
+                    level = 'G4 (Severe)';
+                    color = '#ef4444';
+                } else if (kp >= 7) {
+                    level = 'G3 (Strong)';
+                    color = '#f97316';
+                } else if (kp >= 6) {
+                    level = 'G2 (Moderate)';
+                    color = '#fb923c';
+                }
+                
+                alertMessage.textContent = `${level} geomagnetic storm in progress (Kp=${kp.toFixed(1)}). Aurora may be visible at lower latitudes.`;
+                alertBanner.style.borderColor = color;
+                alertBanner.style.display = 'block';
+            } else {
+                alertBanner.style.display = 'none';
             }
         }
 
