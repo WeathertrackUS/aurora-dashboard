@@ -2993,7 +2993,6 @@ def get_dst_index():
 def get_system_alert():
     """Get system-wide alert configuration for displaying known issues"""
     try:
-        import os
         config_path = os.path.join(os.path.dirname(__file__), 'alert_config.json')
         
         # Check if config file exists
@@ -3010,11 +3009,17 @@ def get_system_alert():
         with open(config_path, 'r') as f:
             config = json.load(f)
             
-        # Validate config structure
-        required_keys = ['enabled', 'message', 'type', 'dismissible']
-        for key in required_keys:
+        # Validate config structure and set defaults
+        defaults = {
+            'enabled': False,
+            'message': '',
+            'type': 'info',
+            'dismissible': True
+        }
+        
+        for key, default_value in defaults.items():
             if key not in config:
-                config[key] = False if key == 'enabled' else ('' if key == 'message' else ('info' if key == 'type' else True))
+                config[key] = default_value
         
         return jsonify(config)
         
