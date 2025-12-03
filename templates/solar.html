@@ -1333,7 +1333,7 @@
                     <div class="card-title">Sunspots</div>
                 </div>
                 <div class="solar-image-container">
-                    <img src="https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg" alt="SDO HMI Magnetogram" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                    <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg" alt="SDO HMI Magnetogram" loading="lazy" onclick="openImageModal(this.src, this.alt)">
                 </div>
             </div>
 
@@ -1343,7 +1343,7 @@
                     <div class="card-title">Coronal Holes</div>
                 </div>
                 <div class="solar-image-container">
-                    <img src="https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg" alt="SDO AIA 193 Coronal Holes" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                    <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg" alt="SDO AIA 193 Coronal Holes" loading="lazy" onclick="openImageModal(this.src, this.alt)">
                 </div>
             </div>
         </div>
@@ -1381,11 +1381,26 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        Recent Solar Flares (M & X Class)
+                        Recent Solar Flares
                         <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">Significant solar flares from the past 7 days. M-class flares can cause brief radio blackouts. X-class flares are the most intense.</span>
+                            <span class="tooltiptext">Solar flares from the past 7 days. C-class are minor, M-class can cause brief radio blackouts, X-class are the most intense.</span>
                         </span>
                     </div>
+                </div>
+                <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: center;">
+                    <span style="font-size: 0.9rem; color: var(--text-secondary); margin-right: 0.5rem;">Filter:</span>
+                    <label class="proton-toggle" style="margin: 0;">
+                        <input type="checkbox" id="filter-c-flares" checked onchange="filterFlares()">
+                        <span style="color: #fbbf24">●</span> C-Class
+                    </label>
+                    <label class="proton-toggle" style="margin: 0;">
+                        <input type="checkbox" id="filter-m-flares" checked onchange="filterFlares()">
+                        <span style="color: #fb923c">●</span> M-Class
+                    </label>
+                    <label class="proton-toggle" style="margin: 0;">
+                        <input type="checkbox" id="filter-x-flares" checked onchange="filterFlares()">
+                        <span style="color: #dc2626">●</span> X-Class
+                    </label>
                 </div>
                 <div id="flare-event-log" style="max-height: 400px; overflow-y: auto;">
                     <p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">Loading solar flare data...</p>
@@ -1612,7 +1627,7 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        Solar Cycle 25 - Sunspot Number
+                        Solar Cycle History - Sunspot Number
                         <span class="tooltip help-icon">ℹ️
                             <span class="tooltiptext">Monthly mean sunspot number (blue) and 13-month smoothed average (orange) with NOAA predictions (dashed).</span>
                         </span>
@@ -1625,7 +1640,7 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        Solar Cycle 25 - F10.7cm Radio Flux
+                        Solar Cycle History - F10.7cm Radio Flux
                         <span class="tooltip help-icon">ℹ️
                             <span class="tooltiptext">Observed F10.7 flux (blue) with NOAA predictions (orange dashed).</span>
                         </span>
@@ -3481,6 +3496,18 @@
             const values = kpData.map(d => d.kp);
             const observed = kpData.map(d => d.observed);
             
+            // Color scale function for Kp values
+            const getKpColor = (v) => {
+                if (v >= 9) return '#ec4899';      // Kp9 (G5): Pink
+                if (v >= 8) return '#a855f7';      // Kp8 (G4): Purple
+                if (v >= 7) return '#ef4444';      // Kp7 (G3): Red
+                if (v >= 6) return '#fb923c';      // Kp6 (G2): Orange
+                if (v >= 5) return '#fbbf24';      // Kp5 (G1): Yellow
+                if (v >= 4) return '#84cc16';      // Kp4: Light Green
+                if (v >= 3) return '#166534';      // Kp3: Dark Green
+                return '#6b7280';                  // Kp0-2: Gray
+            };
+            
             // Split into observed and forecast
             const observedTimes = [];
             const observedValues = [];
@@ -3502,15 +3529,10 @@
                 y: observedValues,
                 type: 'bar',
                 name: 'Observed',
-                text: observedValues.map(v => formatKp(v)),
+                text: observedValues.map(v => Math.round(v)),
                 hovertemplate: 'Kp %{text}<br>%{x}<extra></extra>',
                 marker: {
-                    color: observedValues.map(v => {
-                        if (v >= 5) return '#ef4444';
-                        if (v >= 4) return '#f97316';
-                        if (v >= 3) return '#fbbf24';
-                        return '#22c55e';
-                    })
+                    color: observedValues.map(v => getKpColor(v))
                 }
             };
             
@@ -3519,14 +3541,16 @@
                 y: forecastValues,
                 type: 'bar',
                 name: 'Forecast',
-                text: forecastValues.map(v => formatKp(v)),
+                text: forecastValues.map(v => Math.round(v)),
                 hovertemplate: 'Kp %{text}<br>%{x}<extra></extra>',
                 marker: {
                     color: forecastValues.map(v => {
-                        if (v >= 5) return 'rgba(239, 68, 68, 0.6)';
-                        if (v >= 4) return 'rgba(249, 115, 22, 0.6)';
-                        if (v >= 3) return 'rgba(251, 191, 36, 0.6)';
-                        return 'rgba(34, 197, 94, 0.6)';
+                        const color = getKpColor(v);
+                        // Convert hex to rgba with 0.6 opacity for forecast
+                        const r = parseInt(color.slice(1, 3), 16);
+                        const g = parseInt(color.slice(3, 5), 16);
+                        const b = parseInt(color.slice(5, 7), 16);
+                        return `rgba(${r}, ${g}, ${b}, 0.6)`;
                     })
                 }
             };
@@ -4178,9 +4202,11 @@
         }
 
         // Solar Flare Event Log
+        let allFlares = []; // Store all flares for filtering
+        
         async function loadSolarFlares() {
             try {
-                const response = await fetch('/api/solar-flares');
+                const response = await fetch(`/api/solar-flares?t=${Date.now()}`);
                 const data = await response.json();
                 
                 const container = document.getElementById('flare-event-log');
@@ -4201,39 +4227,73 @@
                 }
                 
                 if (data.flares && data.flares.length > 0) {
-                    let html = '<div style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem;">';
-                    
-                    data.flares.forEach(flare => {
-                        const isXClass = flare.class.startsWith('X');
-                        const bgColor = isXClass ? 'rgba(220, 38, 38, 0.1)' : 'rgba(251, 146, 60, 0.1)';
-                        const borderColor = isXClass ? '#dc2626' : '#fb923c';
-                        const timeStr = new Date(flare.time).toLocaleString('en-US', { 
-                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' 
-                        });
-                        
-                        html += `
-                            <div style="padding: 0.75rem; background: ${bgColor}; border-left: 3px solid ${borderColor}; border-radius: 3px;">
-                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-                                    <div style="font-weight: 700; font-family: var(--font-mono); font-size: 1.1rem; color: ${borderColor};">${flare.class}</div>
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">${timeStr}</div>
-                                </div>
-                                <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
-                                    <strong>Source:</strong> ${flare.source} ${flare.region !== 'N/A' ? `(Region ${flare.region})` : ''}
-                                </div>
-                                ${flare.peak_time !== 'N/A' ? `<div style="font-size: 0.85rem; color: var(--text-secondary);">Peak: ${new Date(flare.peak_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
-                                ${flare.linked_events && flare.linked_events.length > 0 ? `<div style="font-size: 0.85rem; color: #86efac; margin-top: 0.25rem;">⚡ Linked to CME</div>` : ''}
-                            </div>
-                        `;
-                    });
-                    
-                    html += '</div>';
-                    container.innerHTML = html;
+                    allFlares = data.flares;
+                    filterFlares(); // Apply initial filter
                 } else {
                     container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">No significant flares in the past 7 days</p>';
                 }
             } catch (error) {
                 console.error('Error loading solar flares:', error);
                 document.getElementById('flare-event-log').innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem;">Error loading flare data. Check console for details.</p>';
+            }
+        }
+        
+        function filterFlares() {
+            const showC = document.getElementById('filter-c-flares').checked;
+            const showM = document.getElementById('filter-m-flares').checked;
+            const showX = document.getElementById('filter-x-flares').checked;
+            
+            const container = document.getElementById('flare-event-log');
+            
+            const filteredFlares = allFlares.filter(flare => {
+                const flareClass = flare.class.charAt(0);
+                if (flareClass === 'C' && showC) return true;
+                if (flareClass === 'M' && showM) return true;
+                if (flareClass === 'X' && showX) return true;
+                return false;
+            });
+            
+            if (filteredFlares.length > 0) {
+                let html = '<div style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem;">';
+                
+                filteredFlares.forEach(flare => {
+                    const flareClass = flare.class.charAt(0);
+                    let bgColor, borderColor;
+                    
+                    if (flareClass === 'X') {
+                        bgColor = 'rgba(220, 38, 38, 0.1)';
+                        borderColor = '#dc2626';
+                    } else if (flareClass === 'M') {
+                        bgColor = 'rgba(251, 146, 60, 0.1)';
+                        borderColor = '#fb923c';
+                    } else {
+                        bgColor = 'rgba(251, 191, 36, 0.1)';
+                        borderColor = '#fbbf24';
+                    }
+                    
+                    const timeStr = new Date(flare.time).toLocaleString('en-US', { 
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' 
+                    });
+                    
+                    html += `
+                        <div style="padding: 0.75rem; background: ${bgColor}; border-left: 3px solid ${borderColor}; border-radius: 3px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <div style="font-weight: 700; font-family: var(--font-mono); font-size: 1.1rem; color: ${borderColor};">${flare.class}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">${timeStr}</div>
+                            </div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                                <strong>Source:</strong> ${flare.source} ${flare.region !== 'N/A' ? `(Region ${flare.region})` : ''}
+                            </div>
+                            ${flare.peak_time !== 'N/A' ? `<div style="font-size: 0.85rem; color: var(--text-secondary);">Peak: ${new Date(flare.peak_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                            ${flare.linked_events && flare.linked_events.length > 0 ? `<div style="font-size: 0.85rem; color: #86efac; margin-top: 0.25rem;">⚡ Linked to CME</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">No flares match the selected filters</p>';
             }
         }
 

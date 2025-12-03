@@ -2672,15 +2672,17 @@ def get_solar_flares():
         if response.status_code != 200:
             print(f"DONKI API error: {response.status_code}")
             # Return empty array on API error
-            return jsonify({'flares': [], 'error': 'API quota exceeded or unavailable. Please add your own NASA API key.'})
+            resp = jsonify({'flares': [], 'error': 'API quota exceeded or unavailable. Please add your own NASA API key.'})
+            resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return resp
         
         flares_data = response.json()
         
-        # Filter for M and X class flares only
+        # Include C, M, and X class flares (filtering done on frontend)
         significant_flares = []
         for flare in flares_data:
             class_type = flare.get('classType', '')
-            if class_type and (class_type.startswith('M') or class_type.startswith('X')):
+            if class_type and (class_type.startswith('C') or class_type.startswith('M') or class_type.startswith('X')):
                 significant_flares.append({
                     'time': flare.get('beginTime', 'N/A'),
                     'class': class_type,
@@ -2693,7 +2695,9 @@ def get_solar_flares():
         # Sort by time (most recent first)
         significant_flares.sort(key=lambda x: x['time'], reverse=True)
         
-        return jsonify({'flares': significant_flares[:20]})  # Limit to 20 most recent
+        resp = jsonify({'flares': significant_flares[:20]})  # Limit to 20 most recent
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
     except requests.exceptions.RequestException as e:
         print(f"Error fetching solar flares (network): {e}")
         return jsonify({'flares': [], 'error': 'Network error. Check your connection or API key.'})
