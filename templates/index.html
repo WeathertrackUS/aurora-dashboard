@@ -2779,8 +2779,21 @@
                 return;
             }
             
-            // Set alert content
-            message.textContent = config.message;
+            // Set alert content. Allow converting shorthand issue refs like "#123" to GitHub links
+            function escapeHtml(str) {
+                return String(str || '').replace(/[&<>\"']/g, function (s) {
+                    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s];
+                });
+            }
+
+            let processed = escapeHtml(config.message || '');
+            if (config.issue_repo) {
+                processed = processed.replace(/(^|\s)#(\d+)\b/g, function (_, pre, id) {
+                    return pre + `<a href="https://github.com/${config.issue_repo}/issues/${id}" target="_blank" rel="noopener noreferrer">#${id}</a>`;
+                });
+            }
+
+            message.innerHTML = processed;
             
             // Flat design - solid colors instead of gradients
             let bgColor, borderColor, iconText, titleText, titleColor;
