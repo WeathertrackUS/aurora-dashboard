@@ -7,7 +7,7 @@
     "dismissible": true
   },
   {
-    "enabled": true,
+    "enabled": false,
     "message": "We are aware that geomagnetic activity data is not updating. We are working to resolve the issue. See #7 for updates.",
     "issue_repo": "WeathertrackUS/aurora-dashboard",
     "type": "warning",

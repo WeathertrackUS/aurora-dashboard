@@ -1623,13 +1623,17 @@
 
         async function fetchGeomagneticAlerts() {
             try {
-                const response = await fetch('/api/geomagnetic-alerts');
+                console.log('[GEOMAG_ALERTS] Fetching geomagnetic forecast...');
+                const response = await fetch('/api/geomagnetic-alerts?t=' + Date.now());
                 const data = await response.json();
+                
+                console.log('[GEOMAG_ALERTS] Received forecast data:', data);
                 
                 const container = document.getElementById('geomag-forecast-container');
                 if (!container) return;
                 
                 if (!data.forecast || data.forecast.length === 0) {
+                    console.warn('[GEOMAG_ALERTS] No forecast data available');
                     container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem;">No forecast data available</p>';
                     return;
                 }
@@ -1638,6 +1642,11 @@
                 // Store the max forecast Kp globally so updateDataCard can use it
                 window.forecastMaxKp = Math.max(...data.forecast.map(f => f.max_kp));
                 window.forecastMaxGScale = Math.max(...data.forecast.map(f => f.g_scale));
+                
+                console.log('[GEOMAG_ALERTS] Max forecast Kp: ' + window.forecastMaxKp + ', Max G-scale: ' + window.forecastMaxGScale);
+                data.forecast.forEach((day, idx) => {
+                    console.log('[GEOMAG_ALERTS] Day ' + idx + ' (' + day.date + '): Kp=' + day.max_kp + ', G=' + day.g_scale);
+                });
                 
                 // Build the forecast chart
                 let html = '<div class="forecast-grid">';
@@ -2171,33 +2180,14 @@
         }
 
         function formatKp(kp) {
-            // Convert decimal Kp to proper format with thirds (-, o, +)
-            // e.g., 4.7 -> "5-" (Kp5-), 4.3 -> "4o", 4.9 -> "5-"
+            // Convert decimal Kp to proper format
             if (kp === null || kp === undefined || kp === '--') return 'N/A';
             
             const kpNum = typeof kp === 'string' ? parseFloat(kp) : kp;
             if (isNaN(kpNum)) return kp;
             
-            const whole = Math.floor(kpNum);
-            const fraction = kpNum - whole;
-            
-            // Determine third modifier
-            // 0.0-0.33: shows as next number with minus (-)
-            // 0.33-0.67: shows as current number with naught (o)
-            // 0.67-1.0: shows as current number with plus (+)
-            
-            if (fraction < 0.33) {
-                if (fraction === 0) {
-                    return whole + 'o';
-                } else {
-                    // Anything above .0 in lower third rounds to next with minus
-                    return (whole + 1) + '-';
-                }
-            } else if (fraction < 0.67) {
-                return whole + 'o';
-            } else {
-                return whole + '+';
-            }
+            // Return decimal value rounded to 1 decimal place
+            return kpNum.toFixed(1);
         }
         
         function updateDataCard(data) {
@@ -2205,13 +2195,21 @@
             
             // Get observed Kp (current/historical)
             let kp = data.kp_index?.kp || 0;
+            let kpSource = 'observed';
+            
+            console.log('[KP_INDEX] Observed Kp: ' + kp);
             
             // Check if we have forecast data with higher Kp values
             // This will be set by fetchGeomagneticAlerts()
             if (window.forecastMaxKp && window.forecastMaxKp > kp) {
+                console.log('[KP_INDEX] Using forecast Kp: ' + window.forecastMaxKp + ' (higher than observed ' + kp + ')');
                 kp = window.forecastMaxKp;
+                kpSource = 'forecast';
+            } else if (window.forecastMaxKp) {
+                console.log('[KP_INDEX] Forecast Kp ' + window.forecastMaxKp + ' is lower than observed ' + kp + ', keeping observed');
             }
             
+            console.log('[KP_INDEX] Final displayed Kp: ' + kp + ' (source: ' + kpSource + ')');
             document.getElementById('kp-value-text').textContent = formatKp(kp);
             const kpFill = document.getElementById('kp-fill');
             const kpPercent = Math.min((kp / 9) * 100, 100);
@@ -2227,13 +2225,20 @@
             else if (kp >= 3) kpFill.style.background = '#166534'; // Kp3: Dark Green
             else kpFill.style.background = '#6b7280';              // Kp0-2: Gray
             
-            // G-Scale Calculation
+            // G-Scale Calculation (NOAA standards)
+            // G5 = Kp >= 8.67 (extreme storm)
+            // G4 = Kp >= 7.67 (severe storm)
+            // G3 = Kp >= 6.67 (strong storm)
+            // G2 = Kp >= 5.67 (moderate storm)
+            // G1 = Kp >= 5.00 (minor storm)
             let gScale = 0;
-            if (kp >= 9) gScale = 5;
-            else if (kp >= 8) gScale = 4;
-            else if (kp >= 7) gScale = 3;
-            else if (kp >= 6) gScale = 2;
-            else if (kp >= 5) gScale = 1;
+            if (kp >= 8.67) gScale = 5;
+            else if (kp >= 7.67) gScale = 4;
+            else if (kp >= 6.67) gScale = 3;
+            else if (kp >= 5.67) gScale = 2;
+            else if (kp >= 5.00) gScale = 1;
+            
+            console.log('[KP_INDEX] Calculated G-scale: G' + gScale + ' from Kp ' + kp);
             
             const gElem = document.getElementById('g-scale-display');
             gElem.innerHTML = `G${gScale} <span style="font-size: 0.8rem; font-weight: 400; opacity: 0.7;">STORM SCALE</span>`;

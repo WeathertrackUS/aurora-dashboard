@@ -276,20 +276,41 @@ def fetch_solar_data():
         return None
 
 def fetch_kp_index():
-    """Fetch current Kp index"""
+    """Fetch current Kp index from forecast endpoint (has most recent observed data)"""
     try:
-        response = requests.get(KP_URL, timeout=10)
+        # Use forecast endpoint which has more up-to-date observed values
+        KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
+        response = requests.get(KP_FORECAST_URL, timeout=10)
         kp_data = response.json()
         
-        # Get the most recent Kp value
+        # Find the most recent OBSERVED Kp value (not forecast)
         if len(kp_data) > 1:
-            latest = kp_data[-1]
-            return {
-                'time': latest[0],
-                'kp': float(latest[1])
-            }
+            latest_observed = None
+            latest_time = None
+            
+            # Iterate backwards to find most recent observed value
+            for row in reversed(kp_data[1:]):  # Skip header
+                if len(row) >= 3 and row[2] == 'observed':
+                    try:
+                        kp_value = float(row[1])
+                        kp_time = row[0]
+                        latest_observed = kp_value
+                        latest_time = kp_time
+                        break
+                    except (ValueError, TypeError):
+                        continue
+            
+            if latest_observed is not None:
+                print(f"[KP_INDEX] Retrieved latest observed Kp: {latest_observed} at {latest_time}")
+                return {
+                    'time': latest_time,
+                    'kp': latest_observed
+                }
+            
+        print("[KP_INDEX] No observed Kp data available")
+        return None
     except Exception as e:
-        print(f"Error fetching Kp index: {e}")
+        print(f"[KP_INDEX] Error fetching Kp index: {e}")
         return None
 
 def fetch_noaa_scales():
@@ -2154,18 +2175,20 @@ def get_geomagnetic_alerts():
             else:
                 g_scale = 0
             
+            print(f"[GEOMAG_FORECAST] {date} - G-scale: G{g_scale}, Kp: {max_kp:.1f}")
+            
             daily_forecasts.append({
                 'date': date,
                 'max_kp': round(max_kp, 1),
                 'g_scale': g_scale
             })
         
-        print(f"DEBUG: Final forecast: {daily_forecasts}")
+        print(f"[GEOMAG_FORECAST] Final forecast: {daily_forecasts}")
         
         return jsonify({'forecast': daily_forecasts})
         
     except Exception as e:
-        print(f"Error fetching geomagnetic forecast: {e}")
+        print(f"[GEOMAG_FORECAST] ERROR fetching geomagnetic forecast: {e}")
         import traceback
         traceback.print_exc()
         
@@ -2309,11 +2332,14 @@ def get_kp_history():
     """Get 3-day Kp index history with observed and forecast data"""
     try:
         KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
+        print(f"[KP_HISTORY] Fetching Kp history from {KP_FORECAST_URL}")
         response = requests.get(KP_FORECAST_URL, timeout=10)
         data = response.json()
         
         kp_values = []
         current_time = datetime.now(timezone.utc)
+        obs_count = 0
+        pred_count = 0
         
         for row in data[1:]:  # Skip header
             try:
@@ -2334,12 +2360,18 @@ def get_kp_history():
                         'kp': kp,
                         'observed': obs_pred == 'observed'
                     })
+                    if obs_pred == 'observed':
+                        obs_count += 1
+                    else:
+                        pred_count += 1
             except Exception as e:
                 continue
         
+        print(f"[KP_HISTORY] Retrieved {obs_count} observed points and {pred_count} forecast points")
+        print(f"[KP_HISTORY] Total Kp history points: {len(kp_values)}")
         return jsonify({'kp_values': kp_values})
     except Exception as e:
-        print(f"Error fetching Kp history: {e}")
+        print(f"[KP_HISTORY] Error fetching Kp history: {e}")
         return jsonify({'kp_values': []}), 500
 
 @app.route('/api/f107')
