@@ -2993,6 +2993,64 @@ def get_dst_index():
         traceback.print_exc()
         return jsonify({'error': str(e), 'dst_values': []}), 500
 
+@app.route('/api/system-alert')
+def get_system_alert():
+    """Get system-wide alert configuration for displaying known issues"""
+    try:
+        # Construct path securely - file must be in app directory
+        app_dir = os.path.abspath(os.path.dirname(__file__))
+        config_path = os.path.abspath(os.path.join(app_dir, 'alert_config.json'))
+        
+        # Verify the config file is in the expected directory (prevent traversal)
+        if not config_path.startswith(app_dir):
+            print(f"Security warning: Invalid config path attempted")
+            return jsonify({
+                'enabled': False,
+                'message': '',
+                'type': 'info',
+                'dismissible': True
+            })
+        
+        # Check if config file exists
+        if not os.path.exists(config_path):
+            # Return default disabled state if config doesn't exist
+            return jsonify({
+                'enabled': False,
+                'message': '',
+                'type': 'info',
+                'dismissible': True
+            })
+        
+        # Read and return the config
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            
+        # Validate config structure and set defaults
+        defaults = {
+            'enabled': False,
+            'message': '',
+            'type': 'info',
+            'dismissible': True
+        }
+        
+        for key, default_value in defaults.items():
+            if key not in config:
+                config[key] = default_value
+        
+        return jsonify(config)
+        
+    except Exception as e:
+        print(f"Error reading system alert config: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return disabled state on error
+        return jsonify({
+            'enabled': False,
+            'message': '',
+            'type': 'info',
+            'dismissible': True
+        })
+
 if __name__ == '__main__':
     import sys
     

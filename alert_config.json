@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "message": "We are aware of an issue affecting images from SDO. We are working to resolve it as quickly as possible.",
+  "type": "warning",
+  "dismissible": true
+}
