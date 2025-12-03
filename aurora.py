@@ -2993,7 +2993,19 @@ def get_dst_index():
 def get_system_alert():
     """Get system-wide alert configuration for displaying known issues"""
     try:
-        config_path = os.path.join(os.path.dirname(__file__), 'alert_config.json')
+        # Construct path securely - file must be in app directory
+        app_dir = os.path.abspath(os.path.dirname(__file__))
+        config_path = os.path.abspath(os.path.join(app_dir, 'alert_config.json'))
+        
+        # Verify the config file is in the expected directory (prevent traversal)
+        if not config_path.startswith(app_dir):
+            print(f"Security warning: Invalid config path attempted")
+            return jsonify({
+                'enabled': False,
+                'message': '',
+                'type': 'info',
+                'dismissible': True
+            })
         
         # Check if config file exists
         if not os.path.exists(config_path):

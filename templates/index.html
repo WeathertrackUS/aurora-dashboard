@@ -2752,8 +2752,9 @@
                     hideSystemAlert();
                 }
             } catch (error) {
-                console.error('Error fetching system alert:', error);
-                // Hide alert on error
+                console.warn('Unable to fetch system alert configuration. Alerts will not be displayed.', error);
+                // Hide alert on error - this prevents showing stale/incorrect alerts
+                // The error is logged for debugging but doesn't interrupt the user experience
                 hideSystemAlert();
             }
         }
