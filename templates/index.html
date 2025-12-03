@@ -900,10 +900,27 @@
             100% { opacity: 1; }
         }
 
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            z-index: 1001;
+        }
+        
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .navbar {
                 padding: 0.75rem 1rem;
+                flex-wrap: wrap;
+            }
+            
+            .mobile-menu-toggle {
+                display: block;
             }
             
             .brand {
@@ -915,12 +932,24 @@
             }
             
             .nav-links {
-                margin-left: 1rem;
-                gap: 1rem;
+                display: none;
+                width: 100%;
+                margin: 1rem 0 0 0;
+                flex-direction: column;
+                gap: 0.75rem;
+                background: var(--bg-card);
+                padding: 1rem;
+                border-radius: 0.5rem;
+                border: 1px solid var(--border);
+            }
+            
+            .nav-links.active {
+                display: flex;
             }
             
             .nav-link {
-                font-size: 0.85rem;
+                font-size: 0.9rem;
+                padding: 0.5rem;
             }
             
             .nav-stats {
@@ -946,6 +975,25 @@
                 min-height: 160px;
                 max-height: 220px;
                 padding: 0.5rem;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-width: 100%;
+            }
+            
+            .card {
+                margin-bottom: 1rem;
+            }
+            
+            /* Better touch targets */
+            button, .btn, select, input {
+                min-height: 44px;
+                font-size: 1rem;
+            }
+            
+            select {
+                padding: 0.75rem;
             }
             
             .map-panel {
@@ -1036,6 +1084,48 @@
             .chart-value {
                 font-size: 0.95rem;
             }
+            
+            /* Hide beta badge on very small screens */
+            .brand span[style*="BETA"] {
+                display: none;
+            }
+            
+            /* Stack sidebar items more compactly */
+            .sidebar .card {
+                margin-bottom: 0.75rem;
+            }
+            
+            /* Optimize forecast day cards */
+            .forecast-day {
+                min-height: 60px;
+            }
+            
+            /* Improve moon phase card */
+            #moon-image {
+                width: 80px !important;
+                height: 80px !important;
+            }
+        }
+        
+        /* Touch-specific improvements */
+        @media (hover: none) and (pointer: coarse) {
+            /* Larger touch targets */
+            button, .btn, a {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            /* Prevent text selection on buttons */
+            button, .btn {
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            
+            /* Smoother scrolling */
+            * {
+                -webkit-overflow-scrolling: touch;
+            }
         }
     </style>
 </head>
@@ -1046,7 +1136,10 @@
             <span></span> WTUS Space Weather Dashboard
             <span style="margin-left: 0.5rem; font-size: 0.6rem; background: rgba(139, 139, 139, 0.2); color: #8b8b8b; padding: 0.2rem 0.4rem; border-radius: 3px; border: 1px solid rgba(139, 139, 139, 0.3); font-weight: 600; letter-spacing: 0.05em;">BETA</span>
         </a>
-        <div class="nav-links">
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+            ☰
+        </button>
+        <div class="nav-links" id="nav-links">
             <a href="/" class="nav-link active">Geomagnetic Activity</a>
             <a href="/solar" class="nav-link">Solar Activity</a>
         </div>
@@ -2457,6 +2550,11 @@
             setTimeout(() => {
                 toast.classList.remove('show');
             }, 3000);
+        }
+        
+        function toggleMobileMenu() {
+            const navLinks = document.getElementById('nav-links');
+            navLinks.classList.toggle('active');
         }
     </script>
 </body>
