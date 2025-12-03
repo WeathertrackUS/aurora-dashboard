@@ -1128,6 +1128,21 @@
                 -webkit-overflow-scrolling: touch;
             }
         }
+
+        /* System alert link styles: brighter blue/purple for visibility */
+        #system-alert-banner a,
+        #system-alert-banner a:visited {
+            color: #6C63FF; /* bright blue/purple */
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        #system-alert-banner a:hover,
+        #system-alert-banner a:focus {
+            color: #9FA8FF;
+            text-decoration: underline;
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -1152,15 +1167,18 @@
         </div>
     </nav>
 
-    <!-- System Alert Banner (for known issues - hidden by default) -->
-    <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem 1rem;">
+    <!-- System Alerts Container (supports multiple alerts). Individual banners are created by JS. -->
+    <div id="system-alerts-container" style="margin: 0.5rem 1rem;"></div>
+
+    <!-- Legacy single-banner kept as a hidden template for compatibility -->
+    <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span id="system-alert-icon" style="font-size: 1.5rem;">ℹ️</span>
+            <span data-template="icon" style="font-size: 1.5rem;">ℹ️</span>
             <div style="flex: 1;">
-                <div id="system-alert-title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
-                <div id="system-alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
+                <div data-template="title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
+                <div data-template="message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
             </div>
-            <button id="system-alert-close" onclick="dismissSystemAlert()" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
+            <button data-template="close" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
         </div>
     </div>
 
@@ -2750,110 +2768,130 @@
         async function checkSystemAlert() {
             try {
                 const response = await fetch('/api/system-alert');
-                const config = await response.json();
-                
-                if (config.enabled) {
-                    showSystemAlert(config);
-                } else {
-                    hideSystemAlert();
-                }
+                const payload = await response.json();
+
+                // Support both shapes: {alerts: [...]} or an array, or single object
+                let alerts = [];
+                if (Array.isArray(payload)) alerts = payload;
+                else if (payload && Array.isArray(payload.alerts)) alerts = payload.alerts;
+                else if (payload && typeof payload === 'object') alerts = [payload];
+
+                renderSystemAlerts(alerts);
             } catch (error) {
                 console.warn('Unable to fetch system alert configuration. Alerts will not be displayed.', error);
-                // Hide alert on error - this prevents showing stale/incorrect alerts
-                // The error is logged for debugging but doesn't interrupt the user experience
-                hideSystemAlert();
+                // Clear any existing alerts on error
+                clearSystemAlerts();
             }
         }
 
-        function showSystemAlert(config) {
-            const banner = document.getElementById('system-alert-banner');
-            const icon = document.getElementById('system-alert-icon');
-            const title = document.getElementById('system-alert-title');
-            const message = document.getElementById('system-alert-message');
-            const closeBtn = document.getElementById('system-alert-close');
-            
-            // Check if user has dismissed this specific alert message
-            const dismissedKey = `dismissed_alert_${hashString(config.message)}`;
-            if (config.dismissible && localStorage.getItem(dismissedKey) === 'true') {
-                hideSystemAlert();
-                return;
-            }
-            
-            // Set alert content. Allow converting shorthand issue refs like "#123" to GitHub links
-            function escapeHtml(str) {
-                return String(str || '').replace(/[&<>\"']/g, function (s) {
-                    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s];
-                });
-            }
+        function renderSystemAlerts(alerts) {
+            const container = document.getElementById('system-alerts-container');
+            container.innerHTML = '';
 
-            let processed = escapeHtml(config.message || '');
-            if (config.issue_repo) {
-                processed = processed.replace(/(^|\s)#(\d+)\b/g, function (_, pre, id) {
-                    return pre + `<a href="https://github.com/${config.issue_repo}/issues/${id}" target="_blank" rel="noopener noreferrer">#${id}</a>`;
-                });
-            }
+            if (!alerts || alerts.length === 0) return;
 
-            message.innerHTML = processed;
-            
-            // Flat design - solid colors instead of gradients
-            let bgColor, borderColor, iconText, titleText, titleColor;
-            switch (config.type) {
-                case 'warning':
-                    bgColor = 'rgba(251, 146, 60, 0.12)';  // Flat orange/yellow
-                    borderColor = '#fb923c';
-                    iconText = '⚠️';
-                    titleText = 'Warning';
-                    titleColor = '#fb923c';
-                    break;
-                case 'error':
-                    bgColor = 'rgba(239, 68, 68, 0.12)';  // Flat red
-                    borderColor = '#ef4444';
-                    iconText = '❌';
-                    titleText = 'Important Notice';
-                    titleColor = '#ef4444';
-                    break;
-                case 'success':
-                    bgColor = 'rgba(34, 197, 94, 0.12)';  // Flat green
-                    borderColor = '#22c55e';
-                    iconText = '✅';
-                    titleText = 'System Update';
-                    titleColor = '#22c55e';
-                    break;
-                case 'info':
-                default:
-                    bgColor = 'rgba(59, 130, 246, 0.12)';  // Flat blue
-                    borderColor = '#3b82f6';
-                    iconText = 'ℹ️';
-                    titleText = 'System Notice';
-                    titleColor = '#3b82f6';
-                    break;
-            }
-            
-            banner.style.background = bgColor;
-            banner.style.border = `1px solid ${borderColor}`;
-            icon.textContent = iconText;
-            title.textContent = titleText;
-            title.style.color = titleColor;
-            
-            // Show/hide close button based on dismissible setting
-            closeBtn.style.display = config.dismissible ? 'block' : 'none';
-            
-            banner.style.display = 'block';
+            alerts.forEach((config, idx) => {
+                // Skip disabled alerts
+                if (!config.enabled) return;
+
+                const messageText = config.message || '';
+                const dismissedKey = `dismissed_alert_${hashString(messageText)}`;
+                if (config.dismissible && localStorage.getItem(dismissedKey) === 'true') return;
+
+                // Build banner element
+                const banner = document.createElement('div');
+                banner.className = 'system-alert-banner';
+                banner.style.borderRadius = '3px';
+                banner.style.padding = '0.75rem 1rem';
+                banner.style.marginBottom = '0.5rem';
+
+                const inner = document.createElement('div');
+                inner.style.display = 'flex';
+                inner.style.alignItems = 'center';
+                inner.style.gap = '0.75rem';
+
+                const icon = document.createElement('span');
+                icon.style.fontSize = '1.5rem';
+
+                const body = document.createElement('div');
+                body.style.flex = '1';
+
+                const titleEl = document.createElement('div');
+                titleEl.style.fontWeight = '600';
+                titleEl.style.marginBottom = '0.25rem';
+
+                const messageEl = document.createElement('div');
+                messageEl.style.color = '#e5e5e5';
+                messageEl.style.fontSize = '0.9rem';
+
+                const closeBtn = document.createElement('button');
+                closeBtn.style.background = 'none';
+                closeBtn.style.border = 'none';
+                closeBtn.style.color = '#8b8b8b';
+                closeBtn.style.fontSize = '1.2rem';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.style.padding = '0.25rem 0.5rem';
+                closeBtn.textContent = '×';
+
+                // Set textual content and styles based on type
+                function escapeHtml(str) {
+                    return String(str || '').replace(/[&<>"']/g, function (s) {
+                        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s];
+                    });
+                }
+
+                let processed = escapeHtml(messageText);
+                if (config.issue_repo) {
+                    processed = processed.replace(/(^|\s)#(\d+)\b/g, function (_, pre, id) {
+                        return pre + `<a href="https://github.com/${config.issue_repo}/issues/${id}" target="_blank" rel="noopener noreferrer">#${id}</a>`;
+                    });
+                }
+
+                // Type styling
+                let bgColor = 'rgba(59, 130, 246, 0.12)', borderColor = '#3b82f6', iconText = 'ℹ️', titleText = 'System Notice';
+                switch (config.type) {
+                    case 'warning':
+                        bgColor = 'rgba(251, 146, 60, 0.12)'; borderColor = '#fb923c'; iconText = '⚠️'; titleText = 'Warning'; break;
+                    case 'error':
+                        bgColor = 'rgba(239, 68, 68, 0.12)'; borderColor = '#ef4444'; iconText = '❌'; titleText = 'Important Notice'; break;
+                    case 'success':
+                        bgColor = 'rgba(34, 197, 94, 0.12)'; borderColor = '#22c55e'; iconText = '✅'; titleText = 'System Update'; break;
+                    case 'info':
+                    default:
+                        break;
+                }
+
+                banner.style.background = bgColor;
+                banner.style.border = `1px solid ${borderColor}`;
+                icon.textContent = iconText;
+                titleEl.textContent = titleText;
+                titleEl.style.color = borderColor;
+                messageEl.innerHTML = processed;
+
+                // Wire close behavior
+                if (config.dismissible) {
+                    closeBtn.addEventListener('click', () => {
+                        localStorage.setItem(dismissedKey, 'true');
+                        banner.remove();
+                    });
+                } else {
+                    closeBtn.style.display = 'none';
+                }
+
+                body.appendChild(titleEl);
+                body.appendChild(messageEl);
+                inner.appendChild(icon);
+                inner.appendChild(body);
+                inner.appendChild(closeBtn);
+                banner.appendChild(inner);
+
+                container.appendChild(banner);
+            });
         }
 
-        function hideSystemAlert() {
-            const banner = document.getElementById('system-alert-banner');
-            banner.style.display = 'none';
-        }
-
-        function dismissSystemAlert() {
-            const message = document.getElementById('system-alert-message').textContent;
-            const dismissedKey = `dismissed_alert_${hashString(message)}`;
-            
-            // Store dismissed state in localStorage
-            localStorage.setItem(dismissedKey, 'true');
-            
-            hideSystemAlert();
+        function clearSystemAlerts() {
+            const container = document.getElementById('system-alerts-container');
+            container.innerHTML = '';
         }
 
         // Simple string hash function for generating consistent keys

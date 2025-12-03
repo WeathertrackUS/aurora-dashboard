@@ -1,7 +1,16 @@
-{
-  "enabled": true,
-  "message": "We are aware of an issue affecting images from SDO. We are working to resolve it as quickly as possible. See #6 for the latest on the issue.",
-  "issue_repo": "WeathertrackUS/aurora-dashboard",
-  "type": "warning",
-  "dismissible": true
-}
+[
+  {
+    "enabled": true,
+    "message": "We are aware of an issue affecting images from SDO. We are working to resolve it as quickly as possible. See #6 for the latest on the issue.",
+    "issue_repo": "WeathertrackUS/aurora-dashboard",
+    "type": "warning",
+    "dismissible": true
+  },
+  {
+    "enabled": true,
+    "message": "We are aware that geomagnetic activity data is not updating. We are working to resolve the issue. See #7 for updates.",
+    "issue_repo": "WeathertrackUS/aurora-dashboard",
+    "type": "warning",
+    "dismissible": true
+  }
+]

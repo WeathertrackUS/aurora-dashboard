@@ -3021,23 +3021,31 @@ def get_system_alert():
                 'dismissible': True
             })
         
-        # Read and return the config
+        # Read config (support single object or an array of alerts)
         with open(config_path, 'r') as f:
-            config = json.load(f)
-            
-        # Validate config structure and set defaults
+            raw = json.load(f)
+
+        # Normalize to a list of alerts for the frontend to consume
+        if isinstance(raw, list):
+            alerts = raw
+        else:
+            alerts = [raw]
+
+        # Validate config structure and set defaults per-alert
         defaults = {
             'enabled': False,
             'message': '',
             'type': 'info',
             'dismissible': True
         }
-        
-        for key, default_value in defaults.items():
-            if key not in config:
-                config[key] = default_value
-        
-        return jsonify(config)
+
+        for alert in alerts:
+            for key, default_value in defaults.items():
+                if key not in alert:
+                    alert[key] = default_value
+
+        # Return a predictable object with an `alerts` array
+        return jsonify({ 'alerts': alerts })
         
     except Exception as e:
         print(f"Error reading system alert config: {e}")
