@@ -1914,6 +1914,232 @@ def generate_gif_endpoint():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/generate-solar-overview')
+def generate_solar_overview():
+    """Generate a PNG image of the solar activity overview"""
+    try:
+        import matplotlib.dates as mdates
+        
+        print("[SOLAR_OVERVIEW] Generating solar overview PNG...")
+        
+        # Fetch current data (2-hour for X-ray, 6-hour for protons)
+        xray_response = requests.get('https://services.swpc.noaa.gov/json/goes/primary/xrays-2-hour.json', timeout=10)
+        proton_response = requests.get('https://services.swpc.noaa.gov/json/goes/primary/integral-protons-plot-6-hour.json', timeout=10)
+        
+        xray_data = xray_response.json() if xray_response.status_code == 200 else []
+        proton_data = proton_response.json() if proton_response.status_code == 200 else []
+        
+        print(f"[SOLAR_OVERVIEW] X-ray data points: {len(xray_data)}, Proton data points: {len(proton_data)}")
+        
+        # URLs for imagery
+        goes_131_url = 'https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png'
+        goes_ccor_url = 'https://services.swpc.noaa.gov/images/animations/ccor1/latest.jpg'
+        
+        # Create figure with improved 2x2 grid layout
+        fig = plt.figure(figsize=(18, 10), facecolor='#0f172a')
+        gs = GridSpec(2, 2, figure=fig, height_ratios=[1, 1], width_ratios=[1.2, 1],
+                     hspace=0.35, wspace=0.35, left=0.06, right=0.96, top=0.90, bottom=0.08)
+        
+        # Title and timestamp
+        fig.text(0.5, 0.96, 'Solar Activity Overview', ha='center', va='top',
+                fontsize=26, fontweight='bold', color='#e2e8f0', family='sans-serif')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+        fig.text(0.5, 0.92, timestamp, ha='center', va='top',
+                fontsize=13, color='#94a3b8')
+        
+        # 1. X-Ray Flux Chart (top-left) - FIXED DATA HANDLING
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax1.set_facecolor('#1e293b')
+        
+        xray_plotted = False
+        if xray_data and len(xray_data) > 0:
+            try:
+                # Parse times and flux values
+                times = []
+                flux_values = []
+                for d in xray_data:
+                    try:
+                        t = datetime.fromisoformat(d['time_tag'].replace('Z', '+00:00'))
+                        f = float(d['flux']) if d.get('flux') else None
+                        if f and f > 0:
+                            times.append(t)
+                            flux_values.append(f)
+                    except:
+                        continue
+                
+                if len(times) > 0 and len(flux_values) > 0:
+                    # Plot the line
+                    ax1.plot(times, flux_values, color='#f59e0b', linewidth=3, solid_capstyle='round', zorder=3)
+                    ax1.fill_between(times, flux_values, alpha=0.25, color='#f59e0b', zorder=2)
+                    xray_plotted = True
+                    
+                    # Set log scale and limits
+                    ax1.set_yscale('log')
+                    ax1.set_ylim(1e-8, 1e-2)
+                    
+                    # Add colored zone backgrounds
+                    ax1.axhspan(1e-9, 1e-6, facecolor='#4ade80', alpha=0.08, zorder=0)  # A/B
+                    ax1.axhspan(1e-6, 1e-5, facecolor='#fbbf24', alpha=0.08, zorder=0)  # C
+                    ax1.axhspan(1e-5, 1e-4, facecolor='#fb923c', alpha=0.08, zorder=0)  # M
+                    ax1.axhspan(1e-4, 1e-3, facecolor='#f87171', alpha=0.08, zorder=0)  # X
+                    ax1.axhspan(1e-3, 1, facecolor='#e879f9', alpha=0.08, zorder=0)    # X10
+                    
+                    # Add threshold lines
+                    ax1.axhline(y=1e-6, color='#fbbf24', linestyle='--', alpha=0.4, linewidth=1.5, zorder=1)
+                    ax1.axhline(y=1e-5, color='#fb923c', linestyle='--', alpha=0.45, linewidth=1.5, zorder=1)
+                    ax1.axhline(y=1e-4, color='#f87171', linestyle='--', alpha=0.5, linewidth=1.5, zorder=1)
+                    ax1.axhline(y=1e-3, color='#e879f9', linestyle='--', alpha=0.55, linewidth=1.5, zorder=1)
+                    
+                    # Add class labels
+                    ax1.text(0.99, 0.10, 'C', transform=ax1.transAxes, color='#fbbf24', 
+                            va='center', ha='right', fontsize=13, fontweight='bold')
+                    ax1.text(0.99, 0.30, 'M', transform=ax1.transAxes, color='#fb923c',
+                            va='center', ha='right', fontsize=13, fontweight='bold')
+                    ax1.text(0.99, 0.52, 'X', transform=ax1.transAxes, color='#f87171',
+                            va='center', ha='right', fontsize=13, fontweight='bold')
+                    ax1.text(0.99, 0.73, 'X10', transform=ax1.transAxes, color='#e879f9',
+                            va='center', ha='right', fontsize=13, fontweight='bold')
+                    
+                    # Format x-axis
+                    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+                    ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=30))
+                    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=0, ha='center')
+                    
+            except Exception as e:
+                print(f"[SOLAR_OVERVIEW] Error plotting X-ray: {e}")
+        
+        if not xray_plotted:
+            ax1.text(0.5, 0.5, 'No X-Ray Data Available', ha='center', va='center',
+                    transform=ax1.transAxes, color='#64748b', fontsize=14)
+        
+        ax1.set_title('GOES X-Ray Flux (2-Hour)', color='#e2e8f0', fontsize=16, 
+                     fontweight='bold', pad=12, loc='left')
+        ax1.set_ylabel('Watts/m²', color='#94a3b8', fontsize=12, fontweight='600')
+        ax1.tick_params(axis='both', colors='#64748b', labelsize=10, length=5, width=1.2)
+        ax1.grid(True, alpha=0.12, color='#475569', linewidth=0.8, linestyle='-')
+        for spine in ax1.spines.values():
+            spine.set_color('#475569')
+            spine.set_linewidth(1.2)
+        
+        # 2. Proton Flux Chart (bottom-left) - FIXED DATA HANDLING
+        ax2 = fig.add_subplot(gs[1, 0])
+        ax2.set_facecolor('#1e293b')
+        
+        proton_plotted = False
+        if proton_data and len(proton_data) > 0:
+            try:
+                times = []
+                p10_vals = []
+                p100_vals = []
+                
+                for d in proton_data:
+                    try:
+                        t = datetime.fromisoformat(d['time_tag'].replace('Z', '+00:00'))
+                        p10 = float(d.get('>=10 MeV', 0.01))
+                        p100 = float(d.get('>=100 MeV', 0.01))
+                        times.append(t)
+                        p10_vals.append(max(p10, 0.01))  # Ensure positive for log scale
+                        p100_vals.append(max(p100, 0.01))
+                    except:
+                        continue
+                
+                if len(times) > 0:
+                    ax2.plot(times, p10_vals, color='#86efac', linewidth=3, label='≥10 MeV', 
+                            solid_capstyle='round', zorder=3)
+                    ax2.fill_between(times, p10_vals, alpha=0.15, color='#86efac', zorder=1)
+                    
+                    ax2.plot(times, p100_vals, color='#a78bfa', linewidth=3, label='≥100 MeV',
+                            solid_capstyle='round', zorder=3)
+                    ax2.fill_between(times, p100_vals, alpha=0.15, color='#a78bfa', zorder=1)
+                    
+                    proton_plotted = True
+                    ax2.set_yscale('log')
+                    ax2.set_ylim(0.01, 1e5)
+                    
+                    # Add S-scale threshold lines
+                    ax2.axhline(y=10, color='#fbbf24', linestyle='--', alpha=0.35, linewidth=1.5, zorder=2)
+                    ax2.axhline(y=100, color='#fb923c', linestyle='--', alpha=0.4, linewidth=1.5, zorder=2)
+                    ax2.axhline(y=1000, color='#ef4444', linestyle='--', alpha=0.45, linewidth=1.5, zorder=2)
+                    
+                    # Legend
+                    ax2.legend(loc='upper left', fontsize=11, facecolor='#1e293b', 
+                              edgecolor='#475569', framealpha=0.95, labelcolor='#e2e8f0')
+                    
+                    # Format x-axis
+                    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+                    ax2.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+                    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=0, ha='center')
+                    
+            except Exception as e:
+                print(f"[SOLAR_OVERVIEW] Error plotting protons: {e}")
+        
+        if not proton_plotted:
+            ax2.text(0.5, 0.5, 'No Proton Data Available', ha='center', va='center',
+                    transform=ax2.transAxes, color='#64748b', fontsize=14)
+        
+        ax2.set_title('GOES Proton Flux (6-Hour)', color='#e2e8f0', fontsize=16,
+                     fontweight='bold', pad=12, loc='left')
+        ax2.set_ylabel('Particles/(cm²·sr·s)', color='#94a3b8', fontsize=12, fontweight='600')
+        ax2.set_xlabel('Time (UTC)', color='#94a3b8', fontsize=11, fontweight='600')
+        ax2.tick_params(axis='both', colors='#64748b', labelsize=10, length=5, width=1.2)
+        ax2.grid(True, alpha=0.12, color='#475569', linewidth=0.8, linestyle='-')
+        for spine in ax2.spines.values():
+            spine.set_color('#475569')
+            spine.set_linewidth(1.2)
+        
+        # 3. GOES SUVI 131Å (top-right)
+        ax3 = fig.add_subplot(gs[0, 1])
+        ax3.set_facecolor('#0a0a0a')
+        ax3.axis('off')
+        try:
+            img_response = requests.get(goes_131_url, timeout=10)
+            if img_response.status_code == 200:
+                img = Image.open(BytesIO(img_response.content))
+                ax3.imshow(img, aspect='equal')
+                ax3.set_title('GOES SUVI 131Å', color='#e2e8f0', 
+                            fontsize=16, fontweight='bold', pad=12, loc='center')
+        except Exception as e:
+            ax3.text(0.5, 0.5, 'Image Unavailable', ha='center', va='center',
+                    transform=ax3.transAxes, color='#64748b', fontsize=14)
+            ax3.set_title('GOES SUVI 131Å', color='#e2e8f0', 
+                         fontsize=16, fontweight='bold', pad=12, loc='center')
+        
+        # 4. GOES CCOR-1 Coronagraph (bottom-right)
+        ax4 = fig.add_subplot(gs[1, 1])
+        ax4.set_facecolor('#0a0a0a')
+        ax4.axis('off')
+        try:
+            img_response = requests.get(goes_ccor_url, timeout=10)
+            if img_response.status_code == 200:
+                img = Image.open(BytesIO(img_response.content))
+                ax4.imshow(img, aspect='equal')
+                ax4.set_title('GOES-19 CCOR-1 Coronagraph', color='#e2e8f0', 
+                            fontsize=16, fontweight='bold', pad=12, loc='center')
+        except Exception as e:
+            ax4.text(0.5, 0.5, 'Image Unavailable', ha='center', va='center',
+                    transform=ax4.transAxes, color='#64748b', fontsize=14)
+            ax4.set_title('GOES-19 CCOR-1 Coronagraph', color='#e2e8f0', 
+                         fontsize=16, fontweight='bold', pad=12, loc='center')
+        
+        # Save to BytesIO
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=150, facecolor='#0f172a', edgecolor='none', bbox_inches='tight', pad_inches=0.3)
+        buf.seek(0)
+        plt.close(fig)
+        
+        print("[SOLAR_OVERVIEW] Solar overview PNG generated successfully")
+        return send_file(buf, mimetype='image/png', as_attachment=True,
+                        download_name=f'solar-overview-{datetime.now(timezone.utc).strftime("%Y%m%d")}.png')
+        
+    except Exception as e:
+        print(f"[SOLAR_OVERVIEW] Error generating solar overview: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 def generate_map_image():
     """Generate just the auroral oval map image"""
     ovation_lons, ovation_lats, ovation_aurora, ovation_time = fetch_ovation_data()

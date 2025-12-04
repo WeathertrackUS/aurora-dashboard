@@ -1748,6 +1748,32 @@
             if (data.solar_wind_history) {
                 const hist = data.solar_wind_history;
                 
+                // Remove single-point spikes from speed data
+                const cleanedSpeeds = hist.speeds.map((val, idx, arr) => {
+                    if (val === null) return null;
+                    
+                    // Skip first and last points
+                    if (idx === 0 || idx === arr.length - 1) return val;
+                    
+                    const prev = arr[idx - 1];
+                    const next = arr[idx + 1];
+                    
+                    // If neighbors exist, check for isolated spike
+                    if (prev !== null && next !== null) {
+                        const avgNeighbor = (prev + next) / 2;
+                        const deviation = Math.abs(val - avgNeighbor);
+                        
+                        // If point deviates by more than 150 km/s from neighbor average, replace with average
+                        if (deviation > 150) {
+                            return avgNeighbor;
+                        }
+                    }
+                    return val;
+                });
+                
+                // Use cleaned speeds for calculations
+                hist.speeds = cleanedSpeeds;
+                
                 // Dynamic Y-axis range
                 const speeds = hist.speeds.filter(s => s !== null);
                 const maxSpeed = Math.max(...speeds, 400);
