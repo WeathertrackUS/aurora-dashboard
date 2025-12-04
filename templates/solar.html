@@ -1781,7 +1781,7 @@
                              alt="HMI Magnetogram" 
                              style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                              onclick="openImageModal(this.src, 'SDO HMI Magnetogram')"
-                             loading="lazy" onerror="this.src='https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg'">
+                             loading="lazy" onerror="this.src='https://jsoc1.stanford.edu/data/hmi/images/latest/HMI_latest_color_Mag_4096x4096.jpg'">
                     </div>
                 </div>
                 <div class="card">
@@ -2821,10 +2821,6 @@
                 const hmiContinuumLayers = encodeURIComponent('[SDO,HMI,HMI,continuum,1,100]');
                 const hmiContinuumUrl = `https://api.helioviewer.org/v2/takeScreenshot/?date=${isoDate}&imageScale=${imageScale}&layers=${hmiContinuumLayers}&x0=${x0}&y0=${y0}&width=${pixelSize}&height=${pixelSize}&display=true&watermark=false`;
                 
-                // HMI Magnetogram for magnetic field
-                const hmiMagLayers = encodeURIComponent('[SDO,HMI,HMI,magnetogram,1,100]');
-                const hmiMagUrl = `https://api.helioviewer.org/v2/takeScreenshot/?date=${isoDate}&imageScale=${imageScale}&layers=${hmiMagLayers}&x0=${x0}&y0=${y0}&width=${pixelSize}&height=${pixelSize}&display=true&watermark=false`;
-                
                 console.log(`HMI for ${regionNumber} at ${location}: x0=${x0}", y0=${y0}"`);
                 console.log(`Continuum URL: ${hmiContinuumUrl}`);
                 
@@ -2841,18 +2837,33 @@
                 };
                 intensityImg.src = hmiContinuumUrl;
                 
-                // Create colorized HMI magnetogram
+                // Create cropped color magnetogram using backend proxy
+                const fullDiskSize = 4096;
+                const diskRadiusPixels = fullDiskSize / 2;
+                const arcsecToPixel = diskRadiusPixels / solarRadius;
+                
+                const centerX = fullDiskSize / 2;
+                const centerY = fullDiskSize / 2;
+                
+                const regionCenterX = centerX + (x0 * arcsecToPixel);
+                const regionCenterY = centerY + (y0 * arcsecToPixel);
+                const cropSize = fovSize * arcsecToPixel;
+                
+                // Use backend proxy to crop and serve the magnetogram
+                const magProxyUrl = `/api/proxy-magnetogram?x=${regionCenterX}&y=${regionCenterY}&size=${cropSize}&output_size=${pixelSize}`;
+                console.log(`Magnetogram proxy URL: ${magProxyUrl}`);
+                
                 const magImg = document.createElement('img');
                 magImg.style.width = '100%';
                 magImg.style.height = '100%';
                 magImg.style.objectFit = 'contain';
                 magImg.style.cursor = 'pointer';
-                magImg.onclick = () => openImageModal(hmiMagUrl, `HMI Magnetogram - Region ${regionNumber} at ${location}`);
+                magImg.onclick = () => openImageModal(magProxyUrl, `HMI Color Magnetogram - Region ${regionNumber} at ${location}`);
                 magImg.onerror = () => {
-                    console.error('Failed to load HMI Magnetogram');
+                    console.error('Failed to load magnetogram');
                     magnetogramDiv.innerHTML = 'Image unavailable';
                 };
-                magImg.src = hmiMagUrl;
+                magImg.src = magProxyUrl;
                 
                 // Clear and add images
                 intensitygramDiv.innerHTML = '';

@@ -3370,6 +3370,52 @@ def get_system_alert():
             'dismissible': True
         })
 
+@app.route('/api/proxy-magnetogram')
+def proxy_magnetogram():
+    """Proxy the JSOC magnetogram image to avoid CORS issues"""
+    try:
+        mag_url = 'https://jsoc1.stanford.edu/data/hmi/images/latest/HMI_latest_color_Mag_4096x4096.jpg'
+        
+        # Get query parameters for cropping
+        x = request.args.get('x', type=float)
+        y = request.args.get('y', type=float)
+        size = request.args.get('size', type=float)
+        output_size = request.args.get('output_size', type=int, default=512)
+        
+        response = requests.get(mag_url, timeout=30)
+        
+        if response.status_code == 200:
+            # If crop parameters provided, crop the image
+            if x is not None and y is not None and size is not None:
+                img = Image.open(BytesIO(response.content))
+                
+                # Crop the image
+                left = int(x - size / 2)
+                top = int(y - size / 2)
+                right = int(x + size / 2)
+                bottom = int(y + size / 2)
+                
+                cropped = img.crop((left, top, right, bottom))
+                cropped = cropped.resize((output_size, output_size), Image.Resampling.LANCZOS)
+                
+                # Convert to bytes
+                output = BytesIO()
+                cropped.save(output, format='JPEG', quality=95)
+                output.seek(0)
+                
+                return send_file(output, mimetype='image/jpeg')
+            else:
+                # Return full image
+                return send_file(BytesIO(response.content), mimetype='image/jpeg')
+        else:
+            return jsonify({'error': 'Failed to fetch magnetogram'}), 500
+            
+    except Exception as e:
+        print(f"Error proxying magnetogram: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     import sys
     
