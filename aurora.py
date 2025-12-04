@@ -2698,6 +2698,7 @@ def get_solar_flares():
             'api_key': 'bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm'
         }
         
+        print(f"[SOLAR_FLARES] Fetching flares from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
         response = requests.get(url, params=params, timeout=10)
         
         # Check if response is successful
@@ -2709,6 +2710,7 @@ def get_solar_flares():
             return resp
         
         flares_data = response.json()
+        print(f"[SOLAR_FLARES] Retrieved {len(flares_data)} total flares from DONKI")
         
         # Include C, M, and X class flares (filtering done on frontend)
         significant_flares = []
@@ -2727,6 +2729,10 @@ def get_solar_flares():
         # Sort by time (most recent first)
         significant_flares.sort(key=lambda x: x['time'], reverse=True)
         
+        print(f"[SOLAR_FLARES] Filtered to {len(significant_flares)} C/M/X class flares")
+        if significant_flares:
+            print(f"[SOLAR_FLARES] Most recent: {significant_flares[0]['class']} at {significant_flares[0]['time']}")
+        
         resp = jsonify({'flares': significant_flares[:20]})  # Limit to 20 most recent
         resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return resp
@@ -2736,6 +2742,53 @@ def get_solar_flares():
     except Exception as e:
         print(f"Error fetching solar flares: {e}")
         return jsonify({'flares': [], 'error': str(e)})
+
+@app.route('/api/swpc-events')
+def get_swpc_events():
+    """Get real-time solar events from NOAA SWPC (supplements DONKI data)"""
+    try:
+        # NOAA SWPC provides a real-time solar event feed
+        url = "https://services.swpc.noaa.gov/json/solar_events_last_30_days.json"
+        
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            print(f"[SWPC_EVENTS] Error: {response.status_code}")
+            return jsonify({'events': [], 'error': 'SWPC API unavailable'})
+        
+        events_data = response.json()
+        print(f"[SWPC_EVENTS] Retrieved {len(events_data)} events from SWPC")
+        
+        # Filter for X-ray events (Type 1)
+        flare_events = []
+        for event in events_data:
+            event_type = event.get('event_type', '')
+            if event_type == '1':  # Type 1 = X-ray event (solar flare)
+                particulars = event.get('particulars', '')
+                # Parse the flare class from particulars (e.g., "M1.2" or "X2.5")
+                flare_class = particulars.split()[0] if particulars else None
+                
+                if flare_class and (flare_class[0] in ['C', 'M', 'X']):
+                    flare_events.append({
+                        'time': event.get('event_starttime', 'N/A'),
+                        'class': flare_class,
+                        'source': event.get('active_region', 'N/A'),
+                        'region': event.get('active_region_num', 'N/A'),
+                        'peak_time': event.get('event_peaktime', 'N/A'),
+                        'end_time': event.get('event_endtime', 'N/A'),
+                        'linked_events': None,
+                        'swpc_realtime': True
+                    })
+        
+        print(f"[SWPC_EVENTS] Filtered to {len(flare_events)} flare events (C/M/X)")
+        if flare_events:
+            print(f"[SWPC_EVENTS] Most recent: {flare_events[0]['class']} at {flare_events[0]['time']}")
+        
+        resp = jsonify({'events': flare_events})
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
+    except Exception as e:
+        print(f"[SWPC_EVENTS] Error: {e}")
+        return jsonify({'events': [], 'error': str(e)})
 
 @app.route('/api/aurora-probability')
 def calculate_aurora_probability():
