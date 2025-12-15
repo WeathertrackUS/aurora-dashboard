@@ -2237,24 +2237,85 @@
             
             console.log(`X-ray data points: ${long.length}, range: ${currentXrayRange}`);
             
+            // Create colored segments based on flux ranges
+            const traces = [];
+            
+            // Group consecutive points by their color range
+            let currentRange = null;
+            let currentSegment = { x: [], y: [], text: [] };
+            
+            function getFluxColor(flux) {
+                if (flux >= 1e-3) return '#ff1493'; // Pink for X10+
+                if (flux >= 1e-4) return '#ff0000'; // Bright red for X
+                if (flux >= 1e-5) return '#ff8c00'; // Bright orange for M
+                if (flux >= 1e-6) return '#ffff00'; // Bright yellow for C
+                return '#00ff00'; // Bright green for A/B
+            }
+            
+            long.forEach((d, i) => {
+                const flux = d.flux;
+                const color = getFluxColor(flux);
+                
+                if (color !== currentRange) {
+                    // Save previous segment if it has data
+                    if (currentSegment.x.length > 0) {
+                        // Add current point to previous segment for continuity
+                        currentSegment.x.push(d.time_tag);
+                        currentSegment.y.push(flux);
+                        currentSegment.text.push(getFlareClass(flux));
+                        
+                        traces.push({
+                            x: currentSegment.x,
+                            y: currentSegment.y,
+                            text: currentSegment.text,
+                            hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} W/m²<br><b>%{text}</b><extra></extra>`,
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { 
+                                color: currentRange,
+                                width: 2,
+                                shape: 'linear'
+                            },
+                            showlegend: false
+                        });
+                        
+                        // Start new segment with current point
+                        currentRange = color;
+                        currentSegment = { x: [d.time_tag], y: [flux], text: [getFlareClass(flux)] };
+                    } else {
+                        // First segment
+                        currentRange = color;
+                        currentSegment = { x: [d.time_tag], y: [flux], text: [getFlareClass(flux)] };
+                    }
+                } else {
+                    currentSegment.x.push(d.time_tag);
+                    currentSegment.y.push(flux);
+                    currentSegment.text.push(getFlareClass(flux));
+                }
+            });
+            
+            // Add the last segment
+            if (currentSegment.x.length > 0) {
+                traces.push({
+                    x: currentSegment.x,
+                    y: currentSegment.y,
+                    text: currentSegment.text,
+                    hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} W/m²<br><b>%{text}</b><extra></extra>`,
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { 
+                        color: currentRange,
+                        width: 2,
+                        shape: 'linear'
+                    },
+                    showlegend: false
+                });
+            }
+            
+            // Fallback to single trace if no segments
             const xValues = long.map(d => d.time_tag);
             const yValues = long.map(d => d.flux);
             const textValues = yValues.map(y => getFlareClass(y));
-
-            const trace = {
-                x: xValues,
-                y: yValues,
-                text: textValues,
-                hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} W/m²<br><b>%{text}</b><extra></extra>`,
-                name: 'X-Ray Flux',
-                type: 'scatter',
-                mode: 'lines',
-                line: { 
-                    color: '#ffffff', 
-                    width: 2,
-                    shape: 'spline'
-                }
-            };
             
             console.log('X-ray trace data:', {
                 points: xValues.length,
@@ -2406,7 +2467,52 @@
                     { type: 'line', y0: 1e-6, y1: 1e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.3)', width: 1, dash: 'dot' } },
                     { type: 'line', y0: 1e-5, y1: 1e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.4)', width: 1, dash: 'dot' } },
                     { type: 'line', y0: 1e-4, y1: 1e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.5)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 1e-3, y1: 1e-3, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(232, 121, 249, 0.6)', width: 1, dash: 'dot' } }
+                    { type: 'line', y0: 1e-3, y1: 1e-3, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(232, 121, 249, 0.6)', width: 1, dash: 'dot' } },
+                    // Intermediate Grid Lines - A range
+                    { type: 'line', y0: 2e-8, y1: 2e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 3e-8, y1: 3e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 4e-8, y1: 4e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 5e-8, y1: 5e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 6e-8, y1: 6e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 7e-8, y1: 7e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 8e-8, y1: 8e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 9e-8, y1: 9e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    // Intermediate Grid Lines - B range
+                    { type: 'line', y0: 2e-7, y1: 2e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 3e-7, y1: 3e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 4e-7, y1: 4e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 5e-7, y1: 5e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 6e-7, y1: 6e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 7e-7, y1: 7e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 8e-7, y1: 8e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 9e-7, y1: 9e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
+                    // Intermediate Grid Lines - C range
+                    { type: 'line', y0: 2e-6, y1: 2e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 3e-6, y1: 3e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 4e-6, y1: 4e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 5e-6, y1: 5e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 6e-6, y1: 6e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 7e-6, y1: 7e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 8e-6, y1: 8e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 9e-6, y1: 9e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
+                    // Intermediate Grid Lines - M range
+                    { type: 'line', y0: 2e-5, y1: 2e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 3e-5, y1: 3e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 4e-5, y1: 4e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 5e-5, y1: 5e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 6e-5, y1: 6e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 7e-5, y1: 7e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 8e-5, y1: 8e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 9e-5, y1: 9e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
+                    // Intermediate Grid Lines - X range
+                    { type: 'line', y0: 2e-4, y1: 2e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 3e-4, y1: 3e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 4e-4, y1: 4e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 5e-4, y1: 5e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 6e-4, y1: 6e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 7e-4, y1: 7e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 8e-4, y1: 8e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
+                    { type: 'line', y0: 9e-4, y1: 9e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } }
                 ],
                 annotations: [
                     ...flareAnnotations,
@@ -2419,7 +2525,7 @@
 
             // Purge and recreate for clean render
             Plotly.purge('xray-chart');
-            Plotly.newPlot('xray-chart', [trace], layout, {responsive: true, displayModeBar: false});
+            Plotly.newPlot('xray-chart', traces, layout, {responsive: true, displayModeBar: false});
         }
 
         function updateProtonChart(data) {
