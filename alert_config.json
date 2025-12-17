@@ -1,6 +1,6 @@
 [
   {
-    "enabled": true,
+    "enabled": false,
     "message": "We are aware of an issue affecting images from SDO. We are working to resolve it as quickly as possible. See #6 for the latest on the issue.",
     "issue_repo": "WeathertrackUS/aurora-dashboard",
     "type": "warning",
