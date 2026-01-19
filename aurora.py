@@ -53,6 +53,58 @@ GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-d
 GOES_PROTON_URL = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
 SOLAR_REGIONS_URL = "https://services.swpc.noaa.gov/json/solar_regions.json"
 
+def interpolate_gaps(values, max_gap_minutes=10, time_interval_minutes=1):
+    """
+    Interpolate missing/None/NaN values in a data series.
+    Only interpolates gaps up to max_gap_minutes in duration.
+    Larger gaps are left as NaN to avoid showing misleading data.
+    
+    Args:
+        values: List of numeric values (may contain None or NaN)
+        max_gap_minutes: Maximum gap size to interpolate (in minutes)
+        time_interval_minutes: Time between data points (default 1 minute for SWPC data)
+    
+    Returns:
+        List with interpolated values
+    """
+    if not values or len(values) == 0:
+        return values
+    
+    # Convert to numpy array with NaN for None values
+    arr = np.array([float(v) if v is not None and v != '' else np.nan for v in values], dtype=float)
+    
+    # Find indices of valid (non-NaN) values
+    valid_mask = ~np.isnan(arr)
+    valid_indices = np.where(valid_mask)[0]
+    
+    if len(valid_indices) < 2:
+        # Not enough valid points to interpolate
+        return arr.tolist()
+    
+    # Calculate max gap size in data points
+    max_gap_points = int(max_gap_minutes / time_interval_minutes)
+    
+    # Interpolate gaps
+    result = arr.copy()
+    
+    for i in range(len(valid_indices) - 1):
+        start_idx = valid_indices[i]
+        end_idx = valid_indices[i + 1]
+        gap_size = end_idx - start_idx - 1
+        
+        # Only interpolate if gap is within acceptable range
+        if gap_size > 0 and gap_size <= max_gap_points:
+            start_val = arr[start_idx]
+            end_val = arr[end_idx]
+            
+            # Linear interpolation
+            for j in range(1, gap_size + 1):
+                alpha = j / (gap_size + 1)
+                result[start_idx + j] = start_val + alpha * (end_val - start_val)
+    
+    return result.tolist()
+
+
 def fetch_solar_wind_data():
     """Fetch current solar wind plasma and magnetic field data"""
     try:
@@ -157,6 +209,13 @@ def fetch_solar_wind_history():
         if len(times) == 0:
             print("Warning: No valid historical data parsed")
             return None
+        
+        # Interpolate gaps in the data to smooth over temporary dropouts
+        # Use 10-minute max gap to avoid interpolating over extended outages
+        speeds = interpolate_gaps(speeds, max_gap_minutes=10, time_interval_minutes=1)
+        densities = interpolate_gaps(densities, max_gap_minutes=10, time_interval_minutes=1)
+        bzs = interpolate_gaps(bzs, max_gap_minutes=10, time_interval_minutes=1)
+        bts = interpolate_gaps(bts, max_gap_minutes=10, time_interval_minutes=1)
         
         return {
             'times': times,

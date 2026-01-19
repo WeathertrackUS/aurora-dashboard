@@ -44,12 +44,13 @@
         .dashboard-grid {
             display: grid;
             grid-template-columns: 1.6fr 1fr;
-            grid-template-rows: 0.5fr 1fr 1fr 1fr 1fr auto;
+            grid-template-rows: minmax(80px, 0.5fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto;
             gap: 0.5rem;
             width: 100%;
             max-width: 2400px;
             margin: 0 auto;
             padding: 0.5rem;
+            min-height: calc(100vh - 60px);
         }
         
         .chart-panel {
@@ -57,11 +58,13 @@
             border: var(--glass-border);
             border-radius: 3px;
             padding: 0.25rem;
-            min-height: 100px;
-            max-height: 300px;
+            min-height: 120px;
+            height: 100%;
             position: relative;
             overflow: hidden;
             transition: background 0.2s ease;
+            display: flex;
+            flex-direction: column;
         }
         
         .chart-panel:hover {
@@ -93,9 +96,12 @@
         
         .chart-container {
             width: 100%;
-            height: 100%;
+            height: calc(100% - 35px);
             min-height: 80px;
-            max-height: 260px;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
         }
 
         .chart-title {
@@ -973,9 +979,12 @@
             
             .chart-panel {
                 border-radius: 4px;
-                min-height: 160px;
-                max-height: 220px;
+                min-height: 140px;
                 padding: 0.5rem;
+            }
+            
+            .chart-container {
+                height: calc(100% - 30px);
             }
             
             .sidebar {
@@ -1379,7 +1388,7 @@
     </main>
     <footer>
         <p>Data provided by NOAA Space Weather Prediction Center</p>
-        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2025 Weather Track US</p>
+        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2026 Weather Track US</p>
     </footer>
 
     <div class="toast" id="toast">
@@ -2195,15 +2204,27 @@
             
             // Force Plotly to resize all charts after render
             setTimeout(() => {
-                const chartIds = ['chart-speed', 'chart-density', 'chart-bt', 'chart-bz', 'chart-mag', 'chart-power', 'chart-dst'];
-                chartIds.forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        Plotly.Plots.resize(element);
-                    }
-                });
+                resizeAllCharts();
             }, 100);
         }
+        
+        // Global resize function for all Plotly charts
+        function resizeAllCharts() {
+            const chartIds = ['chart-speed', 'chart-density', 'chart-bt', 'chart-bz', 'chart-mag', 'chart-power', 'chart-dst'];
+            chartIds.forEach(id => {
+                const element = document.getElementById(id);
+                if (element && element.data) {
+                    Plotly.Plots.resize(element);
+                }
+            });
+        }
+        
+        // Debounced resize handler for window resize events
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(resizeAllCharts, 150);
+        });
 
         function formatKp(kp) {
             // Convert decimal Kp to proper format
@@ -2219,23 +2240,10 @@
         function updateDataCard(data) {
             const safeVal = (val, decimals = 1) => val !== null && val !== undefined ? Number(val).toFixed(decimals) : '--';
             
-            // Get observed Kp (current/historical)
+            // Get observed Kp (current/historical) - ONLY use observed, never forecast
             let kp = data.kp_index?.kp || 0;
-            let kpSource = 'observed';
             
-            console.log('[KP_INDEX] Observed Kp: ' + kp);
-            
-            // Check if we have forecast data with higher Kp values
-            // This will be set by fetchGeomagneticAlerts()
-            if (window.forecastMaxKp && window.forecastMaxKp > kp) {
-                console.log('[KP_INDEX] Using forecast Kp: ' + window.forecastMaxKp + ' (higher than observed ' + kp + ')');
-                kp = window.forecastMaxKp;
-                kpSource = 'forecast';
-            } else if (window.forecastMaxKp) {
-                console.log('[KP_INDEX] Forecast Kp ' + window.forecastMaxKp + ' is lower than observed ' + kp + ', keeping observed');
-            }
-            
-            console.log('[KP_INDEX] Final displayed Kp: ' + kp + ' (source: ' + kpSource + ')');
+            console.log('[KP_INDEX] Observed Kp: ' + kp + ' (forecast values ignored)');
             document.getElementById('kp-value-text').textContent = formatKp(kp);
             const kpFill = document.getElementById('kp-fill');
             const kpPercent = Math.min((kp / 9) * 100, 100);
@@ -2688,79 +2696,154 @@
         function calculateMoonPhase() {
             const now = new Date();
             
-            // Known new moon: January 11, 2024 at 11:57 UTC
-            const knownNewMoon = new Date('2024-01-11T11:57:00Z');
+            // Known new moon: January 29, 2025 at 12:36 UTC (more recent reference)
+            const knownNewMoon = new Date('2025-01-29T12:36:00Z');
             const lunarCycle = 29.53058867; // days
             
             // Calculate days since known new moon
             const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
-            const phase = ((daysSinceNew % lunarCycle) / lunarCycle);
+            const daysInCycle = ((daysSinceNew % lunarCycle) + lunarCycle) % lunarCycle;
+            const phase = daysInCycle / lunarCycle;
             
-            // Calculate illumination percentage
-            const illumination = Math.abs(Math.cos(phase * 2 * Math.PI));
-            const illuminationPercent = Math.round(illumination * 100);
+            // Calculate illumination percentage (more accurate formula)
+            // Illumination increases from 0 at new moon to 100% at full moon (phase 0.5)
+            const illuminationPercent = Math.round(50 * (1 - Math.cos(phase * 2 * Math.PI)));
             
-            // Determine phase name and image
-            let phaseName, moonImage, visibilityImpact;
+            // Determine phase name and visibility impact
+            let phaseName, visibilityImpact;
             
             if (phase < 0.033 || phase > 0.967) {
                 phaseName = 'New Moon';
-                moonImage = 'new-moon.png';
                 visibilityImpact = 'Excellent for aurora viewing - dark skies';
             } else if (phase < 0.216) {
                 phaseName = 'Waxing Crescent';
-                moonImage = 'waxing-crescent.png';
                 visibilityImpact = 'Very good - minimal moonlight interference';
             } else if (phase < 0.283) {
                 phaseName = 'First Quarter';
-                moonImage = 'first-quarter.png';
                 visibilityImpact = 'Good - moon sets around midnight';
             } else if (phase < 0.466) {
                 phaseName = 'Waxing Gibbous';
-                moonImage = 'waxing-gibbous.png';
                 visibilityImpact = 'Fair - bright moon may reduce visibility';
             } else if (phase < 0.533) {
                 phaseName = 'Full Moon';
-                moonImage = 'full-moon.png';
                 visibilityImpact = 'Poor - bright moonlight washes out aurora';
             } else if (phase < 0.716) {
                 phaseName = 'Waning Gibbous';
-                moonImage = 'waning-gibbous.png';
                 visibilityImpact = 'Fair - moon rises late';
             } else if (phase < 0.783) {
                 phaseName = 'Last Quarter';
-                moonImage = 'last-quarter.png';
                 visibilityImpact = 'Good - moon rises after midnight';
             } else {
                 phaseName = 'Waning Crescent';
-                moonImage = 'waning-crescent.png';
                 visibilityImpact = 'Very good - moon rises near dawn';
             }
             
-            // Update display
+            // Generate realistic moon SVG based on phase
             const moonImgElem = document.getElementById('moon-image');
             if (moonImgElem) {
-                // Use simple, reliable image URLs from a CDN
-                const moonIcons = {
-                    'new-moon.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/></svg>',
-                    'waxing-crescent.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,1 50,95 A35,35 0 0,0 50,5" fill="%23ddd"/></svg>',
-                    'first-quarter.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,1 50,95 Z" fill="%23ddd"/></svg>',
-                    'waxing-gibbous.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ddd" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,0 50,95 A15,15 0 0,1 50,5" fill="%23333"/></svg>',
-                    'full-moon.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ddd" stroke="%23999" stroke-width="2"/></svg>',
-                    'waning-gibbous.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ddd" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,1 50,95 A15,15 0 0,0 50,5" fill="%23333"/></svg>',
-                    'last-quarter.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,0 50,95 Z" fill="%23ddd"/></svg>',
-                    'waning-crescent.png': 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23333" stroke="%23999" stroke-width="2"/><path d="M50,5 A45,45 0 0,0 50,95 A35,35 0 0,1 50,5" fill="%23ddd"/></svg>'
-                };
-                moonImgElem.src = moonIcons[moonImage] || moonIcons['new-moon.png'];
+                moonImgElem.src = generateMoonSVG(phase);
                 moonImgElem.alt = phaseName;
-                moonImgElem.onerror = function() {
-                    console.error('Failed to load moon phase image');
-                    this.style.display = 'none';
-                };
             }
             document.getElementById('moon-phase-name').textContent = phaseName;
             document.getElementById('moon-illumination').textContent = `${illuminationPercent}% illuminated`;
             document.getElementById('moon-visibility-impact').textContent = visibilityImpact;
+        }
+        
+        // Generate a realistic moon SVG based on phase (0-1)
+        function generateMoonSVG(phase) {
+            const size = 100;
+            const cx = size / 2;
+            const cy = size / 2;
+            const r = 42;
+            
+            // Waxing (0-0.5) = right side lit, Waning (0.5-1) = left side lit
+            const isWaxing = phase < 0.5;
+            const adjustedPhase = isWaxing ? phase : phase - 0.5;
+            
+            // Calculate terminator curve
+            // At phase 0 (new) and 0.5 (full relative): terminator at edge
+            // Phase 0.25: half moon (terminator at center)
+            const terminatorX = r * Math.cos(adjustedPhase * 2 * Math.PI);
+            
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">`;
+            
+            // Add subtle outer glow
+            svg += `<defs>
+                <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+                    <stop offset="85%" stop-color="%23e8e4d9" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="%23d0ccc0" stop-opacity="0.8"/>
+                </radialGradient>
+                <radialGradient id="moonDark" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="%231a1a1a"/>
+                    <stop offset="100%" stop-color="%23111"/>
+                </radialGradient>
+                <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.5"/>
+                </filter>
+            </defs>`;
+            
+            // Outer glow ring
+            svg += `<circle cx="${cx}" cy="${cy}" r="${r+4}" fill="none" stroke="%23fff" stroke-width="1" opacity="0.15"/>`;
+            
+            if (phase < 0.02 || phase > 0.98) {
+                // New Moon - dark with subtle outline
+                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(%23moonDark)" stroke="%23444" stroke-width="1.5"/>`;
+                svg += `<circle cx="${cx}" cy="${cy}" r="${r-1}" fill="none" stroke="%23222" stroke-width="0.5" opacity="0.5"/>`;
+            } else if (phase > 0.48 && phase < 0.52) {
+                // Full Moon - fully lit with craters
+                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(%23moonGlow)" stroke="%23ccc" stroke-width="1"/>`;
+                // Add crater details
+                svg += `<circle cx="${cx-12}" cy="${cy-8}" r="8" fill="%23d5d0c5" opacity="0.4"/>`;
+                svg += `<circle cx="${cx+15}" cy="${cy+12}" r="6" fill="%23d5d0c5" opacity="0.3"/>`;
+                svg += `<circle cx="${cx-5}" cy="${cy+18}" r="10" fill="%23d5d0c5" opacity="0.35"/>`;
+                svg += `<circle cx="${cx+8}" cy="${cy-15}" r="4" fill="%23d5d0c5" opacity="0.25"/>`;
+            } else {
+                // Partial phases - use clipping path for smooth terminator
+                const litSide = isWaxing ? 'right' : 'left';
+                
+                // Draw dark background
+                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(%23moonDark)" stroke="%23444" stroke-width="1"/>`;
+                
+                // Calculate the illuminated portion using ellipse
+                const illuminatedWidth = Math.abs(terminatorX);
+                
+                if (isWaxing) {
+                    // Right side illuminated, growing
+                    if (adjustedPhase < 0.25) {
+                        // Crescent - small illuminated arc on right
+                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 0 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
+                    } else {
+                        // Gibbous - large illuminated area, small shadow on left
+                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 1 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
+                    }
+                } else {
+                    // Left side illuminated, shrinking (waning)
+                    if (adjustedPhase < 0.25) {
+                        // Gibbous waning - large lit area, shadow growing on right
+                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 0 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
+                    } else {
+                        // Crescent waning - small lit arc on left
+                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 1 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
+                    }
+                }
+                
+                // Add subtle crater details on lit portion
+                if (illuminationPercent > 30) {
+                    const craterOpacity = Math.min(0.3, illuminationPercent / 100 * 0.4);
+                    if (isWaxing || phase > 0.75) {
+                        svg += `<circle cx="${cx+10}" cy="${cy-5}" r="5" fill="%23c5c0b5" opacity="${craterOpacity}"/>`;
+                        svg += `<circle cx="${cx+5}" cy="${cy+15}" r="7" fill="%23c5c0b5" opacity="${craterOpacity * 0.8}"/>`;
+                    }
+                    if (!isWaxing || phase < 0.25) {
+                        svg += `<circle cx="${cx-12}" cy="${cy}" r="6" fill="%23c5c0b5" opacity="${craterOpacity}"/>`;
+                        svg += `<circle cx="${cx-5}" cy="${cy-12}" r="4" fill="%23c5c0b5" opacity="${craterOpacity * 0.7}"/>`;
+                    }
+                }
+            }
+            
+            svg += '</svg>';
+            
+            return 'data:image/svg+xml,' + encodeURIComponent(svg).replace(/'/g, "%27");
         }
 
         // Alert system

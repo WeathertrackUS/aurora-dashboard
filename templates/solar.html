@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Solar Dashboard</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%2388c%22/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -159,18 +159,21 @@
         .stat-card {
             background: var(--bg-panel);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
             padding: 1rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
 
         .stat-card:hover {
             background: var(--bg-panel-hover);
-            transform: translateY(-2px);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+            border-color: rgba(255, 255, 255, 0.12);
         }
 
         /* Tab Navigation */
@@ -179,9 +182,10 @@
             gap: 0.5rem;
             background: var(--bg-panel);
             border-bottom: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
             padding: 0.5rem;
             margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .tab-btn {
@@ -192,9 +196,23 @@
             font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s;
+            border-radius: 6px;
+            transition: all 0.25s ease;
             font-family: var(--font-sans);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tab-btn::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: var(--accent-primary);
+            transition: all 0.25s ease;
+            transform: translateX(-50%);
         }
 
         .tab-btn:hover {
@@ -202,14 +220,22 @@
             background: var(--bg-panel-hover);
         }
 
+        .tab-btn:hover::before {
+            width: 60%;
+        }
+
         .tab-btn.active {
             color: var(--accent-primary);
             background: var(--bg-panel-hover);
         }
 
+        .tab-btn.active::before {
+            width: 80%;
+        }
+
         .tab-content {
             display: none;
-            animation: fadeIn 0.3s;
+            animation: fadeIn 0.3s ease-out;
         }
 
         .tab-content.active {
@@ -474,10 +500,17 @@
         .card {
             background: var(--bg-panel);
             border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 0.4rem;
+            border-radius: 6px;
+            padding: 0.5rem;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
         }
 
         .chart-stats-grid {
@@ -571,27 +604,81 @@
             border-color: var(--accent-primary);
         }
 
+        /* Chart Loading States */
         .chart-container {
             flex: 1;
             width: 100%;
+            height: 100%;
             position: relative;
-            min-height: 520px;
+            min-height: 380px;
         }
 
-        #proton-chart {
-            min-height: 540px;
+        .chart-container.loading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.03) 50%,
+                rgba(255, 255, 255, 0) 100%
+            );
+            animation: shimmer 2s infinite;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .chart-container.loading::after {
+            content: 'Loading chart data...';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            z-index: 2;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        #xray-chart, #proton-chart {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 380px;
         }
 
         .solar-image-container {
             width: 100%;
             flex: 1; /* Fill available vertical space */
             background: #000;
-            border-radius: 2px;
+            border-radius: 4px;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             border: 1px solid var(--border);
+            position: relative;
+            min-height: 200px;
+        }
+
+        .solar-image-container::before {
+            content: '';
+            position: absolute;
+            font-size: 2rem;
+            opacity: 0.3;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .solar-image-container.loaded::before {
+            opacity: 0;
         }
 
         .solar-image-container img {
@@ -599,10 +686,16 @@
             height: 100%;
             object-fit: contain; /* Ensure full sun is visible */
             cursor: zoom-in;
-            transition: transform 0.2s;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
         }
+
+        .solar-image-container img.loaded {
+            opacity: 1;
+        }
+
         .solar-image-container img:hover {
-            transform: scale(1.02);
+            transform: scale(1.03);
         }
 
         .card-header {
@@ -621,6 +714,26 @@
             color: var(--text-primary);
             letter-spacing: 0.02em;
         }
+
+        /* Proton storm label displayed to the right of the header title */
+        .storm-label {
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+            display: inline-block;
+            color: #0f172a;
+        }
+        .storm-label.no-storm {
+            background: rgba(107,117,128,0.12);
+            color: var(--text-secondary);
+        }
+        .storm-label.s1 { background: #f59e0b; color: #071019; }
+        .storm-label.s2 { background: #fb923c; color: #071019; }
+        .storm-label.s3 { background: #ef4444; color: #071019; }
+        .storm-label.s4 { background: #a855f7; color: #ffffff; }
+        .storm-label.s5 { background: #ec4899; color: #ffffff; }
 
         .sunspot-table {
             width: 100%;
@@ -1147,6 +1260,14 @@
                 padding: 0.5rem;
             }
             
+            .chart-container {
+                min-height: 280px;
+            }
+            
+            #proton-chart {
+                min-height: 300px;
+            }
+            
             .time-btn {
                 font-size: 0.75rem;
                 padding: 0.3rem 0.5rem;
@@ -1229,7 +1350,7 @@
                 <span class="stat-value" id="utc-time">--:--</span>
             </div>
             <button class="theme-toggle" onclick="toggleTheme()">
-                <span id="theme-icon">🌙</span>
+                <span id="theme-icon"></span>
                 <span id="theme-text">Dark</span>
             </button>
         </div>
@@ -1253,7 +1374,7 @@
     <!-- Geomagnetic Storm Alert Banner (hidden by default) -->
     <div id="alert-banner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 3px; padding: 0.75rem 1rem; margin: 0.5rem 1rem; animation: pulse 2s ease-in-out infinite;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span style="font-size: 1.5rem;">⚠️</span>
+            <span style="font-size: 1.5rem;"></span>
             <div style="flex: 1;">
                 <div style="font-weight: 600; color: #ef4444; margin-bottom: 0.25rem;">Geomagnetic Storm Alert</div>
                 <div id="alert-message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
@@ -1299,7 +1420,7 @@
                         <button class="time-btn" data-range="7d" onclick="setXrayRange('7d')">7d</button>
                     </div>
                 </div>
-                <div class="chart-container" id="xray-chart"></div>
+                <div class="chart-container loading" id="xray-chart"></div>
                 
                 <!-- Integrated Stats -->
                 <div class="chart-stats-grid">
@@ -1347,9 +1468,12 @@
         <div class="content-row">
             <!-- Proton Flux Chart -->
             <div class="card">
-                <div class="card-header">
-                    <div class="card-title">GOES Proton Flux</div>
-                    <div class="time-range-selector">
+                    <div class="card-header">
+                        <div style="display:flex; align-items:center;">
+                        <div class="card-title">GOES Proton Flux</div>
+                        <div id="proton-storm-label" class="storm-label no-storm">No Storm</div>
+                        </div>
+                        <div class="time-range-selector">
                         <button class="time-btn" data-range="2h" onclick="setProtonRange('2h')">2h</button>
                         <button class="time-btn" data-range="6h" onclick="setProtonRange('6h')">6h</button>
                         <button class="time-btn" data-range="12h" onclick="setProtonRange('12h')">12h</button>
@@ -1359,7 +1483,7 @@
                         <button class="time-btn" data-range="7d" onclick="setProtonRange('7d')">7d</button>
                     </div>
                 </div>
-                <div class="chart-container" id="proton-chart"></div>
+                <div class="chart-container loading" id="proton-chart"></div>
                 
                 <!-- Proton Controls -->
                 <div class="proton-controls">
@@ -1625,36 +1749,7 @@
                 </div>
             </div>
 
-            <!-- Time Machine - Compare Historical Data -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        🕐 Time Machine - Compare Historical Conditions
-                        <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">Load and compare solar activity from any past date. Useful for studying previous storms and events.</span>
-                        </span>
-                    </div>
-                </div>
-                <div class="compare-controls">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <label style="color: var(--text-secondary); font-size: 0.9rem;">Select Date:</label>
-                        <input type="date" id="compare-date" max="" />
-                    </div>
-                    <button onclick="loadHistoricalData()" style="background: #3b82f6; border-color: #60a5fa;">
-                        📅 Load Historical Data
-                    </button>
-                    <button onclick="resetToLive()" style="background: #22c55e; border-color: #4ade80;">
-                        🔄 Back to Live Data
-                    </button>
-                    <div id="compare-mode-indicator" style="display: none;">
-                        <span class="compare-badge">VIEWING HISTORICAL DATA</span>
-                    </div>
-                </div>
-                <div id="compare-info" style="padding: 1rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
-                    <p style="margin: 0;">💡 <strong>Tip:</strong> Select a date to view historical solar activity, X-ray flux, and geomagnetic conditions. Great for comparing current activity to past storms.</p>
-                    <p style="margin: 0.5rem 0 0 0;"><strong>Notable Events:</strong> May 10-11, 2024 (Extreme G5 storm) • Oct 10-11, 2024 (G4 storm) • Mar 24-25, 2024 (G4 storm)</p>
-                </div>
-            </div>
+
 
         </div>
         <!-- End Tab: Earth Impact & CMEs -->
@@ -1709,299 +1804,271 @@
 
         <!-- Tab: Solar Imagery -->
         <div id="tab-solar-imagery" class="tab-content">
-            
-            <!-- Image Timeline Controls -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">Image Timeline Controls</div>
-                </div>
-                <div style="padding: 1rem;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
-                        <div>
-                            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">Date</label>
-                            <input type="date" id="sdo-date-selector" 
-                                   style="width: 100%; padding: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono);">
+
+            <!-- Section: Featured Views -->
+            <div style="margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">Featured Views</h2>
+                <div class="grid-3">
+                    <!-- SDO Composite -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                Multi-Wavelength Composite
+                                <span class="tooltip help-icon">ℹ️
+                                    <span class="tooltiptext">Combined AIA 211Å, 193Å, 171Å showing different atmospheric layers in one image.</span>
+                                </span>
+                            </div>
                         </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">Time (UTC)</label>
-                            <input type="time" id="sdo-time-selector" 
-                                   style="width: 100%; padding: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono);">
-                        </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button onclick="loadHistoricalSDO()" class="btn btn-primary" style="padding: 0.5rem 1rem;">Load Images</button>
-                            <button onclick="resetToLatest()" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Latest</button>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_211193171.jpg" 
+                                 alt="SDO Composite" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_211193171.jpg', 'SDO Multi-Wavelength Composite')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg'">
                         </div>
                     </div>
-                    <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(139, 139, 139, 0.1); border-radius: 3px;">
-                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Quick Navigation</div>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button onclick="offsetTime(-24)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">-24h</button>
-                            <button onclick="offsetTime(-6)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">-6h</button>
-                            <button onclick="offsetTime(-1)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">-1h</button>
-                            <button onclick="offsetTime(1)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">+1h</button>
-                            <button onclick="offsetTime(6)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">+6h</button>
-                            <button onclick="offsetTime(24)" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">+24h</button>
+                    <!-- HMI Magnetogram -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                HMI Magnetogram
+                                <span class="tooltip help-icon">ℹ️
+                                    <span class="tooltiptext">Magnetic field polarity: white/red = positive, black/blue = negative.</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg" 
+                                 alt="HMI Magnetogram" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_HMIBC.jpg', 'SDO HMI Magnetogram')"
+                                 loading="lazy" onerror="this.src='https://jsoc1.stanford.edu/data/hmi/images/latest/HMI_latest_color_Mag_4096x4096.jpg'">
+                        </div>
+                    </div>
+                    <!-- HMI Continuum -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                Visible Light (Sunspots)
+                                <span class="tooltip help-icon">ℹ️
+                                    <span class="tooltiptext">Photosphere in visible light showing sunspots as dark regions.</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg" 
+                                 alt="HMI Continuum" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_HMII.jpg', 'SDO HMI Visible Light')"
+                                 loading="lazy" onerror="this.src='https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg'">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- SDO Full Disk Composite -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        SDO Full Disk Multi-Wavelength Composite
-                        <span class="tooltip help-icon">ℹ️
-                            <span class="tooltiptext">Composite view showing different layers of the solar atmosphere simultaneously (AIA 211Å, 193Å, 171Å combined).</span>
-                        </span>
-                    </div>
-                </div>
-                <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                    <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_211193171.jpg" 
-                         alt="SDO Composite" 
-                         style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                         onclick="openImageModal(this.src, 'SDO Multi-Wavelength Composite')"
-                         loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg'">
-                </div>
-            </div>
-
-            <!-- Magnetogram & Continuum -->
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            SDO HMI Magnetogram
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Shows magnetic field strength and polarity on the solar surface. Red/white = positive polarity, blue/black = negative polarity.</span>
-                            </span>
+            <!-- Section: SDO AIA Extreme UV -->
+            <div style="margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">SDO AIA Extreme UV (by Temperature)</h2>
+                <div class="grid-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">304Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~60,000K</span></div>
                         </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg" 
+                                 alt="AIA 304Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0304.jpg', 'SDO AIA 304Å - Chromosphere (~60,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0304.jpg'">
+                        </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Chromosphere & prominences</div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg" 
-                             alt="HMI Magnetogram" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO HMI Magnetogram')"
-                             loading="lazy" onerror="this.src='https://jsoc1.stanford.edu/data/hmi/images/latest/HMI_latest_color_Mag_4096x4096.jpg'">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">171Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~600,000K</span></div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg" 
+                                 alt="AIA 171Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0171.jpg', 'SDO AIA 171Å - Quiet Corona (~600,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0171.jpg'">
+                        </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Quiet corona & loops</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">193Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~1MK</span></div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg" 
+                                 alt="AIA 193Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0193.jpg', 'SDO AIA 193Å - Hot Corona (~1,000,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg'">
+                        </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Corona & coronal holes</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">211Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~2MK</span></div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0211.jpg" 
+                                 alt="AIA 211Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0211.jpg', 'SDO AIA 211Å - Active Regions (~2,000,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0211.jpg'">
+                        </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Active regions</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">335Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~2.5MK</span></div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0335.jpg" 
+                                 alt="AIA 335Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0335.jpg', 'SDO AIA 335Å - Very Hot Plasma (~2,500,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0335.jpg'">
+                        </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Very hot plasma</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">94Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~6MK</span></div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0094.jpg" 
+                                 alt="AIA 94Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0094.jpg', 'SDO AIA 94Å - Flare Plasma (~6,000,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0094.jpg'">
+                        </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Flare plasma (hottest)</div>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            SDO HMI Continuum (Visible Light)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Visible light image showing sunspot regions as dark areas on the solar photosphere.</span>
-                            </span>
+                
+                <!-- Additional AIA wavelengths -->
+                <div class="grid-3" style="margin-top: 0.75rem;">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">131Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~10MK</span></div>
                         </div>
-                    </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg" 
-                             alt="HMI Continuum" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO HMI Continuum (Visible Light)')"
-                             loading="lazy" onerror="this.src='https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg'">
-                    </div>
-                </div>
-            </div>
-
-            <!-- SDO AIA Extreme UV - Temperature Range -->
-            <div class="grid-3">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 304Å (Chromosphere)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">He II emission showing chromosphere and prominences (~60,000K).</span>
-                            </span>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0131.jpg" 
+                                 alt="AIA 131Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0131.jpg', 'SDO AIA 131Å - Flaring Regions (~10,000,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0131.jpg'">
                         </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Flaring regions</div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg" 
-                             alt="AIA 304" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 304Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0304.jpg'">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 171Å (Quiet Corona)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe IX emission showing quiet corona and coronal loops (~600,000K).</span>
-                            </span>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">1600Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~100,000K</span></div>
                         </div>
-                    </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg" 
-                             alt="AIA 171" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 171Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0171.jpg'">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 193Å (Hot Corona)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XII emission showing hot coronal loops and flare plasma (~1,000,000K).</span>
-                            </span>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_1600.jpg" 
+                                 alt="AIA 1600Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_1600.jpg', 'SDO AIA 1600Å - Transition Region (~100,000K)')"
+                                 loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l1600.jpg'">
                         </div>
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Transition region</div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg" 
-                             alt="AIA 193" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 193Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg'">
-                    </div>
-                </div>
-            </div>
-
-            <!-- More AIA Wavelengths -->
-            <div class="grid-3">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 211Å (Active Regions)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XIV emission showing active regions and flaring areas (~2,000,000K).</span>
-                            </span>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">1700Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~5,000K</span></div>
                         </div>
-                    </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0211.jpg" 
-                             alt="AIA 211" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 211Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0211.jpg'">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 131Å (Flaring Regions)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe VIII/XXI emission best for observing solar flare material (~400,000K & ~10,000,000K).</span>
-                            </span>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_1700.jpg" 
+                                 alt="AIA 1700Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_1700.jpg', 'SDO AIA 1700Å - Photosphere & Sunspots (~5,000K)')"
+                                 loading="lazy" onerror="this.src='https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg'">
                         </div>
-                    </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0131.jpg" 
-                             alt="AIA 131" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 131Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0131.jpg'">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 335Å (Very Hot Plasma)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XVI emission showing very hot active region plasma (~2,500,000K).</span>
-                            </span>
-                        </div>
-                    </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0335.jpg" 
-                             alt="AIA 335" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 335Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0335.jpg'">
+                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Photosphere & sunspots</div>
                     </div>
                 </div>
             </div>
 
-            <!-- GOES SUVI Images -->
-            <div class="grid-3">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            GOES SUVI 94Å
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XVIII emission showing hot flare plasma (~6,000,000K).</span>
-                            </span>
+            <!-- Section: GOES SUVI -->
+            <div style="margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">GOES SUVI Real-Time</h2>
+                <div class="grid-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">SUVI 94Å</div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/094/latest.png" 
+                                 alt="GOES SUVI 94Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal(this.src, 'GOES SUVI 94Å - Hot Flare Plasma')"
+                                 loading="lazy">
                         </div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/094/latest.png" 
-                             alt="GOES SUVI 94" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'GOES SUVI 94Å')"
-                             loading="lazy">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            GOES SUVI 195Å
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XII emission showing active regions and coronal holes (~1,500,000K).</span>
-                            </span>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">SUVI 195Å</div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/195/latest.png" 
+                                 alt="GOES SUVI 195Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal(this.src, 'GOES SUVI 195Å - Active Regions & Coronal Holes')"
+                                 loading="lazy">
                         </div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/195/latest.png" 
-                             alt="GOES SUVI 195" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'GOES SUVI 195Å')"
-                             loading="lazy">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            GOES SUVI 284Å
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XV emission showing active regions and filaments (~2,000,000K).</span>
-                            </span>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">SUVI 284Å</div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/284/latest.png" 
+                                 alt="GOES SUVI 284Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal(this.src, 'GOES SUVI 284Å - Filaments & Active Regions')"
+                                 loading="lazy">
                         </div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/284/latest.png" 
-                             alt="GOES SUVI 284" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'GOES SUVI 284Å')"
-                             loading="lazy">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Additional SDO Wavelengths -->
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 94Å (Extremely Hot Regions)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">Fe XVIII emission showing hottest regions, flaring plasma (~6,000,000K).</span>
-                            </span>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">SUVI 131Å</div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png" 
+                                 alt="GOES SUVI 131Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal(this.src, 'GOES SUVI 131Å - Flares')"
+                                 loading="lazy">
                         </div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0094.jpg" 
-                             alt="AIA 94" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 94Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0094.jpg'">
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            AIA 1600Å (Transition Region)
-                            <span class="tooltip help-icon">ℹ️
-                                <span class="tooltiptext">C IV emission showing transition region and upper photosphere (~100,000K).</span>
-                            </span>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">SUVI 171Å</div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/171/latest.png" 
+                                 alt="GOES SUVI 171Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal(this.src, 'GOES SUVI 171Å - Coronal Loops')"
+                                 loading="lazy">
                         </div>
                     </div>
-                    <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
-                        <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_1600.jpg" 
-                             alt="AIA 1600" 
-                             style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
-                             onclick="openImageModal(this.src, 'SDO AIA 1600Å')"
-                             loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l1600.jpg'">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">SUVI 304Å</div>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/304/latest.png" 
+                                 alt="GOES SUVI 304Å" 
+                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
+                                 onclick="openImageModal(this.src, 'GOES SUVI 304Å - Chromosphere & Prominences')"
+                                 loading="lazy">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2013,7 +2080,7 @@
 
     <footer>
         <p>Data provided by NOAA Space Weather Prediction Center</p>
-        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2025 Aurora Dashboard</p>
+        <p style="margin-top: 0.5rem; opacity: 0.6;">&copy; 2026 Weather Track US</p>
     </footer>
 
     <!-- Region Details Modal -->
@@ -2416,6 +2483,7 @@
                     tickvals: [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
                     ticktext: ['A', 'B', 'C', 'M', 'X', 'X10', 'X100']
                 },
+                autosize: true,
                 margin: { t: 5, r: 5, b: 30, l: 40 },
                 shapes: [
                     // A/B Class Zone (Green)
@@ -2525,7 +2593,12 @@
 
             // Purge and recreate for clean render
             Plotly.purge('xray-chart');
-            Plotly.newPlot('xray-chart', traces, layout, {responsive: true, displayModeBar: false});
+            Plotly.newPlot('xray-chart', traces, layout, {responsive: true, displayModeBar: false}).then(() => {
+                // Immediate resize after render promise resolves for proper container fill
+                Plotly.Plots.resize('xray-chart');
+                // Remove loading state
+                document.getElementById('xray-chart').classList.remove('loading');
+            });
         }
 
         function updateProtonChart(data) {
@@ -2540,6 +2613,36 @@
             const p10 = data.filter(d => d.energy === '>=10 MeV');
             const p50 = data.filter(d => d.energy === '>=50 MeV'); // Assuming this exists or similar
             const p100 = data.filter(d => d.energy === '>=100 MeV');
+
+            // Determine current proton storm level based on most recent >=10 MeV flux
+            let currentFlux = null;
+            if (p10 && p10.length) {
+                for (let i = p10.length - 1; i >= 0; i--) {
+                    const v = parseFloat(p10[i].flux);
+                    if (!isNaN(v)) { currentFlux = v; break; }
+                }
+            }
+
+            let stormLevel = null;
+            if (currentFlux !== null) {
+                if (currentFlux >= 100000) stormLevel = 'S5';
+                else if (currentFlux >= 10000) stormLevel = 'S4';
+                else if (currentFlux >= 1000) stormLevel = 'S3';
+                else if (currentFlux >= 100) stormLevel = 'S2';
+                else if (currentFlux >= 10) stormLevel = 'S1';
+            }
+
+            const stormLabelEl = document.getElementById('proton-storm-label');
+            if (stormLabelEl) {
+                if (stormLevel) {
+                    stormLabelEl.textContent = `${stormLevel} Radiation Storm`;
+                    stormLabelEl.className = `storm-label ${stormLevel.toLowerCase()}`;
+                    stormLabelEl.style.display = 'inline-block';
+                } else {
+                    stormLabelEl.textContent = 'No Storm';
+                    stormLabelEl.className = 'storm-label no-storm';
+                }
+            }
 
             const traces = [];
 
@@ -2644,6 +2747,7 @@
                     tickvals: [1e0, 1e1, 1e2, 1e3, 1e4, 1e5],
                     ticktext: ['10⁰', '10¹', '10²', '10³', '10⁴', '10⁵']
                 },
+                autosize: true,
                 margin: { t: 5, r: 5, b: 30, l: 40 },
                 shapes: [
                     // S1 (Minor) > 10
@@ -2698,7 +2802,12 @@
 
             // Purge and recreate for clean render
             Plotly.purge('proton-chart');
-            Plotly.newPlot('proton-chart', traces, layout, {responsive: true, displayModeBar: false});
+            Plotly.newPlot('proton-chart', traces, layout, {responsive: true, displayModeBar: false}).then(() => {
+                // Immediate resize after plot is ready
+                Plotly.Plots.resize('proton-chart');
+                // Remove loading state
+                document.getElementById('proton-chart').classList.remove('loading');
+            });
         }
 
         function toggleProtonTrace(index) {
@@ -3314,7 +3423,6 @@
         // Initial fetch
         fetchSolarData();
         fetchKpHistoryExtended();
-        initializeCompareDates();
         
         // Refresh every 5 minutes
         setInterval(fetchSolarData, 300000);
@@ -3395,10 +3503,10 @@
             const icon = document.getElementById('theme-icon');
             const text = document.getElementById('theme-text');
             if (currentTheme === 'dark') {
-                icon.textContent = '🌙';
+                icon.textContent = '';
                 text.textContent = 'Dark';
             } else {
-                icon.textContent = '☀️';
+                icon.textContent = '';
                 text.textContent = 'Light';
             }
         }
@@ -3420,6 +3528,13 @@
             document.getElementById(`tab-${tabName}`).classList.add('active');
 
             localStorage.setItem('activeTab', tabName);
+            
+            // Re-init image handlers for newly visible images
+            setTimeout(() => {
+                if (typeof initImageLoadHandlers === 'function') {
+                    initImageLoadHandlers();
+                }
+            }, 50);
         }
 
         // Restore last active tab
@@ -3594,11 +3709,6 @@
 
         // Refresh all data
         async function refreshAllData() {
-            if (historicalMode) {
-                alert('Currently viewing historical data. Click "Back to Live Data" to return to real-time monitoring.');
-                return;
-            }
-            
             countdown = refreshInterval;
             lastUpdateTime = new Date();
             updateLastUpdateTime();
@@ -4265,34 +4375,9 @@
             URL.revokeObjectURL(url);
         }
 
-        // Touch gestures for mobile (swipe between tabs)
-        let touchStartX = 0;
-        let touchEndX = 0;
-
-        document.addEventListener('touchstart', e => {
-            touchStartX = e.changedTouches[0].screenX;
-        });
-
-        document.addEventListener('touchend', e => {
-            touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
-        });
-
-        function handleSwipe() {
-            const tabs = ['overview', 'earth-impact', 'solar-cycle', 'solar-imagery'];
-            const activeTab = document.querySelector('.tab-content.active')?.id.replace('tab-', '');
-            const currentIndex = tabs.indexOf(activeTab);
-            
-            if (touchEndX < touchStartX - 50 && currentIndex < tabs.length - 1) {
-                // Swipe left - next tab
-                document.querySelector(`[onclick="switchTab('${tabs[currentIndex + 1]}')"]`)?.click();
-            }
-            
-            if (touchEndX > touchStartX + 50 && currentIndex > 0) {
-                // Swipe right - previous tab
-                document.querySelector(`[onclick="switchTab('${tabs[currentIndex - 1]}')"]`)?.click();
-            }
-        }
+        // Touch gestures for mobile - DISABLED to prevent accidental tab switching while scrolling
+        // The swipe detection was too sensitive and interfered with normal page scrolling
+        // Users can still switch tabs by tapping the tab buttons directly
 
         // Initialize new features on page load
         window.addEventListener('load', () => {
@@ -4304,6 +4389,49 @@
             // Re-check system alerts every 5 minutes
             setInterval(checkSystemAlert, 5 * 60 * 1000);
         });
+        
+        // Resize charts on window resize
+        let solarResizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(solarResizeTimeout);
+            solarResizeTimeout = setTimeout(() => {
+                const chartIds = ['xray-chart', 'proton-chart'];
+                chartIds.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element && element.data) {
+                        Plotly.Plots.resize(element);
+                    }
+                });
+            }, 150);
+        });
+
+        // Image load handler for smooth transitions
+        function initImageLoadHandlers() {
+            document.querySelectorAll('.solar-image-container img').forEach(img => {
+                // Handle already loaded images (cached)
+                if (img.complete && img.naturalHeight !== 0) {
+                    img.classList.add('loaded');
+                    img.parentElement.classList.add('loaded');
+                }
+                
+                // Handle load event
+                img.addEventListener('load', function() {
+                    this.classList.add('loaded');
+                    this.parentElement.classList.add('loaded');
+                });
+                
+                // Handle error with placeholder
+                img.addEventListener('error', function() {
+                    this.classList.add('loaded');
+                    this.parentElement.classList.add('loaded');
+                });
+            });
+        }
+
+        // Initialize image handlers after DOM is ready
+        document.addEventListener('DOMContentLoaded', initImageLoadHandlers);
+        // Also run on tab switch since new images may appear
+        const originalSwitchTab = typeof switchTab === 'function' ? switchTab : null;
 
         // Coronal Holes Display
         async function loadCoronalHoles() {
@@ -4316,7 +4444,7 @@
                 if (data.error) {
                     container.innerHTML = `
                         <div style="padding: 2rem; text-align: center;">
-                            <div style="color: #fb923c; font-size: 1.2rem; margin-bottom: 0.5rem;">⚠️ API Access Limited</div>
+                            <div style="color: #fb923c; font-size: 1.2rem; margin-bottom: 0.5rem;">API Access Limited</div>
                             <p style="color: var(--text-secondary); margin-bottom: 1rem;">${data.error}</p>
                             <p style="color: var(--text-secondary); font-size: 0.85rem;">
                                 Get a free NASA API key at <a href="https://api.nasa.gov/" target="_blank" style="color: #86efac;">api.nasa.gov</a>
@@ -4391,7 +4519,7 @@
                 if (data.error) {
                     container.innerHTML = `
                         <div style="padding: 2rem; text-align: center;">
-                            <div style="color: #fb923c; font-size: 1.2rem; margin-bottom: 0.5rem;">⚠️ API Access Limited</div>
+                            <div style="color: #fb923c; font-size: 1.2rem; margin-bottom: 0.5rem;">API Access Limited</div>
                             <p style="color: var(--text-secondary); margin-bottom: 1rem;">${data.error}</p>
                             <p style="color: var(--text-secondary); font-size: 0.85rem;">
                                 To enable this feature, get a free NASA API key at 
@@ -4509,128 +4637,6 @@
             }
         }
 
-        // Solar Imagery Timeline Controls
-        let currentImageDate = new Date();
-
-        function initializeImageryTimeline() {
-            const dateInput = document.getElementById('sdo-date-selector');
-            const timeInput = document.getElementById('sdo-time-selector');
-            
-            if (dateInput && timeInput) {
-                dateInput.value = currentImageDate.toISOString().split('T')[0];
-                timeInput.value = currentImageDate.toISOString().slice(11, 16);
-            }
-        }
-
-        function loadHistoricalSDO() {
-            const dateInput = document.getElementById('sdo-date-selector');
-            const timeInput = document.getElementById('sdo-time-selector');
-            
-            const selectedDate = new Date(`${dateInput.value}T${timeInput.value}:00Z`);
-            currentImageDate = selectedDate;
-            
-            const year = selectedDate.getUTCFullYear();
-            const month = String(selectedDate.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(selectedDate.getUTCDate()).padStart(2, '0');
-            
-            alert(`Loading images from ${selectedDate.toUTCString()}\\n\\nNote: Historical image browsing requires SDO archive API integration. This feature will load the closest available images from the SDO archive.`);
-        }
-
-        function resetToLatest() {
-            currentImageDate = new Date();
-            initializeImageryTimeline();
-            location.reload();
-        }
-
-        function offsetTime(hours) {
-            currentImageDate.setHours(currentImageDate.getHours() + hours);
-            
-            const dateInput = document.getElementById('sdo-date-selector');
-            const timeInput = document.getElementById('sdo-time-selector');
-            
-            dateInput.value = currentImageDate.toISOString().split('T')[0];
-            timeInput.value = currentImageDate.toISOString().slice(11, 16);
-        }
-
-        // Compare Dates / Time Machine functionality
-        let historicalMode = false;
-        let selectedHistoricalDate = null;
-        
-        function initializeCompareDates() {
-            const dateInput = document.getElementById('compare-date');
-            const today = new Date().toISOString().split('T')[0];
-            dateInput.max = today;
-            
-            // Set default to one week ago
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            dateInput.value = weekAgo.toISOString().split('T')[0];
-        }
-        
-        async function loadHistoricalData() {
-            const dateInput = document.getElementById('compare-date');
-            const selectedDate = dateInput.value;
-            
-            if (!selectedDate) {
-                alert('Please select a date first.');
-                return;
-            }
-            
-            historicalMode = true;
-            selectedHistoricalDate = selectedDate;
-            
-            // Show indicator
-            document.getElementById('compare-mode-indicator').style.display = 'block';
-            const indicator = document.querySelector('.compare-badge');
-            indicator.textContent = `VIEWING: ${selectedDate}`;
-            
-            try {
-                // Fetch historical data from backend
-                const response = await fetch(`/api/historical-data?date=${selectedDate}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    alert(`Error loading historical data: ${data.error}`);
-                    resetToLive();
-                    return;
-                }
-                
-                // Update X-ray chart with historical data
-                if (data.xray && data.xray.length > 0) {
-                    const times = data.xray.map(d => d.time_tag);
-                    const shortVals = data.xray.map(d => parseFloat(d.short_channel));
-                    const longVals = data.xray.map(d => parseFloat(d.long_channel));
-                    plotXrayChart(times, shortVals, longVals, 'HISTORICAL');
-                }
-                
-                // Update Kp chart with historical data
-                if (data.kp && data.kp.length > 0) {
-                    plotKpHistoryChart(data.kp, true);
-                }
-                
-                // Update proton chart with historical data
-                if (data.proton && data.proton.length > 0) {
-                    plotProtonChart(data.proton, 'HISTORICAL');
-                }
-                
-                alert(`Historical data loaded for ${selectedDate}\n\n✓ X-ray flux data\n✓ K-index data\n✓ Proton flux data\n\nClick "Back to Live Data" to return to real-time monitoring.`);
-                
-            } catch (error) {
-                console.error('Error loading historical data:', error);
-                alert('Failed to load historical data. The selected date may not have archived data available.');
-                resetToLive();
-            }
-        }
-        
-        function resetToLive() {
-            historicalMode = false;
-            selectedHistoricalDate = null;
-            document.getElementById('compare-mode-indicator').style.display = 'none';
-            
-            // Reload all current data
-            refreshAllData();
-        }
-        
         // Keyboard shortcuts
         document.addEventListener('keydown', e => {
             if (e.key === 'r' && e.ctrlKey) {
@@ -4724,11 +4730,11 @@
                     });
                 }
 
-                let bgColor = 'rgba(59, 130, 246, 0.12)', borderColor = '#3b82f6', iconText = 'ℹ️', titleText = 'System Notice';
+                let bgColor = 'rgba(59, 130, 246, 0.12)', borderColor = '#3b82f6', iconText = '', titleText = 'System Notice';
                 switch (config.type) {
-                    case 'warning': bgColor = 'rgba(251, 146, 60, 0.12)'; borderColor = '#fb923c'; iconText = '⚠️'; titleText = 'Warning'; break;
-                    case 'error': bgColor = 'rgba(239, 68, 68, 0.12)'; borderColor = '#ef4444'; iconText = '❌'; titleText = 'Important Notice'; break;
-                    case 'success': bgColor = 'rgba(34, 197, 94, 0.12)'; borderColor = '#22c55e'; iconText = '✅'; titleText = 'System Update'; break;
+                    case 'warning': bgColor = 'rgba(251, 146, 60, 0.12)'; borderColor = '#fb923c'; iconText = ''; titleText = 'Warning'; break;
+                    case 'error': bgColor = 'rgba(239, 68, 68, 0.12)'; borderColor = '#ef4444'; iconText = ''; titleText = 'Important Notice'; break;
+                    case 'success': bgColor = 'rgba(34, 197, 94, 0.12)'; borderColor = '#22c55e'; iconText = ''; titleText = 'System Update'; break;
                     case 'info':
                     default:
                         break;
