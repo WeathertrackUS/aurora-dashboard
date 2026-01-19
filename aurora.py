@@ -3328,8 +3328,11 @@ def get_historical_data():
 
 @app.route('/api/dst-index')
 def get_dst_index():
-    """Get Dst (Disturbance Storm Time) index from Kyoto WDC"""
+    """Get Dst (Disturbance Storm Time) index from Kyoto WDC with time range filtering"""
     try:
+        # Get time range parameter (default to 24h)
+        time_range = request.args.get('range', '24h')
+        
         # NOAA provides estimated Dst values
         DST_URL = "https://services.swpc.noaa.gov/products/kyoto-dst.json"
         response = requests.get(DST_URL, timeout=10)
@@ -3348,11 +3351,37 @@ def get_dst_index():
                     except (ValueError, IndexError):
                         continue
             
+            # Filter by time range
+            from datetime import datetime, timedelta
+            now = datetime.utcnow()
+            
+            # Parse time range
+            range_hours = {
+                '6h': 6,
+                '12h': 12,
+                '24h': 24,
+                '3d': 72,
+                '7d': 168
+            }.get(time_range, 24)  # Default to 24h
+            
+            cutoff_time = now - timedelta(hours=range_hours)
+            
+            # Filter data points within the time range
+            filtered_values = []
+            for point in dst_values:
+                try:
+                    point_time = datetime.fromisoformat(point['time'].replace('Z', '+00:00'))
+                    if point_time >= cutoff_time:
+                        filtered_values.append(point)
+                except (ValueError, AttributeError):
+                    continue
+            
             return jsonify({
-                'dst_values': dst_values,
-                'count': len(dst_values),
+                'dst_values': filtered_values,
+                'count': len(filtered_values),
                 'source': 'NOAA SWPC / Kyoto WDC',
-                'unit': 'nT'
+                'unit': 'nT',
+                'range': time_range
             })
         else:
             return jsonify({'error': 'Failed to fetch Dst data', 'dst_values': []}), 500

@@ -349,10 +349,10 @@
         .main-container {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 300px;
+            grid-template-columns: 1fr 420px;
             gap: 1rem;
             padding: 1rem;
-            max-width: 2200px;
+            max-width: 2400px;
             margin: 0 auto;
             width: 100%;
             animation: fadeIn 0.6s ease-out;
@@ -427,7 +427,7 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
-            min-width: 280px;
+            min-width: 420px;
         }
 
         .card {
@@ -607,6 +607,41 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
+        }
+
+        /* Time Range Selector for Dst Chart */
+        .time-range-selector {
+            display: flex;
+            gap: 0.25rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.25rem;
+            border-radius: 4px;
+            flex-wrap: wrap;
+        }
+
+        .time-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.35rem 0.7rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+
+        .time-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        .time-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-dark);
+            border-color: var(--accent-primary);
         }
 
         .btn {
@@ -1286,6 +1321,13 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">Dst Index</div>
+                    <div class="time-range-selector">
+                        <button class="time-btn" data-range="6h" onclick="setDstRange('6h')">6h</button>
+                        <button class="time-btn" data-range="12h" onclick="setDstRange('12h')">12h</button>
+                        <button class="time-btn active" data-range="24h" onclick="setDstRange('24h')">24h</button>
+                        <button class="time-btn" data-range="3d" onclick="setDstRange('3d')">3d</button>
+                        <button class="time-btn" data-range="7d" onclick="setDstRange('7d')">7d</button>
+                    </div>
                 </div>
                 <div style="padding: 0.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
@@ -1299,7 +1341,7 @@
                             <div><span style="color: #f97316;">▸</span> Storm</div>
                         </div>
                     </div>
-                    <div id="chart-dst" style="width: 100%; height: 140px;"></div>
+                    <div id="chart-dst" style="width: 100%; height: 180px;"></div>
                 </div>
             </div>
             
@@ -1462,13 +1504,27 @@
             refreshTimer = setInterval(refreshDashboard, 60000);
             
             // Fetch Dst data
+            currentDstRange = '24h';
             fetchDstData();
             setInterval(fetchDstData, 5 * 60 * 1000);  // Update every 5 minutes
         }
         
+        let currentDstRange = '24h';
+        
+        function setDstRange(range) {
+            currentDstRange = range;
+            // Update active button state
+            document.querySelectorAll('.time-range-selector .time-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.time-range-selector .time-btn[data-range="${range}"]`).classList.add('active');
+            // Fetch new data
+            fetchDstData();
+        }
+        
         async function fetchDstData() {
             try {
-                const response = await fetch('/api/dst-index');
+                const response = await fetch(`/api/dst-index?range=${currentDstRange}`);
                 const data = await response.json();
                 if (data.dst_values && data.dst_values.length > 0) {
                     plotDstChart(data.dst_values);
