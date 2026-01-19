@@ -977,15 +977,16 @@ def generate_aurora_image():
                       facecolor='#0f172a', edgecolor='#334155')
         for text in legend.get_texts():
             text.set_color('#f1f5f9')
-        
-        # Substorm detection logic
-        # Active: Rapid increase (40+ nT spike) within last 15-20 minutes AND still elevated
-        # Inactive: No recent spike OR spike occurred but has been declining for 15+ minutes
-        substorm_active = False
-        detection_window = 20  # minutes to look back
-        threshold_change = 40  # nT spike threshold
-        recent_window = 15  # minutes - must have spike within this window to be "active"
-        
+    
+    # Substorm detection logic (outside the if all_times block so it always displays)
+    # Active: Rapid increase (40+ nT spike) within last 15-20 minutes AND still elevated
+    # Inactive: No recent spike OR spike occurred but has been declining for 15+ minutes
+    substorm_active = False
+    detection_window = 20  # minutes to look back
+    threshold_change = 40  # nT spike threshold
+    recent_window = 15  # minutes - must have spike within this window to be "active"
+    
+    if goes_mag:
         # Check GOES-18
         if len(goes_mag.get('goes18_hp', [])) >= 20:
             recent_hp = goes_mag['goes18_hp'][-20:]  # Last 20 minutes
@@ -1027,30 +1028,27 @@ def generate_aurora_image():
                     current_hp = recent_hp[-1]
                     if current_hp >= hp_min + (threshold_change * 0.5):  # Still at least 50% elevated
                         substorm_active = True
-        
-        # Display substorm status above the magnetometer graph with modern styling
-        if substorm_active:
-            substorm_text = "SUBSTORM: ACTIVE"
-            substorm_color = '#ef4444'
-        else:
-            substorm_text = "SUBSTORM: INACTIVE"
-            substorm_color = '#10b981'
-        
-        # Modern boxy badge with shadow
-        substorm_badge_style = dict(boxstyle='round,pad=0.6', facecolor='#1e293b', 
-                                   edgecolor=substorm_color, linewidth=2,
-                                   path_effects=[matplotlib.patheffects.withSimplePatchShadow(offset=(2, -2), 
-                                                                                              shadow_rgbFace='#000000', 
-                                                                                              alpha=0.3)])
-        
-        fig.text(0.21, 0.205, substorm_text, 
-                 fontsize=12, color=substorm_color, fontweight='bold',
-                 bbox=substorm_badge_style, ha='center')
+    
+    # Display substorm status above the magnetometer graph with modern styling
+    if substorm_active:
+        substorm_text = "SUBSTORM: ACTIVE"
+        substorm_color = '#ef4444'
+    else:
+        substorm_text = "SUBSTORM: INACTIVE"
+        substorm_color = '#10b981'
     
     ax_goes.set_ylabel('Hp (nT)', fontsize=11, color='#94a3b8', fontweight='bold')
     title_goes = ax_goes.set_title('GOES MAGNETOMETER (Hp)', fontsize=12, color='#38bdf8',
                      fontweight='bold', pad=8, loc='left')
     title_goes.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2, foreground='#0f172a', alpha=0.7)])
+    
+    # Add substorm status badge to the right of the title using axes coordinates
+    substorm_badge_style = dict(boxstyle='round,pad=0.4', facecolor='#1e293b', 
+                               edgecolor=substorm_color, linewidth=2)
+    ax_goes.text(0.99, 1.05, substorm_text, transform=ax_goes.transAxes,
+                fontsize=10, color=substorm_color, fontweight='bold',
+                bbox=substorm_badge_style, ha='right', va='bottom')
+    
     ax_goes.tick_params(colors='#64748b', labelsize=8, length=0)
     ax_goes.grid(True, alpha=0.1, color='#94a3b8', linestyle='-', linewidth=0.5)
     ax_goes.set_xticklabels([])

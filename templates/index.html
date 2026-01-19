@@ -1304,7 +1304,9 @@
             <!-- Bottom Row: Magnetometer & Power -->
             <div class="chart-panel" style="grid-column: 1 / -1; display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; min-height: 240px;">
                 <div style="position: relative;">
-                    <div class="chart-title">GOES MAGNETOMETER</div>
+                    <div class="chart-title">GOES MAGNETOMETER
+                        <span id="substorm-badge" style="margin-left: 15px; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; background: #1e293b; border: 2px solid #10b981; color: #10b981;">SUBSTORM: INACTIVE</span>
+                    </div>
                     <div id="chart-mag" class="chart-container"></div>
                 </div>
                 <div style="position: relative;">
@@ -2230,6 +2232,60 @@
                     legend: { x: 0, y: 1, font: { color: '#fff' }, bgcolor: 'rgba(0,0,0,0)' }
                 };
                 Plotly.newPlot('chart-mag', [trace18, trace19], layout, config);
+                
+                // Substorm detection logic
+                let substormActive = false;
+                const thresholdChange = 40;  // nT spike threshold
+                
+                // Check GOES-18
+                if (mag.goes18_hp && mag.goes18_hp.length >= 20) {
+                    const recentHp = mag.goes18_hp.slice(-20);
+                    const hpMax = Math.max(...recentHp.filter(v => v !== null));
+                    const hpMin = Math.min(...recentHp.filter(v => v !== null));
+                    const hpChange = hpMax - hpMin;
+                    
+                    if (hpChange >= thresholdChange) {
+                        const maxIdx = recentHp.indexOf(hpMax);
+                        if (maxIdx >= 5) {
+                            const currentHp = recentHp[recentHp.length - 1];
+                            if (currentHp >= hpMin + (thresholdChange * 0.5)) {
+                                substormActive = true;
+                            }
+                        }
+                    }
+                }
+                
+                // Check GOES-19
+                if (mag.goes19_hp && mag.goes19_hp.length >= 20) {
+                    const recentHp = mag.goes19_hp.slice(-20);
+                    const hpMax = Math.max(...recentHp.filter(v => v !== null));
+                    const hpMin = Math.min(...recentHp.filter(v => v !== null));
+                    const hpChange = hpMax - hpMin;
+                    
+                    if (hpChange >= thresholdChange) {
+                        const maxIdx = recentHp.indexOf(hpMax);
+                        if (maxIdx >= 5) {
+                            const currentHp = recentHp[recentHp.length - 1];
+                            if (currentHp >= hpMin + (thresholdChange * 0.5)) {
+                                substormActive = true;
+                            }
+                        }
+                    }
+                }
+                
+                // Update substorm badge
+                const badge = document.getElementById('substorm-badge');
+                if (badge) {
+                    if (substormActive) {
+                        badge.textContent = 'SUBSTORM: ACTIVE';
+                        badge.style.borderColor = '#ef4444';
+                        badge.style.color = '#ef4444';
+                    } else {
+                        badge.textContent = 'SUBSTORM: INACTIVE';
+                        badge.style.borderColor = '#10b981';
+                        badge.style.color = '#10b981';
+                    }
+                }
             }
 
             // 6. Hemispheric Power
