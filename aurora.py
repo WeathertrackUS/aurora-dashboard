@@ -865,8 +865,8 @@ def generate_aurora_image():
             ])
             
             # Create high-resolution grid for smoother interpolation
-            lon_grid = np.linspace(-180, 180, 720)  # Doubled resolution
-            lat_grid = np.linspace(35, 85, 200)  # Doubled resolution
+            lon_grid = np.linspace(-180, 180, 1080)  # Higher resolution for smoother oval
+            lat_grid = np.linspace(35, 85, 300)  # Higher resolution for smoother oval
             lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
             
             # Interpolate using cubic method for smoother results
@@ -887,8 +887,8 @@ def generate_aurora_image():
             if np.any(valid):
                 # Stronger smoothing with multiple passes
                 smoothed = np.nan_to_num(aurora_grid, 0)
-                smoothed = gaussian_filter(smoothed, sigma=2.0)
-                smoothed = gaussian_filter(smoothed, sigma=1.5)
+                smoothed = gaussian_filter(smoothed, sigma=7.5)
+                smoothed = gaussian_filter(smoothed, sigma=5.5)
                 aurora_grid = np.where(valid, smoothed, np.nan)
             
             # Strict masking: only show aurora above threshold and with valid data
@@ -898,7 +898,7 @@ def generate_aurora_image():
             
             # Create custom colormap for aurora matching SWPC reference
             # Green (low) -> Yellow (50%) -> Orange (75%) -> Red (90%+)
-            colors = ['#00ff00', '#88ff00', '#ffff00', '#ffaa00', '#ff0000']
+            colors = ["#477e47", '#88ff00', '#ffff00', '#ffaa00', '#ff0000']
             positions = [0.0, 0.25, 0.5, 0.75, 1.0]
             cmap = LinearSegmentedColormap.from_list('aurora', list(zip(positions, colors)), N=256)
             
@@ -911,7 +911,7 @@ def generate_aurora_image():
             
             # Add colorbar legend with specific ticks matching reference
             cbar = plt.colorbar(mesh, ax=ax_map, orientation='horizontal', 
-                               pad=0.05, shrink=0.8, aspect=15, 
+                               pad=0.05, shrink=0.8, aspect=20, 
                                ticks=[10, 50, 90])
             cbar.set_label('Aurora Probability (%)', fontsize=12, color='#00ff88', fontweight='bold')
             cbar.ax.set_xticklabels(['10%', '50%', '90%'])
@@ -2247,8 +2247,8 @@ def generate_map_image():
             ])
             
             # Create high-resolution grid for smoother interpolation
-            lon_grid = np.linspace(-180, 180, 720)  # Doubled resolution
-            lat_grid = np.linspace(35, 85, 200)  # Doubled resolution
+            lon_grid = np.linspace(-180, 180, 1080)  # Higher resolution for smoother oval
+            lat_grid = np.linspace(35, 85, 300)  # Higher resolution for smoother oval
             lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
             
             # Interpolate using cubic method for smoother results
@@ -2269,8 +2269,8 @@ def generate_map_image():
             if np.any(valid):
                 # Stronger smoothing with multiple passes
                 smoothed = np.nan_to_num(aurora_grid, 0)
-                smoothed = gaussian_filter(smoothed, sigma=2.0)
-                smoothed = gaussian_filter(smoothed, sigma=1.5)
+                smoothed = gaussian_filter(smoothed, sigma=3.5)
+                smoothed = gaussian_filter(smoothed, sigma=2.5)
                 aurora_grid = np.where(valid, smoothed, np.nan)
             
             # Strict masking: only show aurora above threshold and with valid data
