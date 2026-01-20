@@ -207,6 +207,14 @@
             padding: 0.5rem;
             margin-bottom: 1rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        
+        .tab-navigation::-webkit-scrollbar {
+            display: none;
         }
 
         .tab-btn {
@@ -222,6 +230,8 @@
             font-family: var(--font-sans);
             position: relative;
             overflow: hidden;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
         .tab-btn::before {
@@ -341,6 +351,37 @@
             visibility: visible;
             opacity: 1;
         }
+        
+        /* Mobile tooltip - tap to show */
+        @media (hover: none) and (pointer: coarse) {
+            .tooltip .tooltiptext {
+                width: 200px;
+                margin-left: -100px;
+                bottom: auto;
+                top: 100%;
+                margin-top: 10px;
+            }
+            
+            .tooltip:active .tooltiptext,
+            .tooltip:focus .tooltiptext {
+                visibility: visible;
+                opacity: 1;
+            }
+            
+            .tooltip {
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .tooltip .tooltiptext {
+                width: 180px;
+                margin-left: -90px;
+                font-size: 0.8rem;
+                padding: 0.5rem;
+            }
+        }
 
         .help-icon {
             color: var(--text-secondary);
@@ -364,6 +405,20 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        
+        @media (max-width: 480px) {
+            .notification-banner {
+                padding: 0.75rem;
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .notification-banner button {
+                width: 100%;
+            }
         }
 
         .notification-banner button {
@@ -374,6 +429,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
+            min-height: 44px;
         }
 
         .notification-banner button:hover {
@@ -475,11 +531,29 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
         }
+        
+        @media (max-width: 600px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
 
         .grid-3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .grid-3 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
         }
 
         .live-badge {
@@ -543,6 +617,13 @@
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
+        
+        @media (max-width: 400px) {
+            .chart-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+        }
 
         .mini-stat {
             text-align: center;
@@ -563,6 +644,33 @@
             line-height: 1.2;
         }
 
+        .flare-filter-row {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .flare-filter-row .filter-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-right: 0.5rem;
+        }
+        
+        @media (max-width: 480px) {
+            .flare-filter-row {
+                padding: 0.5rem 0.75rem;
+                gap: 0.75rem;
+            }
+            
+            .flare-filter-row .filter-label {
+                width: 100%;
+                margin-bottom: 0.25rem;
+            }
+        }
+
         .proton-controls {
             display: flex;
             justify-content: center;
@@ -571,6 +679,7 @@
             padding: 0.3rem 0.2rem 0.2rem;
             border-top: 1px solid var(--border);
             flex-shrink: 0;
+            flex-wrap: wrap;
         }
 
         .proton-toggle {
@@ -598,6 +707,8 @@
             background: var(--bg-dark);
             padding: 0.25rem;
             border-radius: 4px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .time-btn {
@@ -727,6 +838,8 @@
             padding-bottom: 0.25rem;
             border-bottom: 1px solid var(--border);
             min-height: 28px;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         .card-title {
@@ -761,6 +874,17 @@
             border-collapse: collapse;
             font-family: var(--font-mono);
             font-size: 0.8rem;
+        }
+        
+        @media (max-width: 480px) {
+            .sunspot-table {
+                font-size: 0.7rem;
+            }
+            
+            .sunspot-table th,
+            .sunspot-table td {
+                padding: 0.5rem 0.3rem;
+            }
         }
 
         .sunspot-table th {
@@ -985,9 +1109,27 @@
             line-height: 1;
             opacity: 0.7;
             transition: opacity 0.2s;
+            padding: 0.5rem;
+            min-height: 44px;
+            min-width: 44px;
         }
         .lightbox-close:hover {
             opacity: 1;
+        }
+        
+        @media (max-width: 480px) {
+            .lightbox-close {
+                top: 10px;
+                right: 10px;
+                font-size: 2.5rem;
+                background: rgba(0,0,0,0.5);
+                border-radius: 50%;
+            }
+            
+            .lightbox-caption {
+                font-size: 0.9rem;
+                padding: 0 1rem;
+            }
         }
         
         /* Live Activity Indicator */
@@ -1322,6 +1464,36 @@
             .time-btn {
                 font-size: 0.75rem;
                 padding: 0.3rem 0.5rem;
+                min-height: 36px;
+            }
+            
+            .time-range-selector {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            
+            .card-title {
+                width: 100%;
+            }
+            
+            .solar-image-container {
+                min-height: 250px;
+                max-height: 350px;
+            }
+            
+            .chart-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .proton-controls {
+                gap: 0.75rem;
+                font-size: 0.75rem;
             }
             
             /* Hide beta badge on very small screens */
@@ -1663,17 +1835,17 @@
                         </span>
                     </div>
                 </div>
-                <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: center;">
-                    <span style="font-size: 0.9rem; color: var(--text-secondary); margin-right: 0.5rem;">Filter:</span>
-                    <label class="proton-toggle" style="margin: 0;">
+                <div class="flare-filter-row">
+                    <span class="filter-label">Filter:</span>
+                    <label class="proton-toggle">
                         <input type="checkbox" id="filter-c-flares" checked onchange="filterFlares()">
                         <span style="color: #fbbf24">●</span> C-Class
                     </label>
-                    <label class="proton-toggle" style="margin: 0;">
+                    <label class="proton-toggle">
                         <input type="checkbox" id="filter-m-flares" checked onchange="filterFlares()">
                         <span style="color: #fb923c">●</span> M-Class
                     </label>
-                    <label class="proton-toggle" style="margin: 0;">
+                    <label class="proton-toggle">
                         <input type="checkbox" id="filter-x-flares" checked onchange="filterFlares()">
                         <span style="color: #dc2626">●</span> X-Class
                     </label>
@@ -3639,21 +3811,7 @@
             });
         });
 
-        function openImageModal(src, alt) {
-            const lightbox = document.getElementById('image-lightbox');
-            const img = document.getElementById('lightbox-img');
-            const caption = document.getElementById('lightbox-caption');
-            
-            // Use high-res version if available (some sources have specific patterns)
-            // For now, just use the source image
-            img.src = src;
-            caption.textContent = alt;
-            lightbox.style.display = 'flex';
-        }
-
-        function closeImageModal() {
-            document.getElementById('image-lightbox').style.display = 'none';
-        }
+        // Note: openImageModal is already defined above, use openLightbox or the existing function
         
         // Close on Escape key
         document.addEventListener('keydown', function(event) {
@@ -3952,9 +4110,21 @@
         }
         
         function plotKpHistoryChart(kpData, isHistorical = false) {
-            const times = kpData.map(d => d.time);
-            const values = kpData.map(d => d.kp);
-            const observed = kpData.map(d => d.observed);
+            if (!kpData || kpData.length === 0) {
+                console.warn('No Kp history data available');
+                return;
+            }
+            
+            // Filter out invalid data
+            const validData = kpData.filter(d => d && d.time && d.kp !== null && d.kp !== undefined && !isNaN(parseFloat(d.kp)));
+            if (validData.length === 0) {
+                console.warn('No valid Kp history data');
+                return;
+            }
+            
+            const times = validData.map(d => d.time);
+            const values = validData.map(d => parseFloat(d.kp));
+            const observed = validData.map(d => d.observed);
             
             // Color scale function for Kp values
             const getKpColor = (v) => {
@@ -3974,13 +4144,14 @@
             const forecastTimes = [];
             const forecastValues = [];
             
-            kpData.forEach(d => {
+            validData.forEach(d => {
+                const kpValue = parseFloat(d.kp);
                 if (d.observed) {
                     observedTimes.push(d.time);
-                    observedValues.push(d.kp);
+                    observedValues.push(kpValue);
                 } else {
                     forecastTimes.push(d.time);
-                    forecastValues.push(d.kp);
+                    forecastValues.push(kpValue);
                 }
             });
             
@@ -4196,6 +4367,11 @@
         }
 
         function plotSolarCycleCharts(observed, predicted) {
+            if (!observed || !observed.times || observed.times.length === 0) {
+                console.warn('No solar cycle data available');
+                return;
+            }
+            
             const isDark = currentTheme === 'dark';
             const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)';
             const textColor = isDark ? '#94a3b8' : '#475569';
