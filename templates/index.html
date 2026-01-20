@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -38,6 +41,24 @@
             margin: 0;
             padding: 0;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: pan-x pan-y;
+        }
+
+        /* Safe area insets for notched devices */
+        @supports (padding: env(safe-area-inset-bottom)) {
+            body {
+                padding-left: env(safe-area-inset-left);
+                padding-right: env(safe-area-inset-right);
+            }
+            .navbar {
+                padding-top: max(0.875rem, env(safe-area-inset-top));
+            }
+            footer {
+                padding-bottom: max(2rem, env(safe-area-inset-bottom));
+            }
         }
 
         /* New Dashboard Grid */
@@ -959,18 +980,34 @@
             .navbar {
                 padding: 0.75rem 1rem;
                 flex-wrap: wrap;
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
             }
             
             .mobile-menu-toggle {
                 display: block;
+                padding: 0.5rem;
+                min-width: 44px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             
             .brand {
-                font-size: 1rem;
+                font-size: 0.95rem;
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             
             .brand span {
-                font-size: 1.1rem;
+                font-size: 1rem;
             }
             
             .nav-links {
@@ -978,11 +1015,12 @@
                 width: 100%;
                 margin: 1rem 0 0 0;
                 flex-direction: column;
-                gap: 0.75rem;
+                gap: 0.5rem;
                 background: var(--bg-card);
-                padding: 1rem;
+                padding: 0.75rem;
                 border-radius: 0.5rem;
                 border: 1px solid var(--border);
+                order: 3;
             }
             
             .nav-links.active {
@@ -990,12 +1028,21 @@
             }
             
             .nav-link {
-                font-size: 0.9rem;
-                padding: 0.5rem;
+                font-size: 1rem;
+                padding: 0.75rem;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                border-radius: 4px;
+                transition: background 0.2s;
+            }
+            
+            .nav-link:active {
+                background: rgba(255, 255, 255, 0.1);
             }
             
             .nav-stats {
-                gap: 1rem;
+                gap: 0.75rem;
             }
             
             .stat-item {
@@ -1005,171 +1052,366 @@
             .main-container {
                 padding: 0.5rem;
                 gap: 0.5rem;
+                display: flex;
+                flex-direction: column;
             }
             
             .dashboard-grid {
                 padding: 0.5rem;
                 gap: 0.75rem;
+                display: flex;
+                flex-direction: column;
+                min-height: auto;
             }
             
             .chart-panel {
-                border-radius: 4px;
-                min-height: 140px;
+                border-radius: 6px;
+                min-height: 160px;
+                height: auto !important;
                 padding: 0.5rem;
+                position: relative;
             }
             
             .chart-container {
-                height: calc(100% - 30px);
+                height: 130px !important;
+                min-height: 130px !important;
+                max-height: none;
+                position: relative !important;
+                bottom: auto !important;
+                left: auto !important;
+                right: auto !important;
+                margin-top: 30px;
             }
             
             .sidebar {
                 width: 100%;
                 max-width: 100%;
+                min-width: auto;
             }
             
             .card {
-                margin-bottom: 1rem;
+                margin-bottom: 0.75rem;
             }
             
             /* Better touch targets */
             button, .btn, select, input {
                 min-height: 44px;
                 font-size: 1rem;
+                touch-action: manipulation;
             }
             
             select {
                 padding: 0.75rem;
+                appearance: none;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b8b8b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: right 0.75rem center;
+                padding-right: 2.5rem;
             }
             
             .map-panel {
-                border-radius: 4px;
-                min-height: 350px;
-                max-height: 450px;
-            }
-            
-            .chart-container {
-                min-height: 120px;
-                max-height: 180px;
+                border-radius: 6px;
+                min-height: 280px;
+                max-height: none;
+                height: auto;
+                aspect-ratio: 1;
             }
             
             .chart-title {
-                font-size: 0.7rem;
+                font-size: 0.65rem;
                 top: 8px;
-                left: 10px;
+                left: 8px;
+                max-width: 50%;
             }
             
             .chart-value {
-                font-size: 1rem;
-                top: 8px;
-                right: 10px;
-                padding: 0.1rem 0.3rem;
+                font-size: 0.95rem;
+                top: 6px;
+                right: 8px;
+                padding: 0.15rem 0.35rem;
+            }
+            
+            /* Fix data grid on mobile */
+            .data-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+            }
+            
+            .data-value {
+                font-size: 1.2rem;
+            }
+            
+            /* Forecast grid mobile */
+            .forecast-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.5rem;
+            }
+            
+            .forecast-bar {
+                height: 100px;
+            }
+            
+            .forecast-fill {
+                font-size: 0.9rem;
+            }
+            
+            /* Time range selector mobile */
+            .time-range-selector {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .time-btn {
+                min-height: 36px;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+            }
+            
+            /* Control grid mobile */
+            .control-grid {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .btn-full {
+                grid-column: span 1;
+            }
+            
+            /* Toast positioning */
+            .toast {
+                bottom: 1rem;
+                right: 1rem;
+                left: 1rem;
+                width: auto;
             }
         }
         
         @media (max-width: 480px) {
             .navbar {
                 flex-wrap: wrap;
-                padding: 0.5rem 0.75rem;
+                padding: 0.5rem 0.5rem;
             }
             
             .brand {
-                font-size: 0.9rem;
+                font-size: 0.85rem;
                 flex: 1;
+                min-width: 0;
+            }
+            
+            /* Hide BETA badge on small screens */
+            .brand > span[style*="BETA"] {
+                display: none !important;
             }
             
             .nav-links {
                 order: 3;
                 width: 100%;
                 margin: 0.5rem 0 0 0;
-                justify-content: center;
-                gap: 0.75rem;
+                gap: 0.5rem;
             }
             
             .nav-stats {
                 margin-left: auto;
+                gap: 0.5rem;
+            }
+            
+            .stat-item span:first-child {
+                display: none;
             }
             
             .main-container {
-                padding: 0.5rem;
+                padding: 0.25rem;
             }
             
             .dashboard-grid {
-                padding: 0.5rem;
+                padding: 0.25rem;
                 gap: 0.5rem;
             }
             
             .chart-panel {
-                min-height: 140px;
-                max-height: 200px;
-                padding: 0.5rem 0.25rem;
+                min-height: 150px;
+                padding: 0.4rem;
+                border-radius: 6px;
             }
             
             .map-panel {
-                min-height: 300px;
-                max-height: 400px;
+                min-height: 260px;
+                max-height: none;
+                aspect-ratio: 1;
             }
             
             .chart-container {
-                min-height: 100px;
-                max-height: 160px;
-            }
-            
-            .geomag-forecast-container {
-                padding: 0.5rem;
-            }
-            
-            .forecast-day {
-                padding: 0.25rem;
+                height: 110px !important;
+                min-height: 110px !important;
+                margin-top: 28px;
             }
             
             .chart-title {
-                font-size: 0.65rem;
+                font-size: 0.6rem;
+                top: 6px;
+                left: 6px;
             }
             
             .chart-value {
-                font-size: 0.95rem;
-            }
-            
-            /* Hide beta badge on very small screens */
-            .brand span[style*="BETA"] {
-                display: none;
+                font-size: 0.85rem;
+                top: 4px;
+                right: 6px;
+                padding: 0.1rem 0.25rem;
             }
             
             /* Stack sidebar items more compactly */
             .sidebar .card {
-                margin-bottom: 0.75rem;
+                margin-bottom: 0.5rem;
+                padding: 0.5rem;
             }
             
-            /* Optimize forecast day cards */
+            .card-header {
+                margin-bottom: 0.5rem;
+                padding-bottom: 0.35rem;
+            }
+            
+            .card-title {
+                font-size: 0.85rem;
+            }
+            
+            /* Forecast grid compact */
+            .forecast-grid {
+                gap: 0.35rem;
+            }
+            
             .forecast-day {
-                min-height: 60px;
+                min-height: auto;
+            }
+            
+            .forecast-date {
+                font-size: 0.65rem;
+            }
+            
+            .forecast-bar {
+                height: 80px;
+            }
+            
+            .forecast-fill {
+                font-size: 0.8rem;
+            }
+            
+            .forecast-kp {
+                font-size: 0.6rem;
+            }
+            
+            .forecast-legend {
+                gap: 0.5rem;
+                font-size: 0.6rem;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .legend-color {
+                width: 10px;
+                height: 10px;
             }
             
             /* Improve moon phase card */
             #moon-image {
-                width: 80px !important;
-                height: 80px !important;
+                width: 65px !important;
+                height: 65px !important;
+            }
+            
+            /* Kp meter on mobile */
+            .kp-meter-container {
+                padding: 0.5rem;
+            }
+            
+            .kp-label {
+                font-size: 0.7rem;
+            }
+            
+            /* Data items spacing */
+            .data-item {
+                padding: 0.5rem;
+            }
+            
+            /* Toast on mobile */
+            .toast {
+                left: 0.5rem;
+                right: 0.5rem;
+                bottom: 0.5rem;
+                font-size: 0.85rem;
+            }
+            
+            /* Footer compact */
+            footer {
+                padding: 1.25rem 0.75rem;
+                font-size: 0.8rem;
             }
         }
         
         /* Touch-specific improvements */
         @media (hover: none) and (pointer: coarse) {
             /* Larger touch targets */
-            button, .btn, a {
+            button, .btn, a, .nav-link, .tab-btn, .time-btn {
                 min-height: 44px;
                 min-width: 44px;
             }
             
-            /* Prevent text selection on buttons */
-            button, .btn {
+            /* Prevent text selection on interactive elements */
+            button, .btn, .nav-link, .tab-btn {
                 -webkit-touch-callout: none;
                 -webkit-user-select: none;
                 user-select: none;
             }
             
             /* Smoother scrolling */
-            * {
+            .main-container, .sidebar, .dashboard-grid {
                 -webkit-overflow-scrolling: touch;
+                scroll-behavior: smooth;
+            }
+            
+            /* Disable hover effects on touch */
+            .card:hover {
+                transform: none;
+            }
+            
+            .chart-panel:hover {
+                background: var(--bg-card);
+                border-color: rgba(255, 255, 255, 0.06);
+            }
+            
+            /* Active states for touch feedback */
+            button:active, .btn:active, .time-btn:active {
+                opacity: 0.8;
+                transform: scale(0.98);
+            }
+            
+            /* Prevent zoom on double tap for form elements */
+            input, select, textarea {
+                font-size: 16px !important;
+            }
+            
+            /* Improve chart interactions */
+            .chart-container {
+                touch-action: pan-x pan-y;
+            }
+        }
+        
+        /* Landscape orientation fixes */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .navbar {
+                padding: 0.5rem 1rem;
+            }
+            
+            .map-panel {
+                min-height: 200px;
+                max-height: 60vh;
+            }
+            
+            .chart-panel {
+                min-height: 120px;
+            }
+            
+            .chart-container {
+                height: 90px !important;
+                min-height: 90px !important;
             }
         }
 
@@ -1186,6 +1428,99 @@
             color: #9FA8FF;
             text-decoration: underline;
             outline: none;
+        }
+        
+        /* Bottom charts panel - responsive grid */
+        .bottom-charts-panel {
+            min-height: 240px;
+        }
+        
+        .bottom-charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 0.5rem;
+            height: 100%;
+            min-height: 200px;
+        }
+        
+        .mag-chart-wrapper,
+        .power-chart-wrapper {
+            position: relative;
+            min-height: 180px;
+        }
+        
+        .substorm-badge {
+            margin-left: 15px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            background: #1e293b;
+            border: 2px solid #10b981;
+            color: #10b981;
+            white-space: nowrap;
+        }
+        
+        /* Dst chart container */
+        .dst-chart-container {
+            width: 100%;
+            height: 180px;
+        }
+        
+        @media (max-width: 768px) {
+            .bottom-charts-panel {
+                min-height: auto;
+            }
+            
+            .bottom-charts-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .mag-chart-wrapper,
+            .power-chart-wrapper {
+                min-height: 160px;
+            }
+            
+            .mag-chart-wrapper .chart-container,
+            .power-chart-wrapper .chart-container {
+                height: 130px !important;
+                min-height: 130px !important;
+            }
+            
+            .substorm-badge {
+                display: block;
+                margin-left: 0;
+                margin-top: 0.5rem;
+                text-align: center;
+                font-size: 0.7rem;
+                padding: 3px 8px;
+            }
+            
+            .dst-chart-container {
+                height: 160px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .mag-chart-wrapper,
+            .power-chart-wrapper {
+                min-height: 140px;
+            }
+            
+            .mag-chart-wrapper .chart-container,
+            .power-chart-wrapper .chart-container {
+                height: 110px !important;
+                min-height: 110px !important;
+            }
+            
+            .dst-chart-container {
+                height: 140px;
+            }
+            
+            .substorm-badge {
+                font-size: 0.65rem;
+            }
         }
     </style>
 </head>
@@ -1302,17 +1637,19 @@
             </div>
             
             <!-- Bottom Row: Magnetometer & Power -->
-            <div class="chart-panel" style="grid-column: 1 / -1; display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; min-height: 240px;">
-                <div style="position: relative;">
-                    <div class="chart-title">GOES MAGNETOMETER
-                        <span id="substorm-badge" style="margin-left: 15px; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; background: #1e293b; border: 2px solid #10b981; color: #10b981;">SUBSTORM: INACTIVE</span>
+            <div class="chart-panel bottom-charts-panel" style="grid-column: 1 / -1;">
+                <div class="bottom-charts-grid">
+                    <div class="mag-chart-wrapper">
+                        <div class="chart-title">GOES MAGNETOMETER
+                            <span id="substorm-badge" class="substorm-badge">SUBSTORM: INACTIVE</span>
+                        </div>
+                        <div id="chart-mag" class="chart-container"></div>
                     </div>
-                    <div id="chart-mag" class="chart-container"></div>
-                </div>
-                <div style="position: relative;">
-                    <div class="chart-title">HEMISPHERIC POWER</div>
-                    <div class="chart-value" id="chart-val-power">--</div>
-                    <div id="chart-power" class="chart-container"></div>
+                    <div class="power-chart-wrapper">
+                        <div class="chart-title">HEMISPHERIC POWER</div>
+                        <div class="chart-value" id="chart-val-power">--</div>
+                        <div id="chart-power" class="chart-container"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1343,7 +1680,7 @@
                             <div><span style="color: #f97316;">▸</span> Storm</div>
                         </div>
                     </div>
-                    <div id="chart-dst" style="width: 100%; height: 180px;"></div>
+                    <div id="chart-dst" class="dst-chart-container"></div>
                 </div>
             </div>
             
@@ -1445,13 +1782,44 @@
         let nextRefreshTime = Date.now() + 60000;
         let refreshTimer;
         let countdownTimer;
+        let isMobile = window.innerWidth <= 768;
+        let isResizing = false;
+        let resizeDebounceTimer = null;
 
         // Elements
         const mapImage = document.getElementById('map-image');
         const loadingOverlay = document.getElementById('loading-overlay');
         
+        // Mobile detection helper
+        function checkMobile() {
+            isMobile = window.innerWidth <= 768;
+            return isMobile;
+        }
+        
+        // Debounced resize handler
+        function handleResize() {
+            if (resizeDebounceTimer) {
+                clearTimeout(resizeDebounceTimer);
+            }
+            isResizing = true;
+            resizeDebounceTimer = setTimeout(() => {
+                isResizing = false;
+                checkMobile();
+                resizeAllCharts();
+            }, 250);
+        }
+        
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            checkMobile();
+            
+            // Add resize listener
+            window.addEventListener('resize', handleResize);
+            window.addEventListener('orientationchange', () => {
+                // Delay to let orientation change complete
+                setTimeout(handleResize, 100);
+            });
+            
             refreshDashboard();
             startTimers();
             
@@ -1482,11 +1850,22 @@
             
             // Update moon phase daily
             setInterval(calculateMoonPhase, 3600000); // Update every hour
+            
+            // Handle visibility change to refresh on tab return
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    // Resize charts when tab becomes visible again
+                    setTimeout(resizeAllCharts, 100);
+                }
+            });
         });
 
         function updateUtcTime() {
             const now = new Date();
-            document.getElementById('utc-time').textContent = now.toISOString().slice(11, 16) + ' UTC';
+            const el = document.getElementById('utc-time');
+            if (el) {
+                el.textContent = now.toISOString().slice(11, 16) + ' UTC';
+            }
         }
 
         function startTimers() {
@@ -1494,11 +1873,14 @@
             countdownTimer = setInterval(() => {
                 const now = Date.now();
                 const diff = Math.ceil((nextRefreshTime - now) / 1000);
+                const countdownEl = document.getElementById('countdown');
                 
-                if (diff <= 0) {
-                    document.getElementById('countdown').textContent = 'Refreshing...';
-                } else {
-                    document.getElementById('countdown').textContent = `${diff}s`;
+                if (countdownEl) {
+                    if (diff <= 0) {
+                        countdownEl.textContent = 'Refreshing...';
+                    } else {
+                        countdownEl.textContent = `${diff}s`;
+                    }
                 }
             }, 1000);
 
@@ -1787,19 +2169,35 @@
         }
 
         function renderCharts(data) {
+            // Skip rendering during resize to prevent glitches
+            if (isResizing) return;
+            
+            // Mobile-optimized margins and font sizes
+            const mobileFontSize = isMobile ? 8 : 10;
+            const mobileMargin = isMobile 
+                ? { t: 5, r: 5, b: 20, l: 30 }
+                : { t: 25, r: 8, b: 25, l: 35 };
+            
             const commonLayout = {
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#94a3b8', family: 'Inter, sans-serif' },
-                margin: { t: 25, r: 8, b: 25, l: 35 },
-                xaxis: { showgrid: false, zeroline: false, tickfont: { size: 10 }, fixedrange: true },
-                yaxis: { showgrid: true, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, tickfont: { size: 10 }, fixedrange: true },
+                font: { color: '#94a3b8', family: 'Inter, sans-serif', size: mobileFontSize },
+                margin: mobileMargin,
+                xaxis: { showgrid: false, zeroline: false, tickfont: { size: mobileFontSize }, fixedrange: true },
+                yaxis: { showgrid: true, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, tickfont: { size: mobileFontSize }, fixedrange: true },
                 showlegend: false,
                 autosize: true,
                 responsive: true
             };
 
-            const config = { displayModeBar: false, responsive: true, autosizable: true };
+            // Mobile-optimized config - disable scrollZoom for better touch handling
+            const config = { 
+                displayModeBar: false, 
+                responsive: true, 
+                autosizable: true,
+                scrollZoom: false,
+                staticPlot: isMobile // Disable interactions on mobile for performance
+            };
 
             // Helper for traces
             const createTrace = (x, y, color, fill = 'tozeroy') => ({
@@ -1807,17 +2205,26 @@
                 type: 'scatter',
                 mode: 'lines',
                 fill: fill,
-                line: { color: color, width: 2 },
+                line: { color: color, width: isMobile ? 1.5 : 2 },
                 fillcolor: color + '33' // 20% opacity
             });
+            
+            // Reduce gradient steps on mobile for better performance
+            const gradientSteps = isMobile ? 50 : 300;
 
             // 1. Solar Wind Speed with Gradient Fill
-            if (data.solar_wind_history) {
+            if (data.solar_wind_history && data.solar_wind_history.times && data.solar_wind_history.speeds) {
                 const hist = data.solar_wind_history;
+                
+                // Validate data exists
+                if (!hist.speeds || hist.speeds.length === 0) {
+                    console.warn('No speed data available');
+                    return;
+                }
                 
                 // Remove single-point spikes from speed data
                 const cleanedSpeeds = hist.speeds.map((val, idx, arr) => {
-                    if (val === null) return null;
+                    if (val === null || val === undefined) return null;
                     
                     // Skip first and last points
                     if (idx === 0 || idx === arr.length - 1) return val;
@@ -1842,20 +2249,23 @@
                 hist.speeds = cleanedSpeeds;
                 
                 // Dynamic Y-axis range
-                const speeds = hist.speeds.filter(s => s !== null);
+                const speeds = hist.speeds.filter(s => s !== null && !isNaN(s));
+                if (speeds.length === 0) {
+                    console.warn('No valid speed data after filtering');
+                    return;
+                }
                 const maxSpeed = Math.max(...speeds, 400);
                 const minSpeed = Math.min(...speeds, 200);
                 const yMin = Math.max(0, minSpeed - 50);
                 const yMax = maxSpeed + 100;
                 
                 // Create smooth gradient using SVG pattern approach
-                // Generate many thin gradient layers but with proper blending
+                // Use fewer steps on mobile for performance
                 const traces = [];
-                const steps = 300; // Increased for ultra-smooth gradient
                 
-                for (let i = 0; i < steps; i++) {
-                    const yBottom = yMin + (i / steps) * (yMax - yMin);
-                    const yTop = yMin + ((i + 1) / steps) * (yMax - yMin);
+                for (let i = 0; i < gradientSteps; i++) {
+                    const yBottom = yMin + (i / gradientSteps) * (yMax - yMin);
+                    const yTop = yMin + ((i + 1) / gradientSteps) * (yMax - yMin);
                     const yMid = (yBottom + yTop) / 2;
                     
                     // Smooth color interpolation across the full range
@@ -1967,21 +2377,23 @@
             }
 
             // 2. Density with Gradient
-            if (data.solar_wind_history) {
+            if (data.solar_wind_history && data.solar_wind_history.densities) {
                 const hist = data.solar_wind_history;
-                const densities = hist.densities.filter(d => d !== null);
-                const maxDensity = Math.max(...densities);
+                const densities = hist.densities.filter(d => d !== null && !isNaN(d));
+                if (densities.length === 0) {
+                    console.warn('No valid density data');
+                } else {
+                const maxDensity = Math.max(...densities, 1);
                 const minDensity = Math.min(...densities, 0);
-                const range = maxDensity - minDensity;
+                const range = Math.max(maxDensity - minDensity, 1);
                 const yMin = Math.max(0, minDensity - range * 0.3);
                 const yMax = maxDensity + range * 2;
                 
                 const traces = [];
-                const steps = 300;
                 
-                for (let i = 0; i < steps; i++) {
-                    const yBottom = yMin + (i / steps) * (yMax - yMin);
-                    const yTop = yMin + ((i + 1) / steps) * (yMax - yMin);
+                for (let i = 0; i < gradientSteps; i++) {
+                    const yBottom = yMin + (i / gradientSteps) * (yMax - yMin);
+                    const yTop = yMin + ((i + 1) / gradientSteps) * (yMax - yMin);
                     const yMid = (yBottom + yTop) / 2;
                     
                     // Density color scale based on value
@@ -2057,23 +2469,26 @@
                 
                 const lastVal = hist.densities[hist.densities.length - 1];
                 document.getElementById('chart-val-density').textContent = lastVal ? lastVal.toFixed(1) : '--';
+                }
             }
 
             // 3. Bt with Gradient
-            if (data.solar_wind_history) {
+            if (data.solar_wind_history && data.solar_wind_history.bts) {
                 const hist = data.solar_wind_history;
-                const bts = hist.bts.filter(b => b !== null);
+                const bts = hist.bts.filter(b => b !== null && !isNaN(b));
+                if (bts.length === 0) {
+                    console.warn('No valid Bt data');
+                } else {
                 const maxBt = Math.max(...bts, 10);
                 const minBt = Math.min(...bts, 0);
                 const yMin = Math.max(0, minBt - 2);
                 const yMax = maxBt + 3;
                 
                 const traces = [];
-                const steps = 300;
                 
-                for (let i = 0; i < steps; i++) {
-                    const yBottom = yMin + (i / steps) * (yMax - yMin);
-                    const yTop = yMin + ((i + 1) / steps) * (yMax - yMin);
+                for (let i = 0; i < gradientSteps; i++) {
+                    const yBottom = yMin + (i / gradientSteps) * (yMax - yMin);
+                    const yTop = yMin + ((i + 1) / gradientSteps) * (yMax - yMin);
                     const yMid = (yBottom + yTop) / 2;
                     
                     // Bt color scale based on value (same as Density)
@@ -2149,12 +2564,16 @@
                 
                 const lastVal = hist.bts[hist.bts.length - 1];
                 document.getElementById('chart-val-bt').textContent = lastVal ? lastVal.toFixed(1) + ' nT' : '--';
+                }
             }
 
             // 4. Bz - Simple solid fills (gradient causes artifacts with bipolar data)
-            if (data.solar_wind_history) {
+            if (data.solar_wind_history && data.solar_wind_history.bzs) {
                 const hist = data.solar_wind_history;
-                const bzs = hist.bzs.filter(b => b !== null);
+                const bzs = hist.bzs.filter(b => b !== null && !isNaN(b));
+                if (bzs.length === 0) {
+                    console.warn('No valid Bz data');
+                } else {
                 const maxBz = Math.max(...bzs, 5);
                 const minBz = Math.min(...bzs, -5);
                 const yMin = minBz - 2;
@@ -2209,6 +2628,7 @@
                 if (lastVal !== null) {
                     valElem.textContent = lastVal.toFixed(1) + ' nT';
                     valElem.style.color = lastVal < 0 ? '#ff4444' : '#4ade80';
+                }
                 }
             }
 
@@ -2320,23 +2740,27 @@
             }, 100);
         }
         
-        // Global resize function for all Plotly charts
+        // Global resize function for all Plotly charts with mobile optimization
         function resizeAllCharts() {
+            // Skip if we're in the middle of a resize animation
+            if (isResizing) return;
+            
             const chartIds = ['chart-speed', 'chart-density', 'chart-bt', 'chart-bz', 'chart-mag', 'chart-power', 'chart-dst'];
-            chartIds.forEach(id => {
-                const element = document.getElementById(id);
-                if (element && element.data) {
-                    Plotly.Plots.resize(element);
-                }
+            
+            // Use requestAnimationFrame for smoother resizing
+            requestAnimationFrame(() => {
+                chartIds.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element && element.data) {
+                        try {
+                            Plotly.Plots.resize(element);
+                        } catch (e) {
+                            console.warn(`Failed to resize chart ${id}:`, e);
+                        }
+                    }
+                });
             });
         }
-        
-        // Debounced resize handler for window resize events
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(resizeAllCharts, 150);
-        });
 
         function formatKp(kp) {
             // Convert decimal Kp to proper format
