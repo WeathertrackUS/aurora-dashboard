@@ -617,8 +617,9 @@ def generate_aurora_image():
     
     # Create figure with modern dark theme - enhanced with panel backgrounds
     fig = plt.figure(figsize=(24, 14), facecolor='#0f172a')
-    # 5 rows: header, auroral oval (larger), speed/density/bt on right, bz/magnetometer on bottom
-    gs = GridSpec(5, 3, figure=fig, width_ratios=[1.5, 1, 1], height_ratios=[0.25, 2.8, 1, 1, 1],
+    # 5 rows: header, auroral oval (spans 1-3), speed, density, bt, bz (row 4)
+    # Adjusted height ratios to be more uniform so charts fill their boxes better
+    gs = GridSpec(5, 3, figure=fig, width_ratios=[1.5, 1, 1], height_ratios=[0.3, 1.1, 1.1, 1.1, 1.1],
                   hspace=0.3, wspace=0.3, left=0.04, right=0.97, top=0.94, bottom=0.05)
     
     # === HEADER SECTION ===
@@ -801,23 +802,30 @@ def generate_aurora_image():
                  bbox=power_badge_style, ha='center')
     
     # === AURORAL OVAL MAP (Left side, spans rows 1-3 - much larger) ===
-    ax_map = fig.add_subplot(gs[1:4, 0], projection=ccrs.Orthographic(-100, 60))
+    # Adjusted projection to focus on North America
+    ax_map = fig.add_subplot(gs[1:4, 0], projection=ccrs.Orthographic(-95, 55))
+    # Taller extent to fill the box vertically (25N to 85N)
+    ax_map.set_extent([-135, -55, 25, 85], crs=ccrs.PlateCarree())
     ax_map.set_facecolor('#1e293b')
     # Add subtle border to map panel
     for spine in ax_map.spines.values():
         spine.set_edgecolor('#334155')
         spine.set_linewidth(1)
     
-    # Add map features with updated colors
-    ax_map.add_feature(cfeature.LAND, facecolor='#1e293b', edgecolor='none')
-    ax_map.add_feature(cfeature.OCEAN, facecolor='#0f172a', edgecolor='none')
-    ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=1, alpha=0.4)
-    ax_map.add_feature(cfeature.BORDERS, edgecolor='#475569', linewidth=0.5, linestyle=':')
-    ax_map.add_feature(cfeature.STATES, edgecolor='#475569', linewidth=0.3, linestyle=':')
+    # Add map features with cleaner look
+    # Land: Dark slate blue/grey, Ocean: Very dark blue/black
+    ax_map.add_feature(cfeature.LAND, facecolor='#1e293b', edgecolor='none', zorder=0)
+    ax_map.add_feature(cfeature.OCEAN, facecolor='#020617', edgecolor='none', zorder=0)
+    ax_map.add_feature(cfeature.LAKES, facecolor='#020617', edgecolor='none', zorder=0)
+    
+    # Lines: Thinner and sharper for a cleaner look
+    ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=0.8, alpha=0.8, zorder=1)
+    ax_map.add_feature(cfeature.BORDERS, edgecolor='#475569', linewidth=0.5, alpha=0.5, zorder=1)
+    ax_map.add_feature(cfeature.STATES, edgecolor='#334155', linewidth=0.5, linestyle=':', alpha=0.5, zorder=1)
     
     # Add lat/lon grid
-    gl = ax_map.gridlines(draw_labels=False, linewidth=0.5, color='#475569', 
-                          alpha=0.3, linestyle='--')
+    gl = ax_map.gridlines(draw_labels=False, linewidth=0.3, color='#475569', 
+                          alpha=0.3, linestyle='--', zorder=2)
     
     # Plot OVATION auroral probability data if available
     if ovation_lons is not None and len(ovation_lons) > 0:
@@ -911,6 +919,7 @@ def generate_aurora_image():
             cbar.outline.set_edgecolor('#4a5a6a')
     
     # Add city markers
+    # Expanded list of North American cities with more US locations
     cities = {
         'Seattle': (-122.3, 47.6),
         'Vancouver': (-123.1, 49.3),
@@ -922,16 +931,36 @@ def generate_aurora_image():
         'Chicago': (-87.6, 41.9),
         'Toronto': (-79.4, 43.7),
         'New York': (-74.0, 40.7),
+        'Minneapolis': (-93.3, 45.0),
+        'Denver': (-105.0, 39.7),
+        'Boston': (-71.1, 42.4),
+        'Bismarck': (-100.8, 46.8),
+        'Detroit': (-83.0, 42.3),
+        'Salt Lake City': (-111.9, 40.8),
+        'Quebec City': (-71.2, 46.8),
+        'Ottawa': (-75.7, 45.4),
+        'Portland': (-122.7, 45.5),
+        'Los Angeles': (-118.2, 34.0),
+        'Dallas': (-96.8, 32.8),
+        'Atlanta': (-84.4, 33.7),
+        'Orlando': (-81.4, 28.5),
+        'Norfolk': (-76.3, 36.8)
     }
     
     for city, (lon, lat) in cities.items():
-        ax_map.plot(lon, lat, 'o', color='#ffff00', markersize=6, 
-                   markeredgecolor='white', markeredgewidth=1.5, 
+        # Plot city marker
+        ax_map.plot(lon, lat, 'o', color='#fbbf24', markersize=5, 
+                   markeredgecolor='white', markeredgewidth=1.2, 
                    transform=ccrs.PlateCarree(), zorder=5)
-        ax_map.text(lon, lat-2, city, fontsize=9, ha='center', color='white',
-                   transform=ccrs.PlateCarree(), zorder=5,
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#000000', 
-                            alpha=0.7, edgecolor='none'))
+        
+        # Plot city label with outline for better readability
+        # Offset label slightly to the right for cleaner look
+        text = ax_map.text(lon + 2, lat, city, fontsize=8, ha='left', va='center', 
+                          color='#f8fafc', fontweight='bold',
+                          transform=ccrs.PlateCarree(), zorder=5)
+                          
+        # Add black outline to text instead of box
+        text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.5, foreground='#020617')])
     
     # Title with enhanced styling
     title_map = ax_map.set_title('REAL-TIME AURORAL OVAL',
@@ -2203,18 +2232,24 @@ def generate_map_image():
     
     # Create figure with transparent background
     fig = plt.figure(figsize=(10, 10), facecolor='none')
-    ax_map = fig.add_subplot(1, 1, 1, projection=ccrs.Orthographic(-100, 60))
+    # Adjusted projection to focus more on North America
+    ax_map = fig.add_subplot(1, 1, 1, projection=ccrs.Orthographic(-95, 55))
+    ax_map.set_extent([-135, -55, 25, 85], crs=ccrs.PlateCarree())
     
-    # Add map features with updated colors
-    ax_map.add_feature(cfeature.LAND, facecolor='#334155', edgecolor='none')
-    ax_map.add_feature(cfeature.OCEAN, facecolor='#0f172a', edgecolor='none')
-    ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=1.5, alpha=0.6)
-    ax_map.add_feature(cfeature.BORDERS, edgecolor='#475569', linewidth=1, linestyle=':')
-    ax_map.add_feature(cfeature.STATES, edgecolor='#475569', linewidth=0.5, linestyle=':')
+    # Add map features with cleaner look
+    # Land: Dark slate blue/grey, Ocean: Very dark blue/black
+    ax_map.add_feature(cfeature.LAND, facecolor='#1e293b', edgecolor='none', zorder=0)
+    ax_map.add_feature(cfeature.OCEAN, facecolor='#020617', edgecolor='none', zorder=0)
+    ax_map.add_feature(cfeature.LAKES, facecolor='#020617', edgecolor='none', zorder=0)
+    
+    # Lines: Thinner and sharper for a cleaner look
+    ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=0.8, alpha=0.8, zorder=1)
+    ax_map.add_feature(cfeature.BORDERS, edgecolor='#475569', linewidth=0.5, alpha=0.5, zorder=1)
+    ax_map.add_feature(cfeature.STATES, edgecolor='#334155', linewidth=0.5, linestyle=':', alpha=0.5, zorder=1)
     
     # Add lat/lon grid
-    gl = ax_map.gridlines(draw_labels=False, linewidth=0.5, color='#475569', 
-                          alpha=0.3, linestyle='--')
+    gl = ax_map.gridlines(draw_labels=False, linewidth=0.3, color='#475569', 
+                          alpha=0.3, linestyle='--', zorder=2)
     
     # Plot OVATION auroral probability data if available
     if ovation_lons is not None and len(ovation_lons) > 0:
@@ -2308,6 +2343,7 @@ def generate_map_image():
             cbar.outline.set_edgecolor('#475569')
     
     # Add city markers
+    # Expanded list of North American cities with more US locations
     cities = {
         'Seattle': (-122.3, 47.6),
         'Vancouver': (-123.1, 49.3),
@@ -2319,16 +2355,36 @@ def generate_map_image():
         'Chicago': (-87.6, 41.9),
         'Toronto': (-79.4, 43.7),
         'New York': (-74.0, 40.7),
+        'Minneapolis': (-93.3, 45.0),
+        'Denver': (-105.0, 39.7),
+        'Boston': (-71.1, 42.4),
+        'Bismarck': (-100.8, 46.8),
+        'Detroit': (-83.0, 42.3),
+        'Salt Lake City': (-111.9, 40.8),
+        'Quebec City': (-71.2, 46.8),
+        'Ottawa': (-75.7, 45.4),
+        'Portland': (-122.7, 45.5),
+        'Los Angeles': (-118.2, 34.0),
+        'Dallas': (-96.8, 32.8),
+        'Atlanta': (-84.4, 33.7),
+        'Orlando': (-81.4, 28.5),
+        'Norfolk': (-76.3, 36.8)
     }
     
     for city, (lon, lat) in cities.items():
-        ax_map.plot(lon, lat, 'o', color='#facc15', markersize=6, 
-                   markeredgecolor='white', markeredgewidth=1.5, 
+        # Plot city marker
+        ax_map.plot(lon, lat, 'o', color='#fbbf24', markersize=5, 
+                   markeredgecolor='white', markeredgewidth=1.2, 
                    transform=ccrs.PlateCarree(), zorder=5)
-        ax_map.text(lon, lat-2, city, fontsize=9, ha='center', color='white',
-                   transform=ccrs.PlateCarree(), zorder=5,
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#0f172a', 
-                            alpha=0.7, edgecolor='none'))
+        
+        # Plot city label with outline for better readability
+        # Offset label slightly to the right for cleaner look
+        text = ax_map.text(lon + 2, lat, city, fontsize=8, ha='left', va='center', 
+                          color='#f8fafc', fontweight='bold',
+                          transform=ccrs.PlateCarree(), zorder=5)
+                          
+        # Add black outline to text instead of box
+        text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.5, foreground='#020617')])
     
     # Title
     title_map = ax_map.set_title(f'REAL-TIME AURORAL OVAL\n{ovation_time if ovation_time else ""}',
