@@ -7,7 +7,7 @@
     "dismissible": true
   },
   {
-    "enabled": true,
+    "enabled": false,
     "message": "The ongoing S4 Severe Radiation Storm is resulting in unreliable solar wind data. Please use data with caution.",
     "issue_repo": "WeathertrackUS/aurora-dashboard",
     "type": "warning",
