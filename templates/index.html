@@ -2352,10 +2352,33 @@
         function updateDataCard(data) {
             const safeVal = (val, decimals = 1) => val !== null && val !== undefined ? Number(val).toFixed(decimals) : '--';
             
-            // Get observed Kp (current/historical) - ONLY use observed, never forecast
+            // Get observed Kp - but check if it's stale and use G-scale estimate if needed
             let kp = data.kp_index?.kp || 0;
+            const kpTime = data.kp_index?.time || '';
+            const noaaGScale = parseInt(data.noaa_scales?.g_scale) || 0;
             
-            console.log('[KP_INDEX] Observed Kp: ' + kp + ' (forecast values ignored)');
+            // NOAA Kp is updated every 3 hours. If live G-scale differs significantly
+            // from what the Kp suggests, show an estimated Kp based on G-scale
+            // G-scale to Kp midpoint: G0=2, G1=5, G2=6, G3=7, G4=8, G5=9
+            const gToKpEstimate = [2, 5, 6, 7, 8, 9];
+            const kpFromG = gToKpEstimate[noaaGScale] || 0;
+            
+            // If the observed Kp implies a different G-scale than current, use estimate
+            let calculatedG = 0;
+            if (kp > 8.67) calculatedG = 5;
+            else if (kp >= 7.67) calculatedG = 4;
+            else if (kp >= 6.67) calculatedG = 3;
+            else if (kp >= 5.67) calculatedG = 2;
+            else if (kp >= 5.00) calculatedG = 1;
+            
+            if (Math.abs(calculatedG - noaaGScale) >= 1 && noaaGScale >= 0) {
+                // Kp is stale - use estimate from live G-scale
+                kp = kpFromG;
+                console.log('[KP_INDEX] Kp data stale, estimated Kp ' + kp + ' from live G' + noaaGScale);
+            } else {
+                console.log('[KP_INDEX] Observed Kp: ' + kp + ' at ' + kpTime);
+            }
+            
             document.getElementById('kp-value-text').textContent = formatKp(kp);
             const kpFill = document.getElementById('kp-fill');
             const kpPercent = Math.min((kp / 9) * 100, 100);
@@ -2371,20 +2394,10 @@
             else if (kp >= 3) kpFill.style.background = '#166534'; // Kp3: Dark Green
             else kpFill.style.background = '#6b7280';              // Kp0-2: Gray
             
-            // G-Scale Calculation (NOAA standards)
-            // G5 = Kp > 8.67 (extreme storm) — treat 8.67 as G4
-            // G4 = Kp >= 7.67 (severe storm)
-            // G3 = Kp >= 6.67 (strong storm)
-            // G2 = Kp >= 5.67 (moderate storm)
-            // G1 = Kp >= 5.00 (minor storm)
-            let gScale = 0;
-            if (kp > 8.67) gScale = 5;
-            else if (kp >= 7.67) gScale = 4;
-            else if (kp >= 6.67) gScale = 3;
-            else if (kp >= 5.67) gScale = 2;
-            else if (kp >= 5.00) gScale = 1;
-            
-            console.log('[KP_INDEX] Calculated G-scale: G' + gScale + ' from Kp ' + kp);
+            // G-Scale: Use the live NOAA scale value we already have
+            // noaaGScale was already parsed above for Kp staleness detection
+            let gScale = noaaGScale;
+            console.log('[G_SCALE] Using live NOAA G-scale: G' + gScale);
             
             const gElem = document.getElementById('g-scale-display');
             gElem.innerHTML = `G${gScale} <span style="font-size: 0.8rem; font-weight: 400; opacity: 0.7;">STORM SCALE</span>`;
