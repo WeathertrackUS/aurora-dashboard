@@ -2372,13 +2372,13 @@
             else kpFill.style.background = '#6b7280';              // Kp0-2: Gray
             
             // G-Scale Calculation (NOAA standards)
-            // G5 = Kp >= 8.67 (extreme storm)
+            // G5 = Kp > 8.67 (extreme storm) — treat 8.67 as G4
             // G4 = Kp >= 7.67 (severe storm)
             // G3 = Kp >= 6.67 (strong storm)
             // G2 = Kp >= 5.67 (moderate storm)
             // G1 = Kp >= 5.00 (minor storm)
             let gScale = 0;
-            if (kp >= 8.67) gScale = 5;
+            if (kp > 8.67) gScale = 5;
             else if (kp >= 7.67) gScale = 4;
             else if (kp >= 6.67) gScale = 3;
             else if (kp >= 5.67) gScale = 2;

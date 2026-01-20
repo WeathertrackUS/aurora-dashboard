@@ -820,8 +820,8 @@ def generate_aurora_image():
     
     # Lines: Thinner and sharper for a cleaner look
     ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=0.8, alpha=0.8, zorder=1)
-    ax_map.add_feature(cfeature.BORDERS, edgecolor='#475569', linewidth=0.5, alpha=0.5, zorder=1)
-    ax_map.add_feature(cfeature.STATES, edgecolor='#334155', linewidth=0.5, linestyle=':', alpha=0.5, zorder=1)
+    ax_map.add_feature(cfeature.BORDERS, edgecolor="#8C99AA", linewidth=0.5, alpha=0.6, zorder=1)
+    ax_map.add_feature(cfeature.STATES, edgecolor="#BFC6CF", linewidth=0.5, linestyle=':', alpha=0.9, zorder=1)
     
     # Add lat/lon grid
     gl = ax_map.gridlines(draw_labels=False, linewidth=0.3, color='#475569', 
@@ -918,49 +918,7 @@ def generate_aurora_image():
             cbar.ax.tick_params(labelsize=10, colors='#8899aa')
             cbar.outline.set_edgecolor('#4a5a6a')
     
-    # Add city markers
-    # Expanded list of North American cities with more US locations
-    cities = {
-        'Seattle': (-122.3, 47.6),
-        'Vancouver': (-123.1, 49.3),
-        'Calgary': (-114.1, 51.0),
-        'Yellowknife': (-114.4, 62.5),
-        'Fairbanks': (-147.7, 64.8),
-        'Anchorage': (-149.9, 61.2),
-        'Winnipeg': (-97.1, 49.9),
-        'Chicago': (-87.6, 41.9),
-        'Toronto': (-79.4, 43.7),
-        'New York': (-74.0, 40.7),
-        'Minneapolis': (-93.3, 45.0),
-        'Denver': (-105.0, 39.7),
-        'Boston': (-71.1, 42.4),
-        'Bismarck': (-100.8, 46.8),
-        'Detroit': (-83.0, 42.3),
-        'Salt Lake City': (-111.9, 40.8),
-        'Quebec City': (-71.2, 46.8),
-        'Ottawa': (-75.7, 45.4),
-        'Portland': (-122.7, 45.5),
-        'Los Angeles': (-118.2, 34.0),
-        'Dallas': (-96.8, 32.8),
-        'Atlanta': (-84.4, 33.7),
-        'Orlando': (-81.4, 28.5),
-        'Norfolk': (-76.3, 36.8)
-    }
-    
-    for city, (lon, lat) in cities.items():
-        # Plot city marker
-        ax_map.plot(lon, lat, 'o', color='#fbbf24', markersize=5, 
-                   markeredgecolor='white', markeredgewidth=1.2, 
-                   transform=ccrs.PlateCarree(), zorder=5)
-        
-        # Plot city label with outline for better readability
-        # Offset label slightly to the right for cleaner look
-        text = ax_map.text(lon + 2, lat, city, fontsize=8, ha='left', va='center', 
-                          color='#f8fafc', fontweight='bold',
-                          transform=ccrs.PlateCarree(), zorder=5)
-                          
-        # Add black outline to text instead of box
-        text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.5, foreground='#020617')])
+    # City markers handled later (avoid duplicate drawing)
     
     # Title with enhanced styling
     title_map = ax_map.set_title('REAL-TIME AURORAL OVAL',
@@ -2368,7 +2326,9 @@ def generate_map_image():
         'Dallas': (-96.8, 32.8),
         'Atlanta': (-84.4, 33.7),
         'Orlando': (-81.4, 28.5),
-        'Norfolk': (-76.3, 36.8)
+        'Norfolk': (-76.3, 36.8),
+        'Nashville': (-86.8, 36.16),
+        'St. Louis': (-90.2, 38.63)
     }
     
     for city, (lon, lat) in cities.items():
@@ -2500,8 +2460,8 @@ def get_geomagnetic_alerts():
             # G2 = Kp 6- (5.67-6.00)
             # G3 = Kp 7- (6.67-7.00)
             # G4 = Kp 8- (7.67-8.00)
-            # G5 = Kp 9- (8.67+)
-            if max_kp >= 8.67:
+            # G5 = Kp 9- (strictly > 8.67) — treat 8.67 as G4 per NOAA rounding rules
+            if max_kp > 8.67:
                 g_scale = 5
             elif max_kp >= 7.67:
                 g_scale = 4
