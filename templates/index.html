@@ -1138,6 +1138,18 @@
                 max-height: none;
                 height: auto;
                 aspect-ratio: 1;
+                padding-top: 2rem; /* Space for title */
+            }
+            
+            .map-panel .chart-title {
+                font-size: 0.7rem;
+                top: 6px;
+                left: 8px;
+                max-width: none;
+                background: rgba(10, 10, 10, 0.7);
+                padding: 2px 6px;
+                border-radius: 3px;
+                z-index: 20;
             }
             
             .chart-title {
@@ -1261,6 +1273,13 @@
                 min-height: 260px;
                 max-height: none;
                 aspect-ratio: 1;
+                padding-top: 1.75rem;
+            }
+            
+            .map-panel .chart-title {
+                font-size: 0.6rem;
+                top: 4px;
+                left: 6px;
             }
             
             .chart-container {
@@ -1482,6 +1501,15 @@
             border: 2px solid #10b981;
             color: #10b981;
             white-space: nowrap;
+            vertical-align: middle;
+        }
+        
+        /* Magnetometer chart title with badge - flex container */
+        .mag-chart-wrapper .chart-title {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         
         /* Dst chart container */
@@ -1512,12 +1540,22 @@
             }
             
             .substorm-badge {
-                display: block;
+                display: inline-block;
                 margin-left: 0;
-                margin-top: 0.5rem;
+                margin-top: 0;
                 text-align: center;
-                font-size: 0.7rem;
-                padding: 3px 8px;
+                font-size: 0.65rem;
+                padding: 2px 6px;
+                flex-shrink: 0;
+            }
+            
+            .mag-chart-wrapper .chart-title {
+                font-size: 0.6rem;
+                flex-direction: row;
+                flex-wrap: nowrap;
+                gap: 6px;
+                max-width: 100%;
+                overflow: hidden;
             }
             
             .dst-chart-container {
@@ -1540,9 +1578,14 @@
             .dst-chart-container {
                 height: 140px;
             }
-            
+
             .substorm-badge {
-                font-size: 0.65rem;
+                font-size: 0.55rem;
+                padding: 2px 4px;
+            }
+            
+            .mag-chart-wrapper .chart-title {
+                font-size: 0.55rem;
             }
         }
     </style>
@@ -1836,6 +1879,44 @@
         document.addEventListener('DOMContentLoaded', () => {
             checkMobile();
             
+            // Show loading overlay immediately for initial map load
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if (loadingOverlay) {
+                loadingOverlay.classList.add('active');
+            }
+            
+            // Preload the initial map image with retry logic
+            const mapImage = document.getElementById('map-image');
+            if (mapImage) {
+                // Hide the img initially to prevent flash of broken image
+                mapImage.style.opacity = '0';
+                
+                const initialLoad = async () => {
+                    const src = `/aurora-map.png?t=${Date.now()}`;
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                const img = new Image();
+                                const timeout = setTimeout(() => reject(new Error('timeout')), 15000);
+                                img.onload = () => { clearTimeout(timeout); resolve(); };
+                                img.onerror = () => { clearTimeout(timeout); reject(new Error('load error')); };
+                                img.src = src;
+                            });
+                            mapImage.src = src;
+                            mapImage.style.opacity = '1';
+                            console.log('Initial map loaded successfully');
+                            return;
+                        } catch (e) {
+                            console.warn(`Initial map load attempt ${attempt + 1} failed:`, e.message);
+                            if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                        }
+                    }
+                    // Still show the img even if loading failed
+                    mapImage.style.opacity = '1';
+                };
+                initialLoad();
+            }
+            
             // Add resize listener
             window.addEventListener('resize', handleResize);
             window.addEventListener('orientationchange', () => {
@@ -2068,49 +2149,8 @@
                 // 5. Fetch Geomagnetic Alerts
                 fetchGeomagneticAlerts();
 
-                // 4. Refresh Map Image with proper error handling and timeout
-                const timestamp = new Date().getTime();
-                const newSrc = `/aurora-map.png?t=${timestamp}`;
-                
-                // Preload image with timeout and error handling
-                const tempImg = new Image();
-                let mapLoadTimeout;
-                
-                const finishMapLoad = () => {
-                    clearTimeout(mapLoadTimeout);
-                    loadingOverlay.classList.remove('active');
-                    nextRefreshTime = Date.now() + 60000;
-                };
-                
-                tempImg.onload = () => {
-                    mapImage.src = newSrc;
-                    finishMapLoad();
-                };
-                
-                tempImg.onerror = () => {
-                    console.warn('Failed to load aurora map, retrying...');
-                    // Retry once after 2 seconds
-                    setTimeout(() => {
-                        const retryImg = new Image();
-                        retryImg.onload = () => {
-                            mapImage.src = `/aurora-map.png?t=${Date.now()}`;
-                            finishMapLoad();
-                        };
-                        retryImg.onerror = () => {
-                            console.error('Aurora map failed to load after retry');
-                            finishMapLoad();
-                        };
-                        retryImg.src = `/aurora-map.png?t=${Date.now()}`;
-                    }, 2000);
-                };
-                
-                // Timeout fallback - if map doesn't load in 30 seconds, continue anyway
-                mapLoadTimeout = setTimeout(() => {
-                    console.warn('Aurora map load timeout, continuing...');
-                    finishMapLoad();
-                }, 30000);
-                
-                tempImg.src = newSrc;
+                // 4. Refresh Map Image with robust error handling and retries
+                refreshAuroraMap();
                 
                 // Force resize to fix layout bugs
                 setTimeout(() => {
@@ -2122,6 +2162,72 @@
                 showToast('Failed to refresh data', 'error');
                 loadingOverlay.classList.remove('active');
             }
+        }
+        
+        // Robust map loading function with multiple retries and exponential backoff
+        async function refreshAuroraMap(maxRetries = 3) {
+            const timestamp = Date.now();
+            let retryCount = 0;
+            
+            const finishMapLoad = (success = true) => {
+                loadingOverlay.classList.remove('active');
+                nextRefreshTime = Date.now() + 60000;
+                if (success) {
+                    console.log('Aurora map loaded successfully');
+                }
+            };
+            
+            const attemptLoad = (attemptNum) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    const src = `/aurora-map.png?t=${timestamp + attemptNum}`;
+                    let timeoutId;
+                    
+                    const cleanup = () => {
+                        clearTimeout(timeoutId);
+                        img.onload = null;
+                        img.onerror = null;
+                    };
+                    
+                    img.onload = () => {
+                        cleanup();
+                        mapImage.src = src;
+                        resolve(true);
+                    };
+                    
+                    img.onerror = () => {
+                        cleanup();
+                        console.warn(`Map load attempt ${attemptNum + 1} failed`);
+                        resolve(false);
+                    };
+                    
+                    // Timeout after 15 seconds per attempt
+                    timeoutId = setTimeout(() => {
+                        cleanup();
+                        console.warn(`Map load attempt ${attemptNum + 1} timed out`);
+                        resolve(false);
+                    }, 15000);
+                    
+                    img.src = src;
+                });
+            };
+            
+            // Try loading with exponential backoff
+            for (let i = 0; i < maxRetries; i++) {
+                const success = await attemptLoad(i);
+                if (success) {
+                    finishMapLoad(true);
+                    return;
+                }
+                // Wait before retry: 1s, 2s, 4s
+                if (i < maxRetries - 1) {
+                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+                }
+            }
+            
+            // All retries failed - still finish loading state
+            console.error('Aurora map failed to load after all retries');
+            finishMapLoad(false);
         }
 
         async function fetchGeomagneticAlerts() {
