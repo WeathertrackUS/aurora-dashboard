@@ -13,7 +13,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌌</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         :root {
@@ -2911,7 +2911,7 @@
             
             // Kp title
             ctx.fillStyle = '#94a3b8';
-            ctx.font = 'bold 20px Metropolis, sans-serif';
+            ctx.font = 'bold 20px Outfit, Inter, sans-serif';
             ctx.fillText('PLANETARY K-INDEX', kpPanelX + 40, kpPanelY + 50);
             
             // Kp value
@@ -3021,9 +3021,9 @@
             ];
             
             labels.forEach(label => {
-                // Draw label with Metropolis font
+                // Draw label with Outfit font
                 ctx.fillStyle = '#94a3b8';
-                ctx.font = 'bold 20px Metropolis, sans-serif';
+                ctx.font = 'bold 20px Outfit, Inter, sans-serif';
                 ctx.fillText(label.text, label.x, label.y);
                 
                 // Draw value (right aligned)
@@ -3034,9 +3034,9 @@
                 ctx.textAlign = 'left';
             });
             
-            // Bottom row labels with Metropolis font
+            // Bottom row labels with Outfit font
             ctx.fillStyle = '#94a3b8';
-            ctx.font = 'bold 20px Metropolis, sans-serif';
+            ctx.font = 'bold 20px Outfit, Inter, sans-serif';
             ctx.fillText('GOES MAGNETOMETER', 30, mapHeight + 30);
             ctx.fillText('HEMISPHERIC POWER', mapWidth + 30, mapHeight + 30);
             

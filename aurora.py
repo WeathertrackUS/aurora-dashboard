@@ -22,9 +22,9 @@ import os
 import glob
 warnings.filterwarnings('ignore')
 
-# Set font to Metropolis Bold
+# Set font to system sans-serif with fallbacks
 matplotlib.rcParams['font.family'] = 'sans-serif'
-matplotlib.rcParams['font.sans-serif'] = ['Metropolis', 'Inter', 'Arial', 'sans-serif']
+matplotlib.rcParams['font.sans-serif'] = ['Inter', 'Arial', 'DejaVu Sans', 'sans-serif']
 matplotlib.rcParams['font.weight'] = 'bold'
 matplotlib.rcParams['axes.facecolor'] = '#1e293b'
 matplotlib.rcParams['figure.facecolor'] = '#0f172a'
@@ -2456,14 +2456,16 @@ def get_geomagnetic_alerts():
                 print(f"DEBUG: {date} - No data, using default Kp 2.0")
             
             # Convert Kp to G-scale
-            # G1 = Kp 5 (5.00-5.33)
-            # G2 = Kp 6- (5.67-6.00)
-            # G3 = Kp 7- (6.67-7.00)
-            # G4 = Kp 8- (7.67-8.00)
-            # G5 = Kp 9- (strictly > 8.67) — treat 8.67 as G4 per NOAA rounding rules
+            # G-scale mapping (adjusted thresholds)
+            # G1 ≈ Kp 5
+            # G2 ≈ Kp 6
+            # G3 ≈ Kp 7
+            # G4 ≈ Kp 8
+            # G5 ≈ Kp 9
+            # Use conservative thresholds so values like Kp=7.7 map to G3 (not G4)
             if max_kp > 8.67:
                 g_scale = 5
-            elif max_kp >= 7.67:
+            elif max_kp >= 8.0:
                 g_scale = 4
             elif max_kp >= 6.67:
                 g_scale = 3
