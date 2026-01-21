@@ -35,7 +35,45 @@ matplotlib.rcParams['ytick.color'] = '#64748b'
 matplotlib.rcParams['grid.color'] = '#334155'
 matplotlib.rcParams['axes.edgecolor'] = '#334155'
 
+# Attempt to register local Metropolis fonts for server-side plotting.
+# Place font files (TTF/WOFF/WOFF2) into static/fonts/metropolis/.
+METROPOLIS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'fonts', 'metropolis')
+if os.path.isdir(METROPOLIS_DIR):
+    try:
+        import matplotlib.font_manager as font_manager
+        for fpath in glob.glob(os.path.join(METROPOLIS_DIR, '*')):
+            lower = fpath.lower()
+            if lower.endswith(('.ttf', '.otf', '.woff', '.woff2')):
+                try:
+                    font_manager.fontManager.addfont(fpath)
+                    print(f"Added font to matplotlib: {fpath}")
+                except Exception as e:
+                    print(f"Could not add font {fpath}: {e}")
+        # Prepend Metropolis to sans-serif fallback list if available
+        sans = matplotlib.rcParams.get('font.sans-serif', [])
+        if 'Metropolis' not in sans:
+            matplotlib.rcParams['font.sans-serif'] = ['Metropolis'] + list(sans)
+    except Exception as e:
+        print('Error registering local fonts:', e)
+
 app = Flask(__name__)
+
+# Simple in-memory cache for expensive operations
+_cache = {}
+_cache_timestamps = {}
+
+def get_cached(key, max_age_seconds=30):
+    """Get cached value if not expired"""
+    if key in _cache and key in _cache_timestamps:
+        age = time.time() - _cache_timestamps[key]
+        if age < max_age_seconds:
+            return _cache[key]
+    return None
+
+def set_cached(key, value):
+    """Set cached value with current timestamp"""
+    _cache[key] = value
+    _cache_timestamps[key] = time.time()
 
 # SWPC API endpoints
 PLASMA_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
@@ -1349,6 +1387,12 @@ def get_xray_data():
     """Get X-ray flux data with specified time range"""
     time_range = request.args.get('range', '6h')
     
+    # Check cache first (60 second cache for X-ray data)
+    cache_key = f'xray_data_{time_range}'
+    cached = get_cached(cache_key, max_age_seconds=60)
+    if cached:
+        return jsonify(cached)
+    
     print(f"Fetching X-ray data for range: {time_range}")
     
     # Map time ranges to NOAA API endpoints
@@ -1385,6 +1429,7 @@ def get_xray_data():
             ]
             
             print(f"Returning {len(filtered_data)} X-ray data points for range {time_range}")
+            set_cached(cache_key, filtered_data)
             return jsonify(filtered_data)
         return jsonify([])
     except Exception as e:
@@ -2338,10 +2383,10 @@ def generate_map_image():
                    transform=ccrs.PlateCarree(), zorder=5)
         
         # Plot city label with outline for better readability
-        # Offset label slightly to the right for cleaner look
-        text = ax_map.text(lon + 2, lat, city, fontsize=8, ha='left', va='center', 
-                          color='#f8fafc', fontweight='bold',
-                          transform=ccrs.PlateCarree(), zorder=5)
+        # Place label slightly to the right of marker to avoid overlap
+        text = ax_map.text(lon + 1.0, lat, city, fontsize=8, ha='left', va='center', 
+                  color='#f8fafc', fontweight='bold',
+                  transform=ccrs.PlateCarree(), zorder=5)
                           
         # Add black outline to text instead of box
         text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.5, foreground='#020617')])
@@ -2361,9 +2406,24 @@ def generate_map_image():
 
 @app.route('/aurora-map.png')
 def get_aurora_map_image():
-    """Generate and serve just the auroral oval map image"""
+    """Generate and serve just the auroral oval map image with caching"""
     try:
+        # Check cache first (30 second cache)
+        cached = get_cached('aurora_map', max_age_seconds=30)
+        if cached:
+            # Return cached image
+            buf = BytesIO(cached)
+            buf.seek(0)
+            return send_file(buf, mimetype='image/png')
+        
+        # Generate new image
         img_buffer = generate_map_image()
+        
+        # Cache the image bytes
+        img_bytes = img_buffer.getvalue()
+        set_cached('aurora_map', img_bytes)
+        
+        img_buffer.seek(0)
         return send_file(img_buffer, mimetype='image/png')
     except Exception as e:
         print(f"Error generating map image: {e}")

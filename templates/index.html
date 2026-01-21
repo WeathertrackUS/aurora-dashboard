@@ -14,6 +14,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* Local Metropolis fallback - requires font files in static/fonts/metropolis/ */
+        @font-face {
+            font-family: 'Metropolis';
+            src: local('Metropolis'),
+                 url('/static/fonts/metropolis/Metropolis-Regular.woff2') format('woff2'),
+                 url('/static/fonts/metropolis/Metropolis-Regular.woff') format('woff'),
+                 url('/static/fonts/metropolis/Metropolis-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Metropolis';
+            src: local('Metropolis Bold'),
+                 url('/static/fonts/metropolis/Metropolis-Bold.woff2') format('woff2'),
+                 url('/static/fonts/metropolis/Metropolis-Bold.woff') format('woff'),
+                 url('/static/fonts/metropolis/Metropolis-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+    </style>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         :root {
@@ -30,7 +53,7 @@
             --border: rgba(255, 255, 255, 0.06);
             --glass-border: 1px solid rgba(255, 255, 255, 0.06);
             --glass-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.6);
-            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-sans: 'Metropolis', 'Inter', system-ui, -apple-system, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
 
@@ -197,7 +220,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Metropolis', 'Inter', sans-serif;
             background-color: var(--bg-dark);
             background-image: 
                 radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.15) 0%, transparent 20%),
@@ -2045,17 +2068,48 @@
                 // 5. Fetch Geomagnetic Alerts
                 fetchGeomagneticAlerts();
 
-                // 4. Refresh Map Image
+                // 4. Refresh Map Image with proper error handling and timeout
                 const timestamp = new Date().getTime();
                 const newSrc = `/aurora-map.png?t=${timestamp}`;
                 
-                // Preload image
+                // Preload image with timeout and error handling
                 const tempImg = new Image();
-                tempImg.onload = () => {
-                    mapImage.src = newSrc;
+                let mapLoadTimeout;
+                
+                const finishMapLoad = () => {
+                    clearTimeout(mapLoadTimeout);
                     loadingOverlay.classList.remove('active');
                     nextRefreshTime = Date.now() + 60000;
                 };
+                
+                tempImg.onload = () => {
+                    mapImage.src = newSrc;
+                    finishMapLoad();
+                };
+                
+                tempImg.onerror = () => {
+                    console.warn('Failed to load aurora map, retrying...');
+                    // Retry once after 2 seconds
+                    setTimeout(() => {
+                        const retryImg = new Image();
+                        retryImg.onload = () => {
+                            mapImage.src = `/aurora-map.png?t=${Date.now()}`;
+                            finishMapLoad();
+                        };
+                        retryImg.onerror = () => {
+                            console.error('Aurora map failed to load after retry');
+                            finishMapLoad();
+                        };
+                        retryImg.src = `/aurora-map.png?t=${Date.now()}`;
+                    }, 2000);
+                };
+                
+                // Timeout fallback - if map doesn't load in 30 seconds, continue anyway
+                mapLoadTimeout = setTimeout(() => {
+                    console.warn('Aurora map load timeout, continuing...');
+                    finishMapLoad();
+                }, 30000);
+                
                 tempImg.src = newSrc;
                 
                 // Force resize to fix layout bugs
