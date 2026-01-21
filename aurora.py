@@ -62,6 +62,11 @@ app = Flask(__name__)
 _cache = {}
 _cache_timestamps = {}
 
+# Thread lock for expensive operations to prevent concurrent generation
+import threading
+_map_generation_lock = threading.Lock()
+_map_generating = False  # Flag to indicate generation in progress
+
 def get_cached(key, max_age_seconds=30):
     """Get cached value if not expired"""
     if key in _cache and key in _cache_timestamps:
@@ -2406,7 +2411,9 @@ def generate_map_image():
 
 @app.route('/aurora-map.png')
 def get_aurora_map_image():
-    """Generate and serve just the auroral oval map image with caching"""
+    """Generate and serve just the auroral oval map image with caching and concurrency control"""
+    global _map_generating
+    
     try:
         # Check cache first (30 second cache)
         cached = get_cached('aurora_map', max_age_seconds=30)
@@ -2416,19 +2423,59 @@ def get_aurora_map_image():
             buf.seek(0)
             return send_file(buf, mimetype='image/png')
         
-        # Generate new image
-        img_buffer = generate_map_image()
+        # Try to acquire lock for generation
+        # If another request is already generating, wait for it with timeout
+        lock_acquired = _map_generation_lock.acquire(timeout=45)
         
-        # Cache the image bytes
-        img_bytes = img_buffer.getvalue()
-        set_cached('aurora_map', img_bytes)
+        if not lock_acquired:
+            # Timeout waiting for lock - return stale cache if available or error
+            stale_cached = _cache.get('aurora_map')
+            if stale_cached:
+                print("Map generation busy, returning stale cache")
+                buf = BytesIO(stale_cached)
+                buf.seek(0)
+                return send_file(buf, mimetype='image/png')
+            return "Map generation busy, please retry", 503
         
-        img_buffer.seek(0)
-        return send_file(img_buffer, mimetype='image/png')
+        try:
+            # Double-check cache after acquiring lock (another thread may have populated it)
+            cached = get_cached('aurora_map', max_age_seconds=30)
+            if cached:
+                buf = BytesIO(cached)
+                buf.seek(0)
+                return send_file(buf, mimetype='image/png')
+            
+            _map_generating = True
+            print("Generating new aurora map...")
+            
+            # Generate new image
+            img_buffer = generate_map_image()
+            
+            # Cache the image bytes
+            img_bytes = img_buffer.getvalue()
+            set_cached('aurora_map', img_bytes)
+            
+            print("Aurora map generated and cached successfully")
+            
+            img_buffer.seek(0)
+            return send_file(img_buffer, mimetype='image/png')
+        finally:
+            _map_generating = False
+            _map_generation_lock.release()
+            
     except Exception as e:
         print(f"Error generating map image: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Try to return stale cache on error
+        stale_cached = _cache.get('aurora_map')
+        if stale_cached:
+            print("Returning stale cache due to generation error")
+            buf = BytesIO(stale_cached)
+            buf.seek(0)
+            return send_file(buf, mimetype='image/png')
+        
         return f"Error generating map image: {e}", 500
 
 @app.route('/api/geomagnetic-alerts')
@@ -3609,9 +3656,41 @@ if __name__ == '__main__':
         host = os.environ.get('HOST', '0.0.0.0')
         port = int(os.environ.get('PORT', 3005))
         
+        # Start background map refresh thread
+        def background_map_refresh():
+            """Periodically refresh the aurora map cache in the background"""
+            import time
+            # Wait a bit for server to start
+            time.sleep(5)
+            
+            while True:
+                try:
+                    # Check if cache is stale or missing
+                    cached = get_cached('aurora_map', max_age_seconds=25)
+                    if not cached:
+                        with _map_generation_lock:
+                            # Double check after acquiring lock
+                            cached = get_cached('aurora_map', max_age_seconds=25)
+                            if not cached:
+                                print("[BG] Refreshing aurora map cache...")
+                                img_buffer = generate_map_image()
+                                img_bytes = img_buffer.getvalue()
+                                set_cached('aurora_map', img_bytes)
+                                print("[BG] Aurora map cache refreshed")
+                except Exception as e:
+                    print(f"[BG] Error refreshing map cache: {e}")
+                
+                # Check every 20 seconds
+                time.sleep(20)
+        
+        # Start background thread
+        bg_thread = threading.Thread(target=background_map_refresh, daemon=True)
+        bg_thread.start()
+        print("🔄 Background map refresh thread started")
+        
         print("🌌 Aurora Dashboard Starting...")
         print(f"🌐 Open your browser to: http://localhost:{port}")
         print(f"🎬 Generate GIF: http://localhost:{port}/generate-gif?hours=2&interval=1&duration=500")
         print("\n💡 CLI Mode: python aurora.py generate-gif [hours] [interval_minutes] [frame_duration_ms]")
         print("   Example: python aurora.py generate-gif 2 1 500  (captures 2 hours at 1-min intervals)")
-        app.run(debug=debug_mode, host=host, port=port)
+        app.run(debug=debug_mode, host=host, port=port, threaded=True)
