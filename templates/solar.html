@@ -41,7 +41,9 @@
     <style>
         :root {
             --bg-dark: #0a0a0a;
+            --bg-card: #1a1a1a;
             --bg-panel: #1a1a1a;
+            --bg-card-hover: #222222;
             --bg-panel-hover: #222222;
             --text-primary: #e5e5e5;
             --text-secondary: #8b8b8b;
@@ -51,13 +53,15 @@
             --warning: #f59e0b;
             --danger: #ef4444;
             --border: rgba(255, 255, 255, 0.08);
-            --font-sans: 'Metropolis', 'Inter', system-ui, -apple-system, sans-serif;
+            --font-sans: 'Inter', 'Metropolis', system-ui, -apple-system, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
 
         [data-theme="light"] {
             --bg-dark: #fafafa;
+            --bg-card: #ffffff;
             --bg-panel: #ffffff;
+            --bg-card-hover: #f5f5f5;
             --bg-panel-hover: #f5f5f5;
             --text-primary: #171717;
             --text-secondary: #737373;
@@ -97,11 +101,12 @@
             justify-content: space-between;
             align-items: center;
             padding: 0.875rem 2rem;
-            background: var(--bg-panel);
+            background: var(--bg-card);
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
             z-index: 1000;
+            min-height: 56px;
         }
 
         .brand {
@@ -614,6 +619,38 @@
             gap: 0.85rem;
             align-items: stretch;
         }
+        
+        /* Overview Tab Layout with Sidebar */
+        .overview-layout {
+            display: grid;
+            grid-template-columns: 1fr 520px;
+            gap: 1rem;
+            align-items: start;
+        }
+        
+        .overview-main {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+        
+        .overview-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            position: sticky;
+            top: 1rem;
+        }
+        
+        @media (max-width: 1400px) {
+            .overview-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .overview-sidebar {
+                position: static;
+            }
+        }
 
         .card {
             background: var(--bg-panel);
@@ -769,24 +806,6 @@
         }
 
         .chart-container.loading::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(
-                90deg,
-                rgba(255, 255, 255, 0) 0%,
-                rgba(255, 255, 255, 0.03) 50%,
-                rgba(255, 255, 255, 0) 100%
-            );
-            animation: shimmer 2s infinite;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        .chart-container.loading::after {
             content: 'Loading chart data...';
             position: absolute;
             top: 50%;
@@ -795,11 +814,6 @@
             color: var(--text-secondary);
             font-size: 0.9rem;
             z-index: 2;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
         }
 
         #xray-chart, #proton-chart {
@@ -842,7 +856,6 @@
             object-fit: contain; /* Ensure full sun is visible */
             cursor: zoom-in;
             transition: transform 0.3s ease, opacity 0.3s ease;
-            opacity: 0;
         }
 
         .solar-image-container img.loaded {
@@ -931,34 +944,67 @@
 
         .sunspot-table tbody tr:hover {
             background-color: var(--bg-panel-hover);
+            cursor: pointer;
+        }
+        
+        .sunspot-table tbody tr {
+            transition: background-color 0.2s;
         }
 
         .mag-type {
             display: inline-block;
-            padding: 0.15rem 0.4rem;
-            border-radius: 2px;
-            background: rgba(255, 255, 255, 0.05);
-            font-size: 0.75rem;
-            font-weight: 500;
+            padding: 0.2rem 0.45rem;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.08);
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: 1px solid transparent;
         }
         
-        .mag-alpha { color: #93c5fd; }
-        .mag-beta { color: #86efac; }
-        .mag-gamma { color: #fca5a5; }
-        .mag-delta { color: #fcd34d; }
+        .mag-alpha { 
+            color: #93c5fd; 
+            border-color: rgba(147, 197, 253, 0.3);
+        }
+        .mag-beta { 
+            color: #86efac; 
+            border-color: rgba(134, 239, 172, 0.3);
+        }
+        .mag-gamma { 
+            color: #fcd34d; 
+            background: rgba(252, 211, 77, 0.12);
+            border-color: rgba(252, 211, 77, 0.28);
+            font-weight: 700;
+        }
+        .mag-delta { 
+            color: #ef4444; 
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.28);
+            font-weight: 700;
+        }
 
         .flare-badge {
             display: inline-block;
-            padding: 0.1rem 0.3rem;
-            border-radius: 2px;
-            font-size: 0.7rem;
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.65rem;
             font-weight: 700;
-            margin-left: 0.5rem;
+            margin-left: 0.35rem;
             color: #000;
+            font-family: var(--font-mono);
         }
-        .flare-x { background-color: #ef4444; color: white; }
-        .flare-m { background-color: #f59e0b; color: black; }
-        .flare-c { background-color: #fbbf24; color: black; }
+        .flare-x { 
+            background-color: #ef4444; 
+            color: white;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        }
+        .flare-m { 
+            background-color: #f59e0b; 
+            color: black;
+        }
+        .flare-c { 
+            background-color: #fbbf24; 
+            color: black;
+        }
 
         .btn-view {
             background: var(--bg-panel);
@@ -1241,9 +1287,9 @@
             color: #fb923c;
         }
         
-        /* Mobile Menu Toggle */
+        /* Mobile Menu Toggle - hidden on desktop */
         .mobile-menu-toggle {
-            display: none;
+            display: none !important;
             background: transparent;
             border: none;
             color: var(--text-primary);
@@ -1253,7 +1299,6 @@
             z-index: 1001;
             min-width: 44px;
             min-height: 44px;
-            display: flex;
             align-items: center;
             justify-content: center;
         }
@@ -1624,6 +1669,7 @@
     </style>
 </head>
 <body>
+    <div class="bg-noise"></div>
     <nav class="navbar">
         <a href="/" class="brand">
             <span></span> WTUS Space Weather Dashboard
@@ -1638,18 +1684,33 @@
         </div>
         <div class="nav-stats">
             <div class="stat-item">
-                <span>UTC:</span>
+                <span>Time:</span>
                 <span class="stat-value" id="utc-time">--:--</span>
             </div>
-            <button class="theme-toggle" onclick="toggleTheme()">
-                <span id="theme-icon"></span>
-                <span id="theme-text">Dark</span>
-            </button>
         </div>
     </nav>
 
     <!-- System Alerts Container (supports multiple alerts). Individual banners are created by JS. -->
     <div id="system-alerts-container" style="margin: 0.5rem 1rem;"></div>
+
+    <script>
+        // Lightweight UTC clock placed immediately after navbar to ensure it updates
+        (function() {
+            try {
+                function tick() {
+                    const el = document.getElementById('utc-time');
+                    if (!el) return;
+                    const now = new Date();
+                    el.textContent = now.toISOString().slice(11,16) + ' UTC';
+                }
+                // Run immediately and every second
+                tick();
+                setInterval(tick, 1000);
+            } catch (e) {
+                console.warn('UTC ticker failed:', e);
+            }
+        })();
+    </script>
 
     <!-- Legacy single-banner kept as a hidden template for compatibility -->
     <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem;">
@@ -1680,7 +1741,7 @@
         <!-- Page Header -->
         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
             <div>
-                <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0; color: var(--text-primary);">Solar Activity</h1>
+                <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0; color: var(--text-primary); font-family: var(--font-sans);">Solar Activity</h1>
                 <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.9rem;">Real-time space weather monitoring</p>
             </div>
         </div>
@@ -1695,6 +1756,10 @@
 
         <!-- Tab: Overview (existing content) -->
         <div id="tab-overview" class="tab-content active">
+        
+        <div class="overview-layout">
+            <!-- Main Content Column -->
+            <div class="overview-main">
 
         <!-- Row 1: X-Ray & GOES -->
         <div class="content-row">
@@ -1819,28 +1884,73 @@
             </div>
         </div>
 
-        <!-- Row 3: Sunspots -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Active Regions</div>
             </div>
-            <div style="overflow-y: auto; max-height: 300px;">
-                <table class="sunspot-table">
-                    <thead>
-                        <tr>
-                            <th>Region</th>
-                            <th>Loc</th>
-                            <th>Class</th>
-                            <th>Mag</th>
-                            <th>View</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sunspot-body">
-                        <tr><td colspan="5" style="text-align: center;">Loading...</td></tr>
-                    </tbody>
-                </table>
+            <!-- End Main Content Column -->
+            
+            <!-- Sidebar Column -->
+            <div class="overview-sidebar">
+                <!-- Active Regions Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Active Solar Regions</div>
+                    </div>
+                    <div style="overflow-y: auto; max-height: 500px;">
+                        <table class="sunspot-table">
+                            <thead>
+                                <tr>
+                                    <th>Region</th>
+                                    <th>Location</th>
+                                    <th>Class</th>
+                                    <th>Mag Type</th>
+                                    <th>Area</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sunspot-body">
+                                <tr><td colspan="5" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                        <!-- Divider -->
+                        <div style="border-top: 2px solid var(--border); margin: 0.75rem 0.5rem; padding-top: 0.75rem;">
+                            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding: 0 0.25rem;">Regions To Return</div>
+                            <table class="sunspot-table">
+                                <thead>
+                                    <tr>
+                                        <th>Region</th>
+                                        <th>Est. Return</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="returning-regions-body">
+                                    <tr><td colspan="2" style="text-align: center; font-size: 0.7rem; color: var(--text-secondary); padding: 0.75rem;">No regions expected</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Info Footer -->
+                    <div style="padding: 0.5rem; border-top: 1px solid var(--border); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4;">
+                        <div style="margin-bottom: 0.4rem;"><strong style="color: var(--text-primary);">Magnetic Classification:</strong></div>
+                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.5rem; margin-bottom: 0.5rem;">
+                            <span style="color: #93c5fd;">α</span><span>Alpha - Unipolar, generally not complex</span>
+                            <span style="color: #86efac;">β</span><span>Beta - Slightly complex</span>
+                            <span style="color: #fcd34d;">βγ</span><span>Beta-Gamma - Complex</span>
+                            <span style="color: #ef4444;">βγδ</span><span>Beta-Gamma-Delta - Very complex</span>
+                        </div>
+                        <div style="margin-bottom: 0.4rem;"><strong style="color: var(--text-primary);">Area Size (millionths):</strong></div>
+                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.5rem;">
+                            <span style="color: #22c55e;">●</span><span>&lt; >200 - Small</span>
+                            <span style="color: #fbbf24;">●</span><span>200-600 - Medium</span>
+                            <span style="color: #f97316;">●</span><span>600-900 - Large</span>
+                            <span style="color: #dc2626;">●</span><span>900-1200 - Very Large</span>
+                            <span style="color: #ec4899;">●</span><span>&gt; 1200 - Extreme</span>
+                        </div>
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); font-style: italic;">
+                            Click any region for detailed info
+                        </div>
+                    </div>
+                </div>
             </div>
+            <!-- End Sidebar Column -->
         </div>
+        <!-- End Overview Layout -->
 
         </div>
         <!-- End Tab: Overview -->
@@ -2438,14 +2548,16 @@
                         </div>
                     </div>
                     
+                    <!-- Clickable headers will control sorting (click to cycle: high, low, default=time) -->
+
                     <!-- Detailed Flare List -->
                     <div id="flare-list-container" style="margin-top: 1rem; max-height: 300px; overflow-y: auto; display: none;">
                         <div style="background: var(--bg-dark); border-radius: 4px; border: 1px solid var(--border);">
                             <div style="padding: 0.75rem; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 80px 1fr 100px 60px; gap: 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">
-                                <div>Class</div>
-                                <div>Time (UTC)</div>
-                                <div>Duration</div>
-                                <div>CME</div>
+                                    <div class="flare-col-header" data-key="class" style="cursor:pointer;">Class <span class="sort-indicator"></span></div>
+                                    <div class="flare-col-header" data-key="time" style="cursor:pointer;">Time (UTC) <span class="sort-indicator"></span></div>
+                                    <div class="flare-col-header" data-key="duration" style="cursor:pointer;">Duration <span class="sort-indicator"></span></div>
+                                    <div class="flare-col-header" data-key="cme" style="cursor:pointer; text-align:center;">CME <span class="sort-indicator"></span></div>
                             </div>
                             <div id="flare-list-items" style="max-height: 240px; overflow-y: auto;">
                                 <!-- Flare items will be inserted here -->
@@ -2560,6 +2672,20 @@
                 const solarData = await solarResponse.json();
                 if (solarData && solarData.sunspots) {
                     updateSunspots(solarData.sunspots);
+                    // Fill returning regions: prefer API-provided list if available
+                    if (solarData.returning_regions && Array.isArray(solarData.returning_regions) && solarData.returning_regions.length > 0) {
+                        const returningBody = document.getElementById('returning-regions-body');
+                        returningBody.innerHTML = '';
+                        solarData.returning_regions.forEach(r => {
+                            const tr = document.createElement('tr');
+                            const returnDate = r.expected_return_date || '';
+                            tr.innerHTML = `\n                                <td style="font-weight: 600; font-family: var(--font-mono); font-size: 0.75rem;">${r.number}</td>\n                                <td style="font-size: 0.72rem; color: var(--text-secondary);">${returnDate || 'TBD'}</td>\n                            `;
+                            returningBody.appendChild(tr);
+                        });
+                    } else {
+                        // Fallback: compute from sunspot longitudes
+                        updateReturningRegions(solarData.sunspots);
+                    }
                 }
                 
                 // Fetch X-ray data with current range
@@ -2676,11 +2802,11 @@
             
             function getFluxColor(flux) {
                 const fluxNum = parseFloat(flux);
-                if (fluxNum >= 1e-3) return '#ff1493'; // Pink for X10+
-                if (fluxNum >= 1e-4) return '#ff0000'; // Bright red for X
-                if (fluxNum >= 1e-5) return '#ff8c00'; // Bright orange for M
-                if (fluxNum >= 1e-6) return '#ffff00'; // Bright yellow for C
-                return '#00ff00'; // Bright green for A/B
+                if (fluxNum >= 1e-3) return '#e879f9'; // X10+ (Purple-Pink)
+                if (fluxNum >= 1e-4) return '#ef4444'; // X (Red)
+                if (fluxNum >= 1e-5) return '#f97316'; // M (Orange)
+                if (fluxNum >= 1e-6) return '#fbbf24'; // C (Amber)
+                return '#22c55e'; // A/B (Green)
             }
             
             long.forEach((d, i) => {
@@ -2705,10 +2831,11 @@
                             mode: 'lines',
                             line: { 
                                 color: currentRange,
-                                width: 2,
-                                shape: 'linear'
+                                width: 2.5,
+                                shape: 'spline',
+                                smoothing: 0.8
                             },
-                            showlegend: false
+                        showlegend: false
                         });
                         
                         // Start new segment with current point
@@ -2737,8 +2864,9 @@
                     mode: 'lines',
                     line: { 
                         color: currentRange,
-                        width: 2,
-                        shape: 'linear'
+                        width: 2.5,
+                        shape: 'spline',
+                        smoothing: 0.8
                     },
                     showlegend: false
                 });
@@ -2834,13 +2962,13 @@
                     font: { family: 'Inter, sans-serif', size: 13, color: '#f8fafc' }
                 },
                 xaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.05)',
+                    gridcolor: 'rgba(255, 255, 255, 0.04)',
                     showgrid: true,
                     zeroline: false,
                     range: [timeStart.toISOString(), timeEnd.toISOString()]
                 },
                 yaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.05)', 
+                    gridcolor: 'rgba(255, 255, 255, 0.04)', 
                     type: 'log',
                     title: 'Watts/m²',
                     range: [-8, -2], // A to X100
@@ -3029,7 +3157,9 @@
                         y: validP10.map(d => parseFloat(d.flux)),
                         name: '>= 10 MeV',
                         type: 'scatter',
-                        line: { color: '#fbbf24', width: 2 },
+                        line: { color: '#fbbf24', width: 2, shape: 'spline' },
+                        fill: 'tozeroy',
+                        fillcolor: 'rgba(251, 191, 36, 0.05)',
                         hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 10 MeV</extra>`
                     });
                 }
@@ -3044,7 +3174,9 @@
                         y: validP50.map(d => parseFloat(d.flux)),
                         name: '>= 50 MeV',
                         type: 'scatter',
-                        line: { color: '#38bdf8', width: 2 },
+                        line: { color: '#38bdf8', width: 2, shape: 'spline' },
+                        fill: 'tozeroy',
+                        fillcolor: 'rgba(56, 189, 248, 0.05)',
                         hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 50 MeV</extra>`
                     });
                 }
@@ -3058,7 +3190,9 @@
                         y: validP100.map(d => parseFloat(d.flux)),
                         name: '>= 100 MeV',
                         type: 'scatter',
-                        line: { color: '#a78bfa', width: 2 },
+                        line: { color: '#a78bfa', width: 2, shape: 'spline' },
+                        fill: 'tozeroy',
+                        fillcolor: 'rgba(167, 139, 250, 0.05)',
                         hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 100 MeV</extra>`
                     });
                 }
@@ -3120,11 +3254,11 @@
                     font: { family: 'Inter, sans-serif', size: 13, color: '#f8fafc' }
                 },
                 xaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.05)',
+                    gridcolor: 'rgba(255, 255, 255, 0.04)',
                     range: [timeStart.toISOString(), timeEnd.toISOString()]
                 },
                 yaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.05)', 
+                    gridcolor: 'rgba(255, 255, 255, 0.04)', 
                     type: 'log',
                     title: 'Particles/cm²-s-ster',
                     range: [-1, 5], // 0.1 to 100,000
@@ -3267,18 +3401,84 @@
 
                 // Determine flare badge
                 let flareBadge = '';
-                if (region.x_flares > 0) flareBadge = '<span class="flare-badge flare-x">X</span>';
-                else if (region.m_flares > 0) flareBadge = '<span class="flare-badge flare-m">M</span>';
-                else if (region.c_flares > 0) flareBadge = '<span class="flare-badge flare-c">C</span>';
+                if (region.x_flares > 0) flareBadge = '<span class="flare-badge flare-x">X' + region.x_flares + '</span>';
+                else if (region.m_flares > 0) flareBadge = '<span class="flare-badge flare-m">M' + region.m_flares + '</span>';
+                else if (region.c_flares > 0) flareBadge = '<span class="flare-badge flare-c">C' + region.c_flares + '</span>';
+                
+                // Determine area color
+                let areaStyle = '';
+                const area = parseInt(region.area);
+                if (!isNaN(area)) {
+                    if (area >= 1200) areaStyle = 'color: #ec4899; font-weight: 700;';
+                    else if (area >= 900) areaStyle = 'color: #dc2626; font-weight: 700;';
+                    else if (area >= 650) areaStyle = 'color: #f97316; font-weight: 600;';
+                    else if (area >= 300) areaStyle = 'color: #fbbf24; font-weight: 600;';
+                    else if (area >= 80) areaStyle = 'color: #22c55e;';
+                }
+                
+                // Enhanced mag type display with full name on hover
+                const magTypeDisplay = `<span class="mag-type ${magClass}" title="${region.mag_type}">${region.mag_type}</span>`;
+                
+                // Zurich/McIntosh class
+                const spotClass = region.z || '-';
 
                 tr.innerHTML = `
-                    <td>${region.number}${flareBadge}</td>
-                    <td>${region.location}</td>
-                    <td>${region.z}</td>
-                    <td><span class="mag-type ${magClass}">${region.mag_type}</span></td>
-                    <td><button class="btn-view" onclick="openRegionModal('${region.number}', '${region.location}', '${region.mag_type}', '${region.z}', '${region.area}', ${region.x_flares}, ${region.m_flares}, ${region.c_flares})">View</button></td>
+                    <td style="font-weight: 700;">${region.number}${flareBadge}</td>
+                    <td style="font-family: var(--font-mono); font-size: 0.75rem;">${region.location}</td>
+                    <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary);">${spotClass}</td>
+                    <td>${magTypeDisplay}</td>
+                    <td style="${areaStyle} font-family: var(--font-mono); font-size: 0.75rem;">${region.area}</td>
                 `;
+                
+                // Make the row clickable to open modal with detailed info
+                tr.style.cursor = 'pointer';
+                tr.onclick = () => openRegionModal(region.number, region.location, region.mag_type, region.z, region.area, region.x_flares, region.m_flares, region.c_flares);
+                
                 tbody.appendChild(tr);
+            });
+            
+            // Returning regions will be handled by the caller (fetchSolarData), prefer API-provided list
+        }
+        
+        function updateReturningRegions(allRegions) {
+            const returningBody = document.getElementById('returning-regions-body');
+            if (!returningBody) return;
+            
+            returningBody.innerHTML = '';
+            
+            // Filter for regions beyond W90 (off the visible disk)
+            // These will return in about 14 days (half solar rotation)
+            const returningRegions = allRegions.filter(region => {
+                const match = region.location.match(/([NS])(\d+)([EW])(\d+)/);
+                if (!match) return false;
+                const lonDir = match[3];
+                const lon = parseInt(match[4]);
+                return lonDir === 'W' && lon > 90;
+            });
+            
+            if (returningRegions.length === 0) {
+                returningBody.innerHTML = '<tr><td colspan="2" style="text-align: center; font-size: 0.7rem; color: var(--text-secondary); padding: 0.75rem;">No regions expected</td></tr>';
+                return;
+            }
+            
+            returningRegions.forEach(region => {
+                const tr = document.createElement('tr');
+                
+                // Calculate approximate return date
+                // Solar rotation is ~27 days, so 180° takes ~13.5 days
+                const match = region.location.match(/([NS])(\d+)([EW])(\d+)/);
+                const lon = parseInt(match[4]);
+                const daysToReturn = Math.round((180 - lon) / 360 * 27);
+                const returnDate = new Date();
+                returnDate.setDate(returnDate.getDate() + daysToReturn);
+                const dateStr = returnDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                tr.innerHTML = `
+                    <td style="font-weight: 600; font-family: var(--font-mono); font-size: 0.75rem;">${region.number}</td>
+                    <td style="font-size: 0.72rem; color: var(--text-secondary);">${dateStr} (~${daysToReturn}d)</td>
+                `;
+                
+                returningBody.appendChild(tr);
             });
         }
 
@@ -3394,13 +3594,7 @@
                 const latDir = match[1];
                 const lat = parseInt(match[2]) * (latDir === 'S' ? -1 : 1);
                 const lonDir = match[3];
-                const lon = parseInt(match[4]) * (lonDir === 'W' ? -1 : 1);
-                
-                // Convert to helioprojective coordinates with proper spherical projection
-                const now = new Date();
-                // Request imagery from 1 hour ago to ensure data availability
-                const imageTime = new Date(now - 60 * 60 * 1000);
-                const isoDate = imageTime.toISOString();
+                const lon = parseInt(match[4]) * (lonDir === 'E' ? -1 : 1); // E is left (negative), W is right (positive)
                 
                 // Proper spherical projection for helioprojective coordinates
                 const latRad = lat * Math.PI / 180;
@@ -3410,38 +3604,22 @@
                 const solarRadius = 960;
                 
                 // Helioprojective Cartesian coordinates (arcseconds from disk center)
-                // x = R * sin(lon) * cos(lat)
-                // y = R * sin(lat)
-                // For our coordinate system: negate both to match Helioviewer's convention
-                const x0 = -solarRadius * Math.sin(lonRad) * Math.cos(latRad);
-                const y0 = -solarRadius * Math.sin(latRad);
+                // Standard solar convention: 
+                //   x positive = West (right side of disk as seen from Earth)
+                //   x negative = East (left side of disk as seen from Earth)
+                //   y positive = North (top of disk)
+                //   y negative = South (bottom of disk)
+                // For image coordinates (origin top-left, y increases downward):
+                //   image_x = center + x_arcsec * scale  (positive x_arcsec = West = right)
+                //   image_y = center - y_arcsec * scale  (positive y_arcsec = North = up, so subtract)
+                const x_arcsec = solarRadius * Math.sin(lonRad) * Math.cos(latRad);
+                const y_arcsec = solarRadius * Math.sin(latRad);
                 
-                const fovSize = 300; // Reduced from 600 for closer zoom
+                const fovSize = 350; // arcseconds field of view (slightly larger for better context)
                 const pixelSize = 512;
-                const imageScale = fovSize / pixelSize;
                 
-                // Use better wavelengths for active region visibility
-                // HMI Continuum for white light photosphere
-                const hmiContinuumLayers = encodeURIComponent('[SDO,HMI,HMI,continuum,1,100]');
-                const hmiContinuumUrl = `https://api.helioviewer.org/v2/takeScreenshot/?date=${isoDate}&imageScale=${imageScale}&layers=${hmiContinuumLayers}&x0=${x0}&y0=${y0}&width=${pixelSize}&height=${pixelSize}&display=true&watermark=false`;
-                
-                console.log(`HMI for ${regionNumber} at ${location}: x0=${x0}", y0=${y0}"`);
-                console.log(`Continuum URL: ${hmiContinuumUrl}`);
-                
-                // Create HMI continuum intensitygram
-                const intensityImg = document.createElement('img');
-                intensityImg.style.width = '100%';
-                intensityImg.style.height = '100%';
-                intensityImg.style.objectFit = 'contain';
-                intensityImg.style.cursor = 'pointer';
-                intensityImg.onclick = () => openImageModal(hmiContinuumUrl, `HMI Continuum - Region ${regionNumber} at ${location}`);
-                intensityImg.onerror = () => {
-                    console.error('Failed to load HMI Continuum');
-                    intensitygramDiv.innerHTML = 'Image unavailable';
-                };
-                intensityImg.src = hmiContinuumUrl;
-                
-                // Create cropped color magnetogram using backend proxy
+                // For a 4096px full-disk image, the solar disk is about 4096px wide
+                // So each arcsec = (4096/2) / 960 ~ 2.13 px
                 const fullDiskSize = 4096;
                 const diskRadiusPixels = fullDiskSize / 2;
                 const arcsecToPixel = diskRadiusPixels / solarRadius;
@@ -3449,9 +3627,28 @@
                 const centerX = fullDiskSize / 2;
                 const centerY = fullDiskSize / 2;
                 
-                const regionCenterX = centerX + (x0 * arcsecToPixel);
-                const regionCenterY = centerY + (y0 * arcsecToPixel);
+                // Convert arcsec to pixel coordinates
+                // x: positive arcsec (West) -> positive pixel offset (to the right)
+                // y: positive arcsec (North) -> negative pixel offset (upward in image coords)
+                const regionCenterX = centerX + (x_arcsec * arcsecToPixel);
+                const regionCenterY = centerY - (y_arcsec * arcsecToPixel);
                 const cropSize = fovSize * arcsecToPixel;
+                
+                // Use backend proxy to crop and serve the intensitygram (avoids CORS)
+                const intensityProxyUrl = `/api/proxy-intensity?x=${regionCenterX}&y=${regionCenterY}&size=${cropSize}&output_size=${pixelSize}`;
+                console.log(`Intensitygram proxy URL: ${intensityProxyUrl}`);
+                
+                const intensityImg = document.createElement('img');
+                intensityImg.style.width = '100%';
+                intensityImg.style.height = '100%';
+                intensityImg.style.objectFit = 'contain';
+                intensityImg.style.cursor = 'pointer';
+                intensityImg.onclick = () => openImageModal(intensityProxyUrl, `HMI Intensitygram - Region ${regionNumber} at ${location}`);
+                intensityImg.onerror = () => {
+                    console.error('Failed to load intensitygram');
+                    intensitygramDiv.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.75rem;">Image temporarily unavailable<br><a href="https://sdo.gsfc.nasa.gov/data/" target="_blank" style="color: var(--accent-primary); text-decoration: underline;">View latest on SDO</a></div>';
+                };
+                intensityImg.src = intensityProxyUrl;
                 
                 // Use backend proxy to crop and serve the magnetogram
                 const magProxyUrl = `/api/proxy-magnetogram?x=${regionCenterX}&y=${regionCenterY}&size=${cropSize}&output_size=${pixelSize}`;
@@ -3493,6 +3690,9 @@
             document.getElementById('image-lightbox').style.display = 'none';
         }
 
+        // Keep the most recently loaded region flares available for sorting
+        window.currentRegionFlares = window.currentRegionFlares || [];
+
         async function loadRegionFlares(regionNumber) {
             const chartDiv = document.getElementById('region-flare-chart');
             const flareListContainer = document.getElementById('flare-list-container');
@@ -3507,8 +3707,12 @@
                 const data = await response.json();
                 
                 if (data.flares && data.flares.length > 0) {
+                    // store raw flares for subsequent sorting
+                    window.currentRegionFlares = data.flares || [];
                     plotFlareActivity(data.flares);
-                    populateFlareList(data.flares);
+                    // default: sort by time (most recent first)
+                    const defaultSorted = [...data.flares].sort((a, b) => new Date(b.max_time || b.begin_time) - new Date(a.max_time || a.begin_time));
+                    populateFlareList(defaultSorted);
                     flareListContainer.style.display = 'block';
                 } else {
                     chartDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 0.9rem;">No flares detected in past 7 days</div>';
@@ -3523,14 +3727,8 @@
             const listContainer = document.getElementById('flare-list-items');
             listContainer.innerHTML = '';
             
-            // Sort flares by time (most recent first)
-            const sortedFlares = [...flares].sort((a, b) => {
-                const timeA = new Date(a.max_time || a.begin_time);
-                const timeB = new Date(b.max_time || b.begin_time);
-                return timeB - timeA;
-            });
-            
-            sortedFlares.forEach(flare => {
+            // Assume `flares` is already in the desired order (sorting handled externally)
+            flares.forEach(flare => {
                 const flareClass = flare.max_class || flare.class || 'Unknown';
                 const beginTime = new Date(flare.begin_time);
                 const maxTime = new Date(flare.max_time || flare.begin_time);
@@ -3584,6 +3782,89 @@
                 listContainer.appendChild(flareRow);
             });
         }
+
+        // Sorting helper for the UI. Uses window.currentSort {key,dir}.
+        function parseFlareClass(cls) {
+            if (!cls || typeof cls !== 'string') return 0;
+            // Normalize like 'X8.1' or 'M3.2'
+            const m = cls.trim().toUpperCase().match(/^([A-Z])\s*([0-9]+(?:\.[0-9]+)?)?$/);
+            if (!m) return 0;
+            const letter = m[1];
+            const num = parseFloat(m[2] || '0');
+            const rankMap = { 'X': 4, 'M': 3, 'C': 2, 'B': 1, 'A': 0 };
+            const rank = rankMap[letter] || 0;
+            // Compose a numeric score: rank * 1e4 + num * 1e2 (so X8.1 > X2.8 > M9.9)
+            return rank * 10000 + (isNaN(num) ? 0 : Math.round(num * 100));
+        }
+
+        function sortFlares() {
+            const flares = (window.currentRegionFlares || []).slice();
+            if (!flares || flares.length === 0) return;
+            const sort = window.currentSort || { key: 'time', dir: 'desc' };
+
+            const dirMultiplier = (sort.dir === 'asc') ? 1 : -1; // desc => -1 for b-a
+
+            let sorted = flares.slice();
+            if (sort.key === 'time') {
+                sorted.sort((a, b) => dirMultiplier * (new Date(b.max_time || b.begin_time) - new Date(a.max_time || a.begin_time)));
+            } else if (sort.key === 'class') {
+                sorted.sort((a, b) => {
+                    const sa = parseFlareClass((a.max_class || a.class) || '');
+                    const sb = parseFlareClass((b.max_class || b.class) || '');
+                    if (sa === sb) return dirMultiplier * (new Date(b.max_time || b.begin_time) - new Date(a.max_time || a.begin_time));
+                    return dirMultiplier * (sb - sa);
+                });
+            } else if (sort.key === 'duration') {
+                const dur = f => (f.end_time && f.begin_time) ? ((new Date(f.end_time) - new Date(f.begin_time)) / 60000) : 0;
+                sorted.sort((a, b) => dirMultiplier * (dur(b) - dur(a)) || dirMultiplier * (new Date(b.max_time || b.begin_time) - new Date(a.max_time || a.begin_time)));
+            } else if (sort.key === 'cme') {
+                const hasCME = f => (f.linked_cme || f.has_cme) ? 1 : 0;
+                sorted.sort((a, b) => dirMultiplier * (hasCME(b) - hasCME(a)) || dirMultiplier * (new Date(b.max_time || b.begin_time) - new Date(a.max_time || a.begin_time)));
+            }
+
+            populateFlareList(sorted);
+        }
+
+        // Sorting state: default is time (newest first)
+        window.currentSort = window.currentSort || { key: 'time', dir: 'desc' };
+
+        function updateSortIndicators() {
+            const headers = document.querySelectorAll('.flare-col-header');
+            headers.forEach(h => {
+                const key = h.dataset.key;
+                const span = h.querySelector('.sort-indicator');
+                if (!span) return;
+                if (window.currentSort.key === key) {
+                    if (window.currentSort.dir === 'desc') span.textContent = ' ▼';
+                    else if (window.currentSort.dir === 'asc') span.textContent = ' ▲';
+                    else span.textContent = '';
+                } else {
+                    span.textContent = '';
+                }
+            });
+        }
+
+        // Cycle sort: if clicking same key -> desc -> asc -> default (time desc)
+        function cycleSortForKey(key) {
+            if (window.currentSort.key !== key) {
+                window.currentSort = { key: key, dir: 'desc' };
+            } else {
+                if (window.currentSort.dir === 'desc') window.currentSort.dir = 'asc';
+                else if (window.currentSort.dir === 'asc') window.currentSort = { key: 'time', dir: 'desc' };
+                else window.currentSort = { key: 'time', dir: 'desc' };
+            }
+            updateSortIndicators();
+            sortFlares();
+        }
+
+        // Attach header click handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            const headers = document.querySelectorAll('.flare-col-header');
+            headers.forEach(h => {
+                h.addEventListener('click', () => cycleSortForKey(h.dataset.key));
+            });
+            updateSortIndicators();
+        });
 
         function plotFlareActivity(flares) {
             // Clear the chart area first
@@ -3889,10 +4170,21 @@
         // UTC Time Update
         function updateUtcTime() {
             const now = new Date();
-            document.getElementById('utc-time').textContent = now.toISOString().slice(11, 16) + ' UTC';
+            const timeElement = document.getElementById('utc-time');
+            if (timeElement) {
+                timeElement.textContent = now.toISOString().slice(11, 16) + ' UTC';
+            }
         }
-        setInterval(updateUtcTime, 1000);
-        updateUtcTime();
+        // Start updates when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                updateUtcTime();
+                setInterval(updateUtcTime, 1000);
+            });
+        } else {
+            updateUtcTime();
+            setInterval(updateUtcTime, 1000);
+        }
 
         // Tab Management
         function switchTab(tabName) {
@@ -4308,7 +4600,7 @@
                 text.textContent = trend > 0 ? 'ELEVATED & RISING' : 'ELEVATED';
             } else {
                 indicator.classList.add('quiet');
-                text.textContent = trend > 0 ? 'QUIET (Rising)' : 'QUIET';
+                text.textContent = trend > 0 ? 'QUIET' : 'QUIET';
             }
         }
 

@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, send_file, request
 import requests
+import re
 from datetime import datetime, timezone, timedelta
 import json
 import time
@@ -95,6 +96,13 @@ GOES_XRAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.j
 GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
 GOES_PROTON_URL = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
 SOLAR_REGIONS_URL = "https://services.swpc.noaa.gov/json/solar_regions.json"
+# Possible text summary endpoints (SWPC sometimes publishes a text summary alongside JSON)
+SOLAR_REGION_SUMMARY_URLS = [
+    "https://services.swpc.noaa.gov/text/solar_region_summary.txt",
+    "https://services.swpc.noaa.gov/text/solar-region-summary.txt",
+    "https://services.swpc.noaa.gov/text/solar_region_summary/solar_region_summary.txt",
+    "https://services.swpc.noaa.gov/text/solar-region-summary/solar-region-summary.txt",
+]
 
 def interpolate_gaps(values, max_gap_minutes=10, time_interval_minutes=1):
     """
@@ -334,6 +342,126 @@ def parse_solar_regions(data):
     
     return regions
 
+
+def parse_returning_regions(data):
+    """Parse Regions Due to Return from SWPC solar_regions JSON if present.
+    This function tries multiple heuristics to locate returning-region information
+    and returns a list of dicts with at least 'number' and optional 'expected_return_date'.
+    """
+    if not data:
+        return []
+
+    # If payload is a dict with explicit key
+    if isinstance(data, dict):
+        # Common possible keys
+        for key in ('regions_due_to_return', 'returning_regions', 'regions_to_return'):
+            if key in data and isinstance(data[key], list):
+                out = []
+                for entry in data[key]:
+                    out.append({
+                        'number': str(entry.get('region') or entry.get('number') or ''),
+                        'expected_return_date': entry.get('expected_return_date') or entry.get('return_date') or ''
+                    })
+                return out
+
+    # If payload is list (regular solar regions file), look for entries flagged as returning
+    if isinstance(data, list):
+        candidates = []
+        for entry in data:
+            # Some feeds may mark entries with flags/notes
+            note = (entry.get('note') or '')
+            status = (entry.get('status') or '')
+            if isinstance(status, str) and 'return' in status.lower():
+                candidates.append(entry)
+                continue
+            if isinstance(note, str) and 'return' in note.lower():
+                candidates.append(entry)
+                continue
+            # Explicit boolean flag
+            if entry.get('due_to_return') or entry.get('returning'):
+                candidates.append(entry)
+
+        # Map candidates to minimal structure
+        out = []
+        for e in candidates:
+            out.append({
+                'number': str(e.get('region') or e.get('number') or ''),
+                'expected_return_date': e.get('expected_return_date') or e.get('return_date') or ''
+            })
+        return out
+
+    return []
+
+
+def fetch_solar_region_summary_text(timeout=10):
+    """Attempt to fetch the SWPC Solar Region Summary text product from known endpoints.
+    Returns the raw text if successful, otherwise None.
+    """
+    for url in SOLAR_REGION_SUMMARY_URLS:
+        try:
+            r = requests.get(url, timeout=timeout)
+            if r.status_code == 200 and r.text and 'Regions Due to Return' in r.text:
+                return r.text
+        except requests.RequestException:
+            continue
+    return None
+
+
+def parse_returning_regions_from_summary_text(text):
+    """Parse the 'II. Regions Due to Return' section from the SWPC Solar Region Summary text.
+    Returns a list of {'number': str, 'expected_return_date': str (may be blank)}
+    """
+    if not text:
+        return []
+
+    lines = text.splitlines()
+    start_idx = None
+    header_line = ''
+    for i, line in enumerate(lines):
+        if re.search(r'II\.|II\s*\.', line) and 'Regions' in line and 'Return' in line:
+            start_idx = i
+            header_line = line.strip()
+            break
+
+    if start_idx is None:
+        # Try simpler match
+        for i, line in enumerate(lines):
+            if 'Regions Due to Return' in line:
+                start_idx = i
+                header_line = line.strip()
+                break
+
+    if start_idx is None:
+        return []
+
+    # The block usually has a header row like: Nmbr Lat    Lo
+    # and then rows like: 4343 S09    113
+    out = []
+    # scan forward from start_idx to find rows that look like region entries
+    for j in range(start_idx + 1, min(len(lines), start_idx + 50)):
+        l = lines[j].strip()
+        # stop if next Roman numeral section begins (e.g., 'III.')
+        if re.match(r'^[IVX]+\.', l):
+            break
+        # skip empty and header-like lines
+        if not l or l.lower().startswith('nmbr') or l.lower().startswith('number'):
+            continue
+        # Accept lines that start with a number (region number)
+        m = re.match(r'^(\d{3,5})\s+([NS]\d{1,2})\s+(-?\d{1,3})', l)
+        if m:
+            number = m.group(1)
+            lat = m.group(2)
+            lo = m.group(3)
+            out.append({'number': str(number), 'expected_return_date': header_line})
+            continue
+        # Some lines may be tab/space separated with 3 columns
+        parts = re.split(r'\s+', l)
+        if len(parts) >= 2 and parts[0].isdigit():
+            number = parts[0]
+            out.append({'number': str(number), 'expected_return_date': header_line})
+
+    return out
+
 def fetch_json_with_retry(url, retries=3, timeout=30):
     """Fetch JSON from URL with retry logic"""
     for i in range(retries):
@@ -366,12 +494,25 @@ def fetch_solar_data():
         # Fetch Sunspot Regions with retry and longer timeout
         regions_data = fetch_json_with_retry(SOLAR_REGIONS_URL, retries=3, timeout=30)
         sunspots = parse_solar_regions(regions_data)
+        returning = parse_returning_regions(regions_data)
+        # If JSON didn't include explicit returning list, try parsing SWPC Solar Region Summary text
+        if not returning:
+            try:
+                summary_text = fetch_solar_region_summary_text()
+                if summary_text:
+                    parsed = parse_returning_regions_from_summary_text(summary_text)
+                    if parsed:
+                        returning = parsed
+            except Exception as _:
+                # ignore text parsing failures
+                returning = returning
         
         return {
             'xray': xray_data,
             'xray_1day': xray_1day_data,
             'proton': proton_data,
-            'sunspots': sunspots
+            'sunspots': sunspots,
+            'returning_regions': returning
         }
     except Exception as e:
         print(f"Error fetching solar data: {e}")
@@ -3623,6 +3764,72 @@ def proxy_magnetogram():
             
     except Exception as e:
         print(f"Error proxying magnetogram: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/proxy-intensity')
+def proxy_intensity():
+    """Proxy the HMI intensitygram image to avoid CORS issues, with optional crop"""
+    try:
+        # Full-disk HMI intensitygram candidates (prefer 4096 for quality)
+        intensity_urls = [
+            'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_4096_HMII.jpg',
+            'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_HMII.jpg',
+            'https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg',
+        ]
+        
+        # Get query parameters for cropping
+        x = request.args.get('x', type=float)
+        y = request.args.get('y', type=float)
+        size = request.args.get('size', type=float)
+        output_size = request.args.get('output_size', type=int, default=512)
+        
+        img_data = None
+        for url in intensity_urls:
+            try:
+                response = requests.get(url, timeout=20)
+                if response.status_code == 200:
+                    img_data = response.content
+                    break
+            except Exception:
+                continue
+        
+        if img_data is None:
+            return jsonify({'error': 'Failed to fetch intensitygram from all sources'}), 500
+        
+        # If crop parameters provided, crop the image
+        if x is not None and y is not None and size is not None:
+            img = Image.open(BytesIO(img_data))
+            
+            # Crop the image
+            left = int(x - size / 2)
+            top = int(y - size / 2)
+            right = int(x + size / 2)
+            bottom = int(y + size / 2)
+            
+            # Clamp to image bounds
+            left = max(0, left)
+            top = max(0, top)
+            right = min(img.width, right)
+            bottom = min(img.height, bottom)
+            
+            cropped = img.crop((left, top, right, bottom))
+            cropped = cropped.resize((output_size, output_size), Image.Resampling.LANCZOS)
+            
+            # Convert to bytes
+            output = BytesIO()
+            cropped.save(output, format='JPEG', quality=95)
+            output.seek(0)
+            
+            return send_file(output, mimetype='image/jpeg')
+        else:
+            # Return full image
+            return send_file(BytesIO(img_data), mimetype='image/jpeg')
+            
+    except Exception as e:
+        print(f"Error proxying intensitygram: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

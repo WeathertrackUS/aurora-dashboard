@@ -53,7 +53,7 @@
             --border: rgba(255, 255, 255, 0.06);
             --glass-border: 1px solid rgba(255, 255, 255, 0.06);
             --glass-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.6);
-            --font-sans: 'Metropolis', 'Inter', system-ui, -apple-system, sans-serif;
+            --font-sans: 'Inter', 'Metropolis', system-ui, -apple-system, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
 
@@ -327,6 +327,7 @@
             position: sticky;
             top: 0;
             z-index: 1000;
+            min-height: 56px;
         }
 
         .brand {
@@ -748,6 +749,80 @@
             grid-column: span 2;
         }
 
+        /* Active Regions Table Styles */
+        .regions-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
+        .regions-table th {
+            text-align: left;
+            padding: 0.5rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .regions-table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .regions-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .regions-table tbody tr:hover {
+            background-color: var(--bg-card-hover);
+        }
+
+        .region-number {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .region-mag-type {
+            display: inline-block;
+            padding: 0.15rem 0.35rem;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .mag-alpha { color: #60a5fa; }
+        .mag-beta { color: #34d399; }
+        .mag-gamma { color: #fcd34d; }
+        .mag-delta { color: #ef4444; }
+        .mag-bgd { color: #ef4444; }
+
+        .region-flare-badge {
+            display: inline-block;
+            padding: 0.1rem 0.25rem;
+            border-radius: 2px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            margin-left: 0.25rem;
+        }
+        .flare-x { background-color: #ef4444; color: white; }
+        .flare-m { background-color: #f59e0b; color: black; }
+        .flare-c { background-color: #fbbf24; color: black; }
+
+        .region-area {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .area-huge { color: #ec4899; }
+        .area-large { color: #dc2626; }
+        .area-medium { color: #f97316; }
+        .area-small { color: #fbbf24; }
+        .area-tiny { color: #22c55e; }
+
         /* GIF Generator */
         .form-group {
             margin-bottom: 1.25rem;
@@ -986,9 +1061,9 @@
             100% { opacity: 1; }
         }
 
-        /* Mobile Menu Toggle */
+        /* Mobile Menu Toggle - hidden on desktop */
         .mobile-menu-toggle {
-            display: none;
+            display: none !important;
             background: transparent;
             border: none;
             color: var(--text-primary);
@@ -1218,6 +1293,30 @@
                 right: 1rem;
                 left: 1rem;
                 width: auto;
+            }
+            
+            /* Regions table mobile */
+            .regions-table {
+                font-size: 0.7rem;
+            }
+            
+            .regions-table th {
+                font-size: 0.6rem;
+                padding: 0.4rem 0.3rem;
+            }
+            
+            .regions-table td {
+                padding: 0.4rem 0.3rem;
+            }
+            
+            .region-mag-type {
+                font-size: 0.65rem;
+                padding: 0.1rem 0.25rem;
+            }
+            
+            .region-flare-badge {
+                font-size: 0.6rem;
+                padding: 0.05rem 0.2rem;
             }
         }
         
@@ -1927,6 +2026,11 @@
             refreshDashboard();
             startTimers();
             
+            // Fetch solar regions
+            fetchSolarRegions();
+            // Refresh solar regions every 15 minutes
+            setInterval(fetchSolarRegions, 15 * 60 * 1000);
+            
             // Check for system alerts
             checkSystemAlert();
             // Re-check system alerts every 5 minutes
@@ -2148,6 +2252,9 @@
 
                 // 5. Fetch Geomagnetic Alerts
                 fetchGeomagneticAlerts();
+                
+                // 6. Fetch Solar Regions
+                fetchSolarRegions();
 
                 // 4. Refresh Map Image with robust error handling and retries
                 refreshAuroraMap();
@@ -2328,9 +2435,99 @@
             }
         }
 
+        async function fetchSolarRegions() {
+            try {
+                const response = await fetch('/api/solar-data');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('regions-body-overview');
+                if (!tbody) return;
+                
+                if (!data.sunspots || data.sunspots.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: var(--text-secondary);">No active regions</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = '';
+                
+                // Show up to 5 most recent regions
+                const regionsToShow = data.sunspots.slice(0, 5);
+                
+                regionsToShow.forEach(region => {
+                    const tr = document.createElement('tr');
+                    
+                    // Determine mag type class
+                    let magClass = '';
+                    const magType = region.mag_type.toLowerCase();
+                    if (magType.includes('beta-gamma-delta')) magClass = 'mag-bgd';
+                    else if (magType.includes('gamma')) magClass = 'mag-gamma';
+                    else if (magType.includes('beta')) magClass = 'mag-beta';
+                    else magClass = 'mag-alpha';
+
+                    // Determine flare badge
+                    let flareBadge = '';
+                    if (region.x_flares > 0) flareBadge = '<span class="region-flare-badge flare-x">X</span>';
+                    else if (region.m_flares > 0) flareBadge = '<span class="region-flare-badge flare-m">M</span>';
+                    else if (region.c_flares > 0) flareBadge = '<span class="region-flare-badge flare-c">C</span>';
+                    
+                    // Determine area size class
+                    let areaClass = '';
+                    const area = parseInt(region.area);
+                    if (!isNaN(area)) {
+                        if (area >= 1200) areaClass = 'area-huge';
+                        else if (area >= 900) areaClass = 'area-large';
+                        else if (area >= 650) areaClass = 'area-medium';
+                        else if (area >= 300) areaClass = 'area-small';
+                        else areaClass = 'area-tiny';
+                    }
+                    
+                    // Compact mag type display
+                    let shortMagType = region.mag_type;
+                    if (magType.includes('beta-gamma-delta')) shortMagType = 'βγδ';
+                    else if (magType.includes('beta-gamma')) shortMagType = 'βγ';
+                    else if (magType.includes('beta')) shortMagType = 'β';
+                    else if (magType.includes('alpha')) shortMagType = 'α';
+
+                    tr.innerHTML = `
+                        <td><span class="region-number">${region.number}</span>${flareBadge}</td>
+                        <td style="color: var(--text-secondary);">${region.location}</td>
+                        <td><span class="region-mag-type ${magClass}">${shortMagType}</span></td>
+                        <td><span class="region-area ${areaClass}">${region.area}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                // Add link to full solar page if there are more regions
+                if (data.sunspots.length > 5) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td colspan="4" style="text-align: center; padding: 0.5rem;">
+                            <a href="/solar" style="color: var(--accent-primary); text-decoration: none; font-size: 0.7rem;">
+                                View all ${data.sunspots.length} regions →
+                            </a>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching solar regions:', error);
+                const tbody = document.getElementById('regions-body-overview');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: var(--text-secondary);">Error loading regions</td></tr>';
+                }
+            }
+        }
+
         function renderCharts(data) {
             // Skip rendering during resize to prevent glitches
             if (isResizing) return;
+            
+            // Validate data exists before rendering
+            if (!data || !data.solar_wind_history) {
+                console.warn('Chart data not ready yet');
+                return;
+            }
             
             // Mobile-optimized margins and font sizes
             const mobileFontSize = isMobile ? 8 : 10;
@@ -2376,9 +2573,14 @@
             if (data.solar_wind_history && data.solar_wind_history.times && data.solar_wind_history.speeds) {
                 const hist = data.solar_wind_history;
                 
-                // Validate data exists
-                if (!hist.speeds || hist.speeds.length === 0) {
+                // Validate data exists and has minimum length
+                if (!hist.speeds || hist.speeds.length === 0 || !hist.times || hist.times.length === 0) {
                     console.warn('No speed data available');
+                    return;
+                }
+                
+                if (hist.speeds.length !== hist.times.length) {
+                    console.warn('Speed and time data length mismatch');
                     return;
                 }
                 
