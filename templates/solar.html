@@ -2047,7 +2047,7 @@
                         <span id="activity-text">QUIET</span>
                     </div>
                 </div>
-                <div id="kp-history-chart" style="width: 100%; height: 400px; padding: 1rem;"></div>
+                <div id="kp-history-chart" style="width: 100%; height: 400px;"></div>
             </div>
 
             <!-- CME Tracker -->
@@ -3987,10 +3987,14 @@
         // Initial fetch
         fetchSolarData();
         fetchKpHistoryExtended();
+        fetchSolarCycleData();
+        fetchF107Data();
         
         // Refresh every 5 minutes
         setInterval(fetchSolarData, 300000);
         setInterval(fetchKpHistoryExtended, 300000);
+        setInterval(fetchSolarCycleData, 300000);
+        setInterval(fetchF107Data, 300000);
 
         // Handle window resize for charts - delegated to resizeAllCharts which uses ECharts API
 
@@ -4088,6 +4092,27 @@
             setTimeout(() => {
                 if (typeof initImageLoadHandlers === 'function') {
                     initImageLoadHandlers();
+                }
+                
+                // Resize all charts when tab becomes visible
+                resizeAllCharts();
+                
+                // Load data for specific tabs if needed
+                if (tabName === 'solar-cycle') {
+                    fetchSolarCycleData();
+                    fetchF107Data();
+                } else if (tabName === 'earth-impact') {
+                    // Ensure solar flares are loaded
+                    if (allFlares.length === 0) {
+                        loadSolarFlares();
+                    }
+                    // Resize the K-index chart
+                    setTimeout(() => {
+                        const kpChart = window.echartsInstances['kp-history-chart'];
+                        if (kpChart) {
+                            kpChart.resize();
+                        }
+                    }, 100);
                 }
             }, 50);
         }
