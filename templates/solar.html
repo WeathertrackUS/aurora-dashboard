@@ -37,7 +37,8 @@
             font-display: swap;
         }
     </style>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- ECharts for charting -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         :root {
             --bg-dark: #0a0a0a;
@@ -820,6 +821,7 @@
             width: 100% !important;
             height: 100% !important;
             min-height: 380px;
+            overflow: hidden;
         }
 
         .solar-image-container {
@@ -1673,7 +1675,6 @@
     <nav class="navbar">
         <a href="/" class="brand">
             <span></span> WTUS Space Weather Dashboard
-            <span style="margin-left: 0.5rem; font-size: 0.6rem; background: rgba(139, 139, 139, 0.2); color: #8b8b8b; padding: 0.2rem 0.4rem; border-radius: 3px; border: 1px solid rgba(139, 139, 139, 0.3); font-weight: 600; letter-spacing: 0.05em;">BETA</span>
         </a>
         <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
             ☰
@@ -2607,6 +2608,9 @@
         let isResizing = false;
         let resizeDebounceTimer = null;
         
+        // ECharts instance storage
+        window.echartsInstances = window.echartsInstances || {};
+        
         // Mobile detection helper
         function checkMobile() {
             isMobile = window.innerWidth <= 768;
@@ -2626,18 +2630,16 @@
             }, 250);
         }
         
-        // Global resize function
+        // Global resize function for ECharts
         function resizeAllCharts() {
             if (isResizing) return;
             
-            const chartIds = ['xray-chart', 'proton-chart', 'solar-cycle-ssn-chart', 'solar-cycle-f107-chart', 'region-flare-chart'];
-            
             requestAnimationFrame(() => {
-                chartIds.forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element && element.data) {
+                Object.keys(window.echartsInstances).forEach(id => {
+                    const chart = window.echartsInstances[id];
+                    if (chart && !chart.isDisposed()) {
                         try {
-                            Plotly.Plots.resize(element);
+                            chart.resize();
                         } catch (e) {
                             console.warn(`Failed to resize chart ${id}:`, e);
                         }
@@ -2736,11 +2738,11 @@
         }
 
         function getFlareColor(flux) {
-            if (flux >= 1e-3) return 'rgba(232, 121, 249, 0.8)'; // X10+ opacity: 0.8;
-            if (flux >= 1e-4) return 'rgba(239, 68, 68, 0.8)'; // X opacity: 0.8;
-            if (flux >= 1e-5) return 'rgba(251, 146, 60, 0.8)'; // M opacity: 0.8;
-            if (flux >= 1e-6) return 'rgba(251, 191, 36, 0.8)'; // C opacity: 0.8;
-            return 'rgba(74, 222, 128, 0.8)'; // A/B opacity: 0.8;
+            if (flux >= 1e-3) return 'rgba(232, 121, 249, 0.8)'; // X10+ opacity: 0.6;
+            if (flux >= 1e-4) return 'rgba(239, 68, 68, 0.8)'; // X opacity: 0.6;
+            if (flux >= 1e-5) return 'rgba(251, 146, 60, 0.8)'; // M opacity: 0.6;
+            if (flux >= 1e-6) return 'rgba(251, 191, 36, 0.8)'; // C opacity: 0.6;
+            return 'rgba(74, 222, 128, 0.8)'; // A/B opacity: 0.6;
         }
 
         function detectFlares(data) {
@@ -2793,310 +2795,256 @@
             
             console.log(`X-ray data points: ${long.length}, range: ${currentXrayRange}`);
             
-            // Create colored segments based on flux ranges
-            const traces = [];
-            
-            // Group consecutive points by their color range
-            let currentRange = null;
-            let currentSegment = { x: [], y: [], text: [] };
-            
-            function getFluxColor(flux) {
-                const fluxNum = parseFloat(flux);
-                if (fluxNum >= 1e-3) return '#e879f9'; // X10+ (Purple-Pink)
-                if (fluxNum >= 1e-4) return '#ef4444'; // X (Red)
-                if (fluxNum >= 1e-5) return '#f97316'; // M (Orange)
-                if (fluxNum >= 1e-6) return '#fbbf24'; // C (Amber)
-                return '#22c55e'; // A/B (Green)
-            }
-            
-            long.forEach((d, i) => {
-                const flux = parseFloat(d.flux);
-                if (isNaN(flux)) return; // Skip invalid flux values
-                const color = getFluxColor(flux);
-                
-                if (color !== currentRange) {
-                    // Save previous segment if it has data
-                    if (currentSegment.x.length > 0) {
-                        // Add current point to previous segment for continuity
-                        currentSegment.x.push(d.time_tag);
-                        currentSegment.y.push(flux);
-                        currentSegment.text.push(getFlareClass(flux));
-                        
-                        traces.push({
-                            x: currentSegment.x,
-                            y: currentSegment.y,
-                            text: currentSegment.text,
-                            hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} W/m²<br><b>%{text}</b><extra></extra>`,
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { 
-                                color: currentRange,
-                                width: 2.5,
-                                shape: 'spline',
-                                smoothing: 0.8
-                            },
-                        showlegend: false
-                        });
-                        
-                        // Start new segment with current point
-                        currentRange = color;
-                        currentSegment = { x: [d.time_tag], y: [flux], text: [getFlareClass(flux)] };
-                    } else {
-                        // First segment
-                        currentRange = color;
-                        currentSegment = { x: [d.time_tag], y: [flux], text: [getFlareClass(flux)] };
-                    }
-                } else {
-                    currentSegment.x.push(d.time_tag);
-                    currentSegment.y.push(flux);
-                    currentSegment.text.push(getFlareClass(flux));
-                }
-            });
-            
-            // Add the last segment
-            if (currentSegment.x.length > 0) {
-                traces.push({
-                    x: currentSegment.x,
-                    y: currentSegment.y,
-                    text: currentSegment.text,
-                    hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} W/m²<br><b>%{text}</b><extra></extra>`,
-                    type: 'scatter',
-                    mode: 'lines',
-                    line: { 
-                        color: currentRange,
-                        width: 2.5,
-                        shape: 'spline',
-                        smoothing: 0.8
-                    },
-                    showlegend: false
-                });
-            }
-            
-            // Fallback to single trace if no segments
+            // Prepare data for ECharts
             const xValues = long.map(d => d.time_tag);
-            const yValues = long.map(d => d.flux);
-            const textValues = yValues.map(y => getFlareClass(y));
+            const yValues = long.map(d => parseFloat(d.flux));
             
-            console.log('X-ray trace data:', {
-                points: xValues.length,
-                firstX: xValues[0],
-                lastX: xValues[xValues.length - 1],
-                minY: Math.min(...yValues),
-                maxY: Math.max(...yValues)
-            });
-
-            // Detect flares for annotations
+            // Detect flares for annotations - use markPoints at the peak position
             const flares = detectFlares(long);
-            const flareAnnotations = flares.map(flare => {
+            const flareMarkPoints = flares.map(flare => {
                 const flareClass = getFlareClass(flare.flux);
                 const color = getFlareColor(flare.flux);
+                // Find the index of this flare in our data
+                const idx = xValues.indexOf(flare.time_tag);
                 return {
-                    x: flare.time_tag,
-                    y: flare.flux,
-                    xref: 'x',
-                    yref: 'y',
-                    text: `<b>${flareClass}</b>`,
-                    showarrow: true,
-                    arrowhead: 2,
-                    arrowsize: 1,
-                    arrowwidth: 2,
-                    arrowcolor: color,
-                    ax: 0,
-                    ay: -20,
-                    bgcolor: color,
-                    bordercolor: color,
-                    borderwidth: 1,
-                    borderpad: 4,
-                    font: {
-                        color: '#0f172a', // Dark text on colored background
-                        size: 12,
-                        family: 'JetBrains Mono',
-                        weight: 'bold'
+                    coord: [idx, flare.flux],
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    itemStyle: { 
+                        color: color,
+                        borderColor: '#fff',
+                        borderWidth: 1
                     },
-                    captureevents: true
+                    label: {
+                        show: true,
+                        formatter: flareClass,
+                        position: 'top',
+                        distance: 5,
+                        color: '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 10,
+                        backgroundColor: color,
+                        padding: [2, 4],
+                        borderRadius: 3
+                    }
                 };
             });
 
-            // Calculate time range - use actual data range, not theoretical range
+            // Calculate time range
             const now = new Date();
             let timeStart, timeEnd;
             
             if (xValues.length > 0) {
-                // Use actual data timestamps - no buffer
                 timeStart = new Date(xValues[0]);
                 timeEnd = new Date(xValues[xValues.length - 1]);
                 
-                // Extend left side to show full requested range if needed
-                const rangeHours = {
-                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
-                    '2d': 48, '5d': 120, '7d': 168
-                };
+                const rangeHours = { '2h': 2, '6h': 6, '12h': 12, '24h': 24, '2d': 48, '5d': 120, '7d': 168 };
                 const hours = rangeHours[currentXrayRange] || 6;
                 const theoreticalStart = new Date(now - hours * 60 * 60 * 1000);
                 
-                // Use the earlier of actual data start or theoretical start
                 if (theoreticalStart < timeStart) {
                     timeStart = theoreticalStart;
                 }
             } else {
-                // Fallback if no data
-                const rangeHours = {
-                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
-                    '2d': 48, '5d': 120, '7d': 168
-                };
+                const rangeHours = { '2h': 2, '6h': 6, '12h': 12, '24h': 24, '2d': 48, '5d': 120, '7d': 168 };
                 const hours = rangeHours[currentXrayRange] || 6;
                 timeStart = new Date(now - hours * 60 * 60 * 1000);
                 timeEnd = now;
             }
-            
-            console.log('X-ray time range:', {start: timeStart, end: timeEnd});
-            
-            // Set appropriate time range for x-axis
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#94a3b8' },
-                hoverlabel: {
-                    bgcolor: '#1e293b',
-                    bordercolor: '#334155',
-                    font: { family: 'Inter, sans-serif', size: 13, color: '#f8fafc' }
-                },
-                xaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.04)',
-                    showgrid: true,
-                    zeroline: false,
-                    range: [timeStart.toISOString(), timeEnd.toISOString()]
-                },
-                yaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.04)', 
-                    type: 'log',
-                    title: 'Watts/m²',
-                    range: [-8, -2], // A to X100
-                    fixedrange: true,
-                    tickvals: [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
-                    ticktext: ['A', 'B', 'C', 'M', 'X', 'X10', 'X100']
-                },
-                autosize: true,
-                margin: { t: 5, r: 5, b: 30, l: 40 },
-                shapes: [
-                    // A/B Class Zone (Green)
-                    {
-                        type: 'rect',
-                        y0: 1e-9, y1: 1e-6,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(74, 222, 128, 0.1)',
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // C Class Zone (Yellow)
-                    {
-                        type: 'rect',
-                        y0: 1e-6, y1: 1e-5,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(251, 191, 36, 0.1)',
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // M Class Zone (Orange)
-                    {
-                        type: 'rect',
-                        y0: 1e-5, y1: 1e-4,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(251, 146, 60, 0.1)',
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // X Class Zone (Red)
-                    {
-                        type: 'rect',
-                        y0: 1e-4, y1: 1e-3,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(248, 113, 113, 0.1)',
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // X10 Class Zone (Pink)
-                    {
-                        type: 'rect',
-                        y0: 1e-3, y1: 1,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(232, 121, 249, 0.1)',
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // Threshold Lines
-                    { type: 'line', y0: 1e-6, y1: 1e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.3)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 1e-5, y1: 1e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.4)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 1e-4, y1: 1e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.5)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 1e-3, y1: 1e-3, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(232, 121, 249, 0.6)', width: 1, dash: 'dot' } },
-                    // Intermediate Grid Lines - A range
-                    { type: 'line', y0: 2e-8, y1: 2e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 3e-8, y1: 3e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 4e-8, y1: 4e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 5e-8, y1: 5e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 6e-8, y1: 6e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 7e-8, y1: 7e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 8e-8, y1: 8e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 9e-8, y1: 9e-8, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    // Intermediate Grid Lines - B range
-                    { type: 'line', y0: 2e-7, y1: 2e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 3e-7, y1: 3e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 4e-7, y1: 4e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 5e-7, y1: 5e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 6e-7, y1: 6e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 7e-7, y1: 7e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 8e-7, y1: 8e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 9e-7, y1: 9e-7, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(74, 222, 128, 0.15)', width: 0.5, dash: 'dot' } },
-                    // Intermediate Grid Lines - C range
-                    { type: 'line', y0: 2e-6, y1: 2e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 3e-6, y1: 3e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 4e-6, y1: 4e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 5e-6, y1: 5e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 6e-6, y1: 6e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 7e-6, y1: 7e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 8e-6, y1: 8e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 9e-6, y1: 9e-6, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.2)', width: 0.5, dash: 'dot' } },
-                    // Intermediate Grid Lines - M range
-                    { type: 'line', y0: 2e-5, y1: 2e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 3e-5, y1: 3e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 4e-5, y1: 4e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 5e-5, y1: 5e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 6e-5, y1: 6e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 7e-5, y1: 7e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 8e-5, y1: 8e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 9e-5, y1: 9e-5, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.25)', width: 0.5, dash: 'dot' } },
-                    // Intermediate Grid Lines - X range
-                    { type: 'line', y0: 2e-4, y1: 2e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 3e-4, y1: 3e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 4e-4, y1: 4e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 5e-4, y1: 5e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 6e-4, y1: 6e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 7e-4, y1: 7e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 8e-4, y1: 8e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } },
-                    { type: 'line', y0: 9e-4, y1: 9e-4, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.3)', width: 0.5, dash: 'dot' } }
-                ],
-                annotations: [
-                    ...flareAnnotations,
-                    { x: 1, y: 1e-6, xref: 'paper', yref: 'y', text: 'C', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fbbf24', size: 12}, xshift: -5, yshift: 2 },
-                    { x: 1, y: 1e-5, xref: 'paper', yref: 'y', text: 'M', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fb923c', size: 12}, xshift: -5, yshift: 2 },
-                    { x: 1, y: 1e-4, xref: 'paper', yref: 'y', text: 'X', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#f87171', size: 12}, xshift: -5, yshift: 2 },
-                    { x: 1, y: 1e-3, xref: 'paper', yref: 'y', text: 'X10', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#e879f9', size: 12}, xshift: -5, yshift: 2 }
-                ]
-            };
 
-            // Purge and recreate for clean render
-            Plotly.purge('xray-chart');
-            const config = {
-                responsive: true, 
-                displayModeBar: false,
-                staticPlot: isMobile // Disable interactions on mobile for performance
-            };
-            Plotly.newPlot('xray-chart', traces, layout, config).then(() => {
-                // Immediate resize after render promise resolves for proper container fill
-                Plotly.Plots.resize('xray-chart');
-                // Remove loading state
-                document.getElementById('xray-chart').classList.remove('loading');
+            // Get or create chart instance
+            const container = document.getElementById('xray-chart');
+            if (window.echartsInstances['xray-chart']) {
+                window.echartsInstances['xray-chart'].dispose();
+            }
+            const chart = echarts.init(container);
+            window.echartsInstances['xray-chart'] = chart;
+            
+            // Minor gridlines removed
+            
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 45, right: 15, top: 15, bottom: 45, containLabel: false },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc', fontFamily: 'Inter, sans-serif' },
+                    formatter: function(params) {
+                        const p = params[0];
+                        const d = new Date(p.axisValue);
+                        const timeStr = d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0') + ' UTC';
+                        const flareClass = getFlareClass(p.value);
+                        return `<b>${timeStr}</b><br>${p.value.toExponential(2)} W/m²<br><b>${flareClass}</b>`;
+                    }
+                },
+                dataZoom: [
+                    {
+                        type: 'inside',
+                        xAxisIndex: 0,
+                        filterMode: 'none',
+                        zoomOnMouseWheel: true,
+                        moveOnMouseMove: true
+                    },
+                    {
+                        type: 'slider',
+                        xAxisIndex: 0,
+                        filterMode: 'none',
+                        height: 20,
+                        bottom: 5,
+                        borderColor: 'transparent',
+                        backgroundColor: 'rgba(51, 65, 85, 0.3)',
+                        fillerColor: 'rgba(59, 130, 246, 0.2)',
+                        handleStyle: { color: '#3b82f6' },
+                        textStyle: { color: '#94a3b8', fontSize: 10 },
+                        dataBackground: {
+                            lineStyle: { color: 'rgba(148, 163, 184, 0.3)' },
+                            areaStyle: { color: 'rgba(148, 163, 184, 0.1)' }
+                        }
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: xValues,
+                    boundaryGap: false,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: '#94a3b8',
+                        fontSize: 10,
+                        formatter: (val) => {
+                            const d = new Date(val);
+                            return d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+                        }
+                    },
+                    splitLine: { show: false }
+                },
+                yAxis: {
+                    type: 'log',
+                    min: 1e-8,
+                    max: 1e-2,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: '#94a3b8',
+                        fontSize: 10,
+                        margin: 8,
+                        formatter: (val) => {
+                            if (val >= 1e-2) return '';
+                            if (val >= 1e-3) return 'X10';
+                            if (val >= 1e-4) return 'X';
+                            if (val >= 1e-5) return 'M';
+                            if (val >= 1e-6) return 'C';
+                            if (val >= 1e-7) return 'B';
+                            return 'A';
+                        }
+                    },
+                    splitLine: { show: false },
+                    minorTick: { show: false },
+                    minorSplitLine: { show: false }
+                },
+                visualMap: {
+                    show: false,
+                    dimension: 1,
+                    pieces: [
+                        { lt: 1e-6, color: '#10b981' },             // A/B - Emerald Green
+                        { gte: 1e-6, lt: 1e-5, color: '#eab308' },  // C - Bright Yellow
+                        { gte: 1e-5, lt: 1e-4, color: '#f97316' },  // M - Bright Orange
+                        { gte: 1e-4, lt: 1e-3, color: '#dc2626' },  // X - Bright Red
+                        { gte: 1e-3, color: '#c026d3' }             // X10+ - Bright Fuchsia
+                    ]
+                },
+                series: [{
+                    type: 'line',
+                    data: yValues,
+                    smooth: 0.3,
+                    symbol: 'none',
+                    lineStyle: { width: 2.5 },
+                    z: 5,
+                    clip: true,
+                    markArea: {
+                        silent: true,
+                        z: 1,
+                        data: [
+                            [{ yAxis: 1e-9, itemStyle: { color: 'rgba(16, 185, 129, 0.15)' } }, { yAxis: 1e-6 }],
+                            [{ yAxis: 1e-6, itemStyle: { color: 'rgba(234, 179, 8, 0.15)' } }, { yAxis: 1e-5 }],
+                            [{ yAxis: 1e-5, itemStyle: { color: 'rgba(249, 115, 22, 0.15)' } }, { yAxis: 1e-4 }],
+                            [{ yAxis: 1e-4, itemStyle: { color: 'rgba(220, 38, 38, 0.18)' } }, { yAxis: 1e-3 }],
+                            [{ yAxis: 1e-3, itemStyle: { color: 'rgba(192, 38, 211, 0.20)' } }, { yAxis: 1 }]
+                        ]
+                    },
+                    markPoint: {
+                        data: flareMarkPoints,
+                        animation: false,
+                        z: 10
+                    },
+                    // ========== CUSTOMIZABLE GRIDLINES ==========
+                    // You can tweak these values:
+                    //   - xStart/xEnd: pixel position from left (0) to right edge
+                    //   - yAxis: the flux value for that line
+                    //   - color: rgba with last value being opacity (0.0 - 1.0)
+                    //   - width: line thickness in pixels
+                    //   - type: 'solid', 'dashed', or 'dotted'
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        animation: false,
+                        label: { show: false },
+                        data: (function() {
+                            const xStart = 45;   // Left edge of line (pixels from left)
+                            const xEnd = '98%'; // Right edge ('100%' = full width)
+                            
+                            // Major class boundaries (A/B/C/M/X/X10)
+                            const majorColor = 'rgba(255, 255, 255, 0.25)';
+                            const majorWidth = 1;
+                            const majorType = 'solid';
+                            const majorLines = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3];
+                            
+                            // Minor gridlines (C1-C9, M1-M9, etc.)
+                            const minorColor = 'rgba(255, 255, 255, 0.08)';
+                            const minorWidth = 1;
+                            const minorType = 'solid';
+                            const minorLines = [];
+                            [1e-7, 1e-6, 1e-5, 1e-4, 1e-3].forEach(base => {
+                                for (let i = 2; i <= 9; i++) {
+                                    minorLines.push(base * i);
+                                }
+                            });
+                            
+                            const result = [];
+                            
+                            // Add major lines
+                            majorLines.forEach(y => {
+                                result.push([{
+                                    x: xStart,
+                                    yAxis: y,
+                                    lineStyle: { color: majorColor, width: majorWidth, type: majorType }
+                                }, {
+                                    x: xEnd,
+                                    yAxis: y
+                                }]);
+                            });
+                            
+                            // Add minor lines
+                            minorLines.forEach(y => {
+                                result.push([{
+                                    x: xStart,
+                                    yAxis: y,
+                                    lineStyle: { color: minorColor, width: minorWidth, type: minorType }
+                                }, {
+                                    x: xEnd,
+                                    yAxis: y
+                                }]);
+                            });
+                            
+                            return result;
+                        })()
+                    }
+                }]
             });
+            
+            // Remove loading state
+            container.classList.remove('loading');
         }
 
         function updateProtonChart(data) {
@@ -3109,7 +3057,7 @@
             console.log(`Proton data points: ${data.length}, range: ${currentProtonRange}`);
 
             const p10 = data.filter(d => d.energy === '>=10 MeV');
-            const p50 = data.filter(d => d.energy === '>=50 MeV'); // Assuming this exists or similar
+            const p50 = data.filter(d => d.energy === '>=50 MeV');
             const p100 = data.filter(d => d.energy === '>=100 MeV');
 
             // Determine current proton storm level based on most recent >=10 MeV flux
@@ -3142,25 +3090,26 @@
                 }
             }
 
-            const traces = [];
-
             // Helper function to validate and filter flux data
             function filterValidData(dataArray) {
                 return dataArray.filter(d => d && d.time_tag && d.flux !== null && d.flux !== undefined && !isNaN(parseFloat(d.flux)));
             }
 
+            const series = [];
+            let allTimes = [];
+
             if (document.getElementById('p10-toggle').checked) {
                 const validP10 = filterValidData(p10);
                 if (validP10.length > 0) {
-                    traces.push({
-                        x: validP10.map(d => d.time_tag),
-                        y: validP10.map(d => parseFloat(d.flux)),
+                    allTimes = validP10.map(d => d.time_tag);
+                    series.push({
                         name: '>= 10 MeV',
-                        type: 'scatter',
-                        line: { color: '#fbbf24', width: 2, shape: 'spline' },
-                        fill: 'tozeroy',
-                        fillcolor: 'rgba(251, 191, 36, 0.05)',
-                        hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 10 MeV</extra>`
+                        type: 'line',
+                        data: validP10.map(d => parseFloat(d.flux)),
+                        smooth: 0.3,
+                        symbol: 'none',
+                        lineStyle: { color: '#fbbf24', width: 2 },
+                        areaStyle: { color: 'rgba(251, 191, 36, 0.1)' }
                     });
                 }
             }
@@ -3168,16 +3117,15 @@
             if (document.getElementById('p50-toggle').checked) {
                 const validP50 = filterValidData(p50);
                 if (validP50.length > 0) {
-                    // Note: API might not return 50 MeV, check data structure if empty
-                    traces.push({
-                        x: validP50.map(d => d.time_tag),
-                        y: validP50.map(d => parseFloat(d.flux)),
+                    if (allTimes.length === 0) allTimes = validP50.map(d => d.time_tag);
+                    series.push({
                         name: '>= 50 MeV',
-                        type: 'scatter',
-                        line: { color: '#38bdf8', width: 2, shape: 'spline' },
-                        fill: 'tozeroy',
-                        fillcolor: 'rgba(56, 189, 248, 0.05)',
-                        hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 50 MeV</extra>`
+                        type: 'line',
+                        data: validP50.map(d => parseFloat(d.flux)),
+                        smooth: 0.3,
+                        symbol: 'none',
+                        lineStyle: { color: '#38bdf8', width: 2 },
+                        areaStyle: { color: 'rgba(56, 189, 248, 0.1)' }
                     });
                 }
             }
@@ -3185,152 +3133,104 @@
             if (document.getElementById('p100-toggle').checked) {
                 const validP100 = filterValidData(p100);
                 if (validP100.length > 0) {
-                    traces.push({
-                        x: validP100.map(d => d.time_tag),
-                        y: validP100.map(d => parseFloat(d.flux)),
+                    if (allTimes.length === 0) allTimes = validP100.map(d => d.time_tag);
+                    series.push({
                         name: '>= 100 MeV',
-                        type: 'scatter',
-                        line: { color: '#a78bfa', width: 2, shape: 'spline' },
-                        fill: 'tozeroy',
-                        fillcolor: 'rgba(167, 139, 250, 0.05)',
-                        hovertemplate: `<b>%{x|%H:%M UTC}</b><br>%{y:.2e} pfu<extra>>= 100 MeV</extra>`
+                        type: 'line',
+                        data: validP100.map(d => parseFloat(d.flux)),
+                        smooth: 0.3,
+                        symbol: 'none',
+                        lineStyle: { color: '#a78bfa', width: 2 },
+                        areaStyle: { color: 'rgba(167, 139, 250, 0.1)' }
                     });
                 }
             }
 
-            // Calculate time range - use actual data range
-            const now = new Date();
-            let timeStart, timeEnd;
-            
-            if (traces.length > 0 && traces[0].x && traces[0].x.length > 0) {
-                // Find min/max from all traces - no buffer
-                let minTime = new Date(traces[0].x[0]);
-                let maxTime = new Date(traces[0].x[0]);
-                
-                traces.forEach(trace => {
-                    if (trace.x && trace.x.length > 0) {
-                        const traceMin = new Date(trace.x[0]);
-                        const traceMax = new Date(trace.x[trace.x.length - 1]);
-                        if (traceMin < minTime) minTime = traceMin;
-                        if (traceMax > maxTime) maxTime = traceMax;
-                    }
-                });
-                
-                timeStart = minTime;
-                timeEnd = maxTime;
-                
-                // Extend left side to show full requested range if needed
-                const rangeHours = {
-                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
-                    '2d': 48, '5d': 120, '7d': 168
-                };
-                const hours = rangeHours[currentProtonRange] || 24;
-                const theoreticalStart = new Date(now - hours * 60 * 60 * 1000);
-                
-                if (theoreticalStart < timeStart) {
-                    timeStart = theoreticalStart;
-                }
-            } else {
-                // Fallback
-                const rangeHours = {
-                    '2h': 2, '6h': 6, '12h': 12, '24h': 24,
-                    '2d': 48, '5d': 120, '7d': 168
-                };
-                const hours = rangeHours[currentProtonRange] || 24;
-                timeStart = new Date(now - hours * 60 * 60 * 1000);
-                timeEnd = now;
+            // Get or create chart instance
+            const container = document.getElementById('proton-chart');
+            if (window.echartsInstances['proton-chart']) {
+                window.echartsInstances['proton-chart'].dispose();
             }
-            
-            console.log('Proton time range:', {start: timeStart, end: timeEnd});
+            const chart = echarts.init(container);
+            window.echartsInstances['proton-chart'] = chart;
 
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#94a3b8' },
-                showlegend: false,
-                hoverlabel: {
-                    bgcolor: '#1e293b',
-                    bordercolor: '#334155',
-                    font: { family: 'Inter, sans-serif', size: 13, color: '#f8fafc' }
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 45, right: 25, top: 5, bottom: 30 },
+                legend: { show: false },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc', fontFamily: 'Inter, sans-serif' },
+                    formatter: function(params) {
+                        const d = new Date(params[0].axisValue);
+                        const timeStr = d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0') + ' UTC';
+                        let result = `<b>${timeStr}</b>`;
+                        params.forEach(p => {
+                            result += `<br>${p.seriesName}: ${p.value.toExponential(2)} pfu`;
+                        });
+                        return result;
+                    }
                 },
-                xaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.04)',
-                    range: [timeStart.toISOString(), timeEnd.toISOString()]
+                xAxis: {
+                    type: 'category',
+                    data: allTimes,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: '#94a3b8',
+                        fontSize: 10,
+                        formatter: (val) => {
+                            const d = new Date(val);
+                            return d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+                        }
+                    },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } }
                 },
-                yaxis: { 
-                    gridcolor: 'rgba(255, 255, 255, 0.04)', 
+                yAxis: {
                     type: 'log',
-                    title: 'Particles/cm²-s-ster',
-                    range: [-1, 5], // 0.1 to 100,000
-                    tickvals: [1e0, 1e1, 1e2, 1e3, 1e4, 1e5],
-                    ticktext: ['10⁰', '10¹', '10²', '10³', '10⁴', '10⁵']
+                    min: 0.1,
+                    max: 100000,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: '#94a3b8',
+                        fontSize: 10,
+                        formatter: (val) => val.toExponential(0)
+                    },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } }
                 },
-                autosize: true,
-                margin: { t: 5, r: 5, b: 30, l: 40 },
-                shapes: [
-                    // S1 (Minor) > 10
-                    {
-                        type: 'rect',
-                        y0: 10, y1: 100,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(251, 191, 36, 0.1)', // Yellow
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // S2 (Moderate) > 100
-                    {
-                        type: 'rect',
-                        y0: 100, y1: 1000,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(251, 146, 60, 0.1)', // Orange
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // S3 (Strong) > 1000
-                    {
-                        type: 'rect',
-                        y0: 1000, y1: 10000,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(248, 113, 113, 0.1)', // Red
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // S4 (Severe) > 10000
-                    {
-                        type: 'rect',
-                        y0: 10000, y1: 100000,
-                        x0: 0, x1: 1, xref: 'paper',
-                        fillcolor: 'rgba(232, 121, 249, 0.1)', // Pink
-                        line: { width: 0 },
-                        layer: 'below'
-                    },
-                    // Threshold Lines
-                    { type: 'line', y0: 10, y1: 10, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 191, 36, 0.3)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 100, y1: 100, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(251, 146, 60, 0.4)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 1000, y1: 1000, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(248, 113, 113, 0.5)', width: 1, dash: 'dot' } },
-                    { type: 'line', y0: 10000, y1: 10000, x0: 0, x1: 1, xref: 'paper', line: { color: 'rgba(232, 121, 249, 0.6)', width: 1, dash: 'dot' } }
-                ],
-                annotations: [
-                    { x: 1, y: 10, xref: 'paper', yref: 'y', text: 'S1', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fbbf24', size: 12}, xshift: -5, yshift: 2 },
-                    { x: 1, y: 100, xref: 'paper', yref: 'y', text: 'S2', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#fb923c', size: 12}, xshift: -5, yshift: 2 },
-                    { x: 1, y: 1000, xref: 'paper', yref: 'y', text: 'S3', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#f87171', size: 12}, xshift: -5, yshift: 2 },
-                    { x: 1, y: 10000, xref: 'paper', yref: 'y', text: 'S4', showarrow: false, xanchor: 'right', yanchor: 'bottom', font: {color: '#e879f9', size: 12}, xshift: -5, yshift: 2 }
-                ]
-            };
-
-            // Purge and recreate for clean render
-            Plotly.purge('proton-chart');
-            const config = {
-                responsive: true, 
-                displayModeBar: false,
-                staticPlot: isMobile // Disable interactions on mobile for performance
-            };
-            Plotly.newPlot('proton-chart', traces, layout, config).then(() => {
-                // Immediate resize after plot is ready
-                Plotly.Plots.resize('proton-chart');
-                // Remove loading state
-                document.getElementById('proton-chart').classList.remove('loading');
+                series: series.map(s => ({
+                    ...s,
+                    markLine: s.name === '>= 10 MeV' ? {
+                        silent: true,
+                        symbol: 'none',
+                        animation: false,
+                        animationDuration: 0,
+                        lineStyle: { type: 'dashed', width: 1 },
+                        label: { position: 'end', fontSize: 10, show: true },
+                        data: [
+                            { yAxis: 10, name: 'S1', lineStyle: { color: 'rgba(250, 204, 21, 0.5)' }, label: { show: true, formatter: 'S1', color: '#facc15', fontWeight: 'bold' } },
+                            { yAxis: 100, name: 'S2', lineStyle: { color: 'rgba(251, 146, 60, 0.6)' }, label: { show: true, formatter: 'S2', color: '#fb923c', fontWeight: 'bold' } },
+                            { yAxis: 1000, name: 'S3', lineStyle: { color: 'rgba(239, 68, 68, 0.7)' }, label: { show: true, formatter: 'S3', color: '#ef4444', fontWeight: 'bold' } },
+                            { yAxis: 10000, name: 'S4', lineStyle: { color: 'rgba(217, 70, 239, 0.8)' }, label: { show: true, formatter: 'S4', color: '#d946ef', fontWeight: 'bold' } }
+                        ]
+                    } : undefined,
+                    markArea: s.name === '>= 10 MeV' ? {
+                        silent: true,
+                        data: [
+                            [{ yAxis: 10, itemStyle: { color: 'rgba(250, 204, 21, 0.12)' } }, { yAxis: 100 }],
+                            [{ yAxis: 100, itemStyle: { color: 'rgba(251, 146, 60, 0.12)' } }, { yAxis: 1000 }],
+                            [{ yAxis: 1000, itemStyle: { color: 'rgba(239, 68, 68, 0.12)' } }, { yAxis: 10000 }],
+                            [{ yAxis: 10000, itemStyle: { color: 'rgba(217, 70, 239, 0.15)' } }, { yAxis: 100000 }]
+                        ]
+                    } : undefined
+                }))
             });
+            
+            // Remove loading state
+            container.classList.remove('loading');
         }
 
         function toggleProtonTrace(index) {
@@ -3882,10 +3782,9 @@
                 const hasCME = flare.linked_cme || flare.has_cme || false;
                 
                 const dataPoint = {
-                    x: time,
-                    y: parseFlareIntensity(flareClass),
-                    text: flareClass,
-                    customdata: hasCME ? 'CME Linked' : 'No CME Data'
+                    value: [time, parseFlareIntensity(flareClass)],
+                    flareClass: flareClass,
+                    cmeInfo: hasCME ? 'CME Linked' : 'No CME Data'
                 };
                 
                 if (flareClass.startsWith('X')) {
@@ -3897,106 +3796,101 @@
                 }
             });
             
-            const traces = [];
+            const series = [];
             
             if (cFlares.length > 0) {
-                traces.push({
-                    x: cFlares.map(f => f.x),
-                    y: cFlares.map(f => f.y),
-                    text: cFlares.map(f => f.text),
-                    customdata: cFlares.map(f => f.customdata),
-                    mode: 'markers',
-                    type: 'scatter',
+                series.push({
                     name: 'C-Class',
-                    marker: { 
-                        color: '#fbbf24', 
-                        size: 10,
-                        line: { width: 1, color: 'rgba(251, 191, 36, 0.5)' }
-                    },
-                    hovertemplate: '<b>%{text}</b><br>%{x|%b %d, %H:%M UTC}<br>%{customdata}<extra></extra>'
+                    type: 'scatter',
+                    data: cFlares,
+                    symbolSize: 10,
+                    itemStyle: { color: '#fbbf24' }
                 });
             }
             
             if (mFlares.length > 0) {
-                traces.push({
-                    x: mFlares.map(f => f.x),
-                    y: mFlares.map(f => f.y),
-                    text: mFlares.map(f => f.text),
-                    customdata: mFlares.map(f => f.customdata),
-                    mode: 'markers',
-                    type: 'scatter',
+                series.push({
                     name: 'M-Class',
-                    marker: { 
-                        color: '#f97316', 
-                        size: 12,
-                        line: { width: 1, color: 'rgba(249, 115, 22, 0.5)' }
-                    },
-                    hovertemplate: '<b>%{text}</b><br>%{x|%b %d, %H:%M UTC}<br>%{customdata}<extra></extra>'
+                    type: 'scatter',
+                    data: mFlares,
+                    symbolSize: 12,
+                    itemStyle: { color: '#f97316' }
                 });
             }
             
             if (xFlares.length > 0) {
-                traces.push({
-                    x: xFlares.map(f => f.x),
-                    y: xFlares.map(f => f.y),
-                    text: xFlares.map(f => f.text),
-                    customdata: xFlares.map(f => f.customdata),
-                    mode: 'markers',
-                    type: 'scatter',
+                series.push({
                     name: 'X-Class',
-                    marker: { 
-                        color: '#dc2626', 
-                        size: 14,
-                        symbol: 'star',
-                        line: { width: 1, color: 'rgba(220, 38, 38, 0.5)' }
-                    },
-                    hovertemplate: '<b>%{text}</b><br>%{x|%b %d, %H:%M UTC}<br>%{customdata}<extra></extra>'
+                    type: 'scatter',
+                    data: xFlares,
+                    symbol: 'star',
+                    symbolSize: 14,
+                    itemStyle: { color: '#dc2626' }
                 });
             }
             
-            const layout = {
-                margin: { t: 20, r: 10, b: 50, l: 50 },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0.2)',
-                font: { color: '#94a3b8', size: 11 },
-                xaxis: {
-                    gridcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: '#94a3b8',
-                    showgrid: true,
-                    zeroline: false,
-                    title: { text: 'Date & Time (UTC)', font: { size: 10 } }
-                },
-                yaxis: {
-                    type: 'log',
-                    gridcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: '#94a3b8',
-                    title: { text: 'X-ray Flux (Watts/m²)', font: { size: 10 } },
-                    showgrid: true,
-                    range: [-7, -3],
-                    tickvals: [1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
-                    ticktext: ['B1.0', 'C1.0', 'M1.0', 'X1.0', 'X10']
-                },
-                showlegend: true,
+            // Get or create chart instance
+            if (window.echartsInstances['region-flare-chart']) {
+                window.echartsInstances['region-flare-chart'].dispose();
+            }
+            const chart = echarts.init(chartDiv);
+            window.echartsInstances['region-flare-chart'] = chart;
+            
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 60, right: 15, top: 40, bottom: 60 },
                 legend: {
-                    x: 0,
-                    xanchor: 'left',
-                    y: 1.1,
-                    yanchor: 'top',
-                    orientation: 'h',
-                    font: { color: '#94a3b8', size: 10 },
-                    bgcolor: 'rgba(0,0,0,0.3)',
-                    bordercolor: 'rgba(255,255,255,0.1)',
-                    borderwidth: 1
+                    show: true,
+                    left: 0,
+                    top: 0,
+                    orient: 'horizontal',
+                    textStyle: { color: '#94a3b8', fontSize: 10 },
+                    itemGap: 15
                 },
-                hovermode: 'closest'
-            };
-            
-            const config = { 
-                responsive: true, 
-                displayModeBar: false 
-            };
-            
-            Plotly.newPlot('region-flare-chart', traces, layout, config);
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' },
+                    formatter: function(params) {
+                        const d = new Date(params.value[0]);
+                        const dateStr = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) + ' UTC';
+                        return `<b>${params.data.flareClass}</b><br>${dateStr}<br>${params.data.cmeInfo}`;
+                    }
+                },
+                xAxis: {
+                    type: 'time',
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { 
+                        color: '#94a3b8', 
+                        fontSize: 10,
+                        rotate: 0
+                    },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+                },
+                yAxis: {
+                    type: 'log',
+                    min: 1e-7,
+                    max: 1e-3,
+                    name: 'X-ray Flux (W/m²)',
+                    nameTextStyle: { color: '#94a3b8', fontSize: 10 },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: '#94a3b8',
+                        fontSize: 10,
+                        formatter: (val) => {
+                            if (val >= 1e-4) return 'X1.0';
+                            if (val >= 1e-5) return 'M1.0';
+                            if (val >= 1e-6) return 'C1.0';
+                            return 'B1.0';
+                        }
+                    },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+                },
+                series: series
+            });
         }
         
         function parseFlareIntensity(flareClass) {
@@ -4098,13 +3992,7 @@
         setInterval(fetchSolarData, 300000);
         setInterval(fetchKpHistoryExtended, 300000);
 
-        // Handle window resize for charts
-        window.addEventListener('resize', function() {
-            const xray = document.getElementById('xray-chart');
-            const proton = document.getElementById('proton-chart');
-            if (xray) Plotly.Plots.resize(xray);
-            if (proton) Plotly.Plots.resize(proton);
-        });
+        // Handle window resize for charts - delegated to resizeAllCharts which uses ECharts API
 
         // Image Lightbox
         function openLightbox(imageUrl, caption) {
@@ -4486,93 +4374,96 @@
                 }
             });
             
-            const trace1 = {
-                x: observedTimes,
-                y: observedValues,
-                type: 'bar',
-                name: 'Observed',
-                text: observedValues.map(v => Math.round(v)),
-                hovertemplate: 'Kp %{text}<br>%{x}<extra></extra>',
-                marker: {
-                    color: observedValues.map(v => getKpColor(v))
-                }
-            };
+            // Get or create chart instance
+            const container = document.getElementById('kp-history-chart');
+            if (window.echartsInstances['kp-history-chart']) {
+                window.echartsInstances['kp-history-chart'].dispose();
+            }
+            const chart = echarts.init(container);
+            window.echartsInstances['kp-history-chart'] = chart;
             
-            const trace2 = {
-                x: forecastTimes,
-                y: forecastValues,
-                type: 'bar',
-                name: 'Forecast',
-                text: forecastValues.map(v => Math.round(v)),
-                hovertemplate: 'Kp %{text}<br>%{x}<extra></extra>',
-                marker: {
-                    color: forecastValues.map(v => {
-                        const color = getKpColor(v);
-                        // Convert hex to rgba with 0.6 opacity for forecast
-                        const r = parseInt(color.slice(1, 3), 16);
-                        const g = parseInt(color.slice(3, 5), 16);
-                        const b = parseInt(color.slice(5, 7), 16);
-                        return `rgba(${r}, ${g}, ${b}, 0.6)`;
-                    })
-                }
-            };
-            
-            const layout = {
-                margin: { l: 50, r: 30, t: 20, b: 80 },
-                paper_bgcolor: 'transparent',
-                plot_bgcolor: 'transparent',
-                showlegend: true,
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 50, right: 30, top: 30, bottom: 80 },
                 legend: {
-                    x: 0.02,
-                    y: 0.98,
-                    font: { color: '#e5e5e5', size: 11 }
+                    show: true,
+                    left: 5,
+                    top: 5,
+                    textStyle: { color: '#e5e5e5', fontSize: 11 }
                 },
-                xaxis: {
-                    color: '#8b8b8b',
-                    gridcolor: 'rgba(255,255,255,0.05)',
-                    tickangle: -45,
-                    tickfont: { size: 10 }
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' },
+                    formatter: function(params) {
+                        const p = params[0];
+                        return `Kp ${Math.round(p.value)}<br>${p.axisValue}`;
+                    }
                 },
-                yaxis: {
-                    title: 'Kp Index',
-                    color: '#8b8b8b',
-                    gridcolor: 'rgba(255,255,255,0.1)',
-                    range: [0, 9]
+                xAxis: {
+                    type: 'category',
+                    data: times,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { 
+                        color: '#8b8b8b', 
+                        fontSize: 10,
+                        rotate: 45
+                    },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
                 },
-                shapes: [
+                yAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: 9,
+                    name: 'Kp Index',
+                    nameTextStyle: { color: '#8b8b8b' },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: '#8b8b8b' },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+                },
+                series: [
                     {
-                        type: 'line',
-                        x0: times[0],
-                        x1: times[times.length - 1],
-                        y0: 5,
-                        y1: 5,
-                        line: {
-                            color: '#ef4444',
-                            width: 1,
-                            dash: 'dot'
-                        }
+                        name: 'Observed',
+                        type: 'bar',
+                        data: validData.map(d => ({
+                            value: d.observed ? parseFloat(d.kp) : null,
+                            itemStyle: { color: getKpColor(parseFloat(d.kp)) }
+                        }))
+                    },
+                    {
+                        name: 'Forecast',
+                        type: 'bar',
+                        data: validData.map(d => ({
+                            value: !d.observed ? parseFloat(d.kp) : null,
+                            itemStyle: { 
+                                color: getKpColor(parseFloat(d.kp)),
+                                opacity: 0.6
+                            }
+                        }))
                     }
                 ],
-                annotations: [
-                    {
-                        x: times[Math.floor(times.length / 2)],
-                        y: 5.2,
-                        text: 'G1 Storm Threshold',
-                        showarrow: false,
-                        font: { color: '#ef4444', size: 10 }
-                    },
-                    isHistorical ? {
-                        x: times[Math.floor(times.length / 4)],
-                        y: 8.5,
+                markLine: {
+                    silent: true,
+                    symbol: 'none',
+                    lineStyle: { color: '#ef4444', width: 1, type: 'dashed' },
+                    data: [{ yAxis: 5 }]
+                },
+                graphic: isHistorical ? [{
+                    type: 'text',
+                    left: 'center',
+                    top: 60,
+                    style: {
                         text: '📅 HISTORICAL DATA',
-                        showarrow: false,
-                        font: { color: '#fb923c', size: 14, weight: 'bold' },
+                        fill: '#fb923c',
+                        fontSize: 14,
+                        fontWeight: 'bold',
                         opacity: 0.7
-                    } : null
-                ].filter(a => a !== null)
-            };
-            
-            Plotly.newPlot('kp-history-chart', [trace1, trace2], layout, { responsive: true, displayModeBar: false, staticPlot: isMobile });
+                    }
+                }] : []
+            });
         }
         
         function updateActivityIndicator(kpData) {
@@ -4624,48 +4515,72 @@
         }
 
         function plotKpChart(times, values) {
-            const trace = {
-                x: times,
-                y: values,
-                type: 'scatter',
-                mode: 'lines+markers',
-                line: { color: '#fbbf24', width: 2 },
-                marker: { 
-                    size: 6, 
-                    color: values.map(v => {
-                        if (v >= 5) return '#ef4444';
-                        if (v >= 4) return '#f97316';
-                        if (v >= 3) return '#fbbf24';
-                        return '#22c55e';
-                    })
+            const container = document.getElementById('kp-chart');
+            if (window.echartsInstances['kp-chart']) {
+                window.echartsInstances['kp-chart'].dispose();
+            }
+            const chart = echarts.init(container);
+            window.echartsInstances['kp-chart'] = chart;
+            
+            const isDark = currentTheme === 'dark';
+            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)';
+            const textColor = isDark ? '#94a3b8' : '#475569';
+            
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 40, right: 10, top: 15, bottom: 45 },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' },
+                    formatter: function(params) {
+                        return `<b>${params[0].axisValue}</b><br>Kp: ${params[0].value.toFixed(1)}`;
+                    }
                 },
-                hovertemplate: '<b>%{x}</b><br>Kp: %{y:.1f}<extra></extra>'
-            };
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: currentTheme === 'dark' ? '#94a3b8' : '#475569' },
-                margin: { t: 10, r: 10, b: 40, l: 40 },
-                xaxis: { 
-                    gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',
-                    showgrid: true
+                xAxis: {
+                    type: 'category',
+                    data: times,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor, fontSize: 10 },
+                    splitLine: { lineStyle: { color: gridColor } }
                 },
-                yaxis: { 
-                    gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',
-                    title: 'Kp Index',
-                    range: [0, 9]
+                yAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: 9,
+                    name: 'Kp Index',
+                    nameTextStyle: { color: textColor },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor },
+                    splitLine: { lineStyle: { color: gridColor } }
                 },
-                shapes: [{
+                series: [{
                     type: 'line',
-                    y0: 5, y1: 5,
-                    x0: 0, x1: 1,
-                    xref: 'paper',
-                    line: { color: '#ef4444', width: 1, dash: 'dot' }
+                    data: values,
+                    smooth: false,
+                    symbolSize: 6,
+                    lineStyle: { color: '#fbbf24', width: 2 },
+                    itemStyle: {
+                        color: function(params) {
+                            const v = params.value;
+                            if (v >= 5) return '#ef4444';
+                            if (v >= 4) return '#f97316';
+                            if (v >= 3) return '#fbbf24';
+                            return '#22c55e';
+                        }
+                    },
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        lineStyle: { color: '#ef4444', width: 1, type: 'dashed' },
+                        data: [{ yAxis: 5 }],
+                        label: { show: false }
+                    }
                 }]
-            };
-
-            Plotly.newPlot('kp-chart', [trace], layout, { responsive: true, displayModeBar: false, staticPlot: isMobile });
+            });
         }
 
         // Fetch F10.7 Data
@@ -4722,122 +4637,144 @@
                 }
             });
             
-            // Common layout settings
-            const commonLayout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: textColor, size: 11 },
-                margin: { t: 20, r: 20, b: 40, l: 50 },
-                xaxis: { 
-                    gridcolor: gridColor,
-                    showgrid: true,
-                    zeroline: false
-                },
-                yaxis: { 
-                    gridcolor: gridColor,
-                    showgrid: true,
-                    zeroline: false,
-                    rangemode: 'tozero'
-                },
-                hovermode: 'x unified',
-                showlegend: true,
-                legend: {
-                    orientation: 'h',
-                    yanchor: 'bottom',
-                    y: 1.02,
-                    xanchor: 'left',
-                    x: 0,
-                    font: { size: 10 }
-                }
-            };
-
             // Chart 1: Sunspot Number with predictions
-            const ssnTraces = [
+            const ssnContainer = document.getElementById('solar-cycle-ssn-chart');
+            if (window.echartsInstances['solar-cycle-ssn-chart']) {
+                window.echartsInstances['solar-cycle-ssn-chart'].dispose();
+            }
+            const ssnChart = echarts.init(ssnContainer);
+            window.echartsInstances['solar-cycle-ssn-chart'] = ssnChart;
+            
+            const ssnSeries = [
                 {
-                    x: observed.times,
-                    y: observed.sunspot_numbers,
-                    type: 'scatter',
-                    mode: 'lines',
                     name: 'Monthly SSN',
-                    line: { color: '#60a5fa', width: 1 },
-                    hovertemplate: 'SSN: %{y:.0f}<extra></extra>'
+                    type: 'line',
+                    data: observed.times.map((t, i) => [t, observed.sunspot_numbers[i]]),
+                    symbol: 'none',
+                    lineStyle: { color: '#60a5fa', width: 1 }
                 },
                 {
-                    x: observed.times,
-                    y: observed.smoothed_ssn,
-                    type: 'scatter',
-                    mode: 'lines',
                     name: 'Smoothed SSN',
-                    line: { color: '#fb923c', width: 2.5 },
-                    hovertemplate: 'Smoothed: %{y:.1f}<extra></extra>'
+                    type: 'line',
+                    data: observed.times.map((t, i) => [t, observed.smoothed_ssn[i]]),
+                    symbol: 'none',
+                    lineStyle: { color: '#fb923c', width: 2.5 }
                 }
             ];
-
-            // Add predicted smoothed SSN
+            
             if (predicted.times.length > 0) {
-                ssnTraces.push({
-                    x: predicted.times,
-                    y: predicted.smoothed_ssn,
-                    type: 'scatter',
-                    mode: 'lines',
+                ssnSeries.push({
                     name: 'Predicted SSN',
-                    line: { color: '#fbbf24', width: 2, dash: 'dash' },
-                    hovertemplate: 'Predicted: %{y:.1f}<extra></extra>'
+                    type: 'line',
+                    data: predicted.times.map((t, i) => [t, predicted.smoothed_ssn[i]]),
+                    symbol: 'none',
+                    lineStyle: { color: '#fbbf24', width: 2, type: 'dashed' }
                 });
             }
-
-            const ssnLayout = {
-                ...commonLayout,
-                yaxis: { 
-                    ...commonLayout.yaxis,
-                    title: 'Sunspot Number'
-                }
-            };
-
-            Plotly.newPlot('solar-cycle-ssn-chart', ssnTraces, ssnLayout, { 
-                responsive: true, 
-                displayModeBar: false,
-                staticPlot: isMobile
+            
+            ssnChart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 50, right: 20, top: 40, bottom: 45 },
+                legend: {
+                    show: true,
+                    left: 0,
+                    top: 0,
+                    orient: 'horizontal',
+                    textStyle: { color: textColor, fontSize: 10 }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' }
+                },
+                xAxis: {
+                    type: 'time',
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor },
+                    splitLine: { lineStyle: { color: gridColor } }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Sunspot Number',
+                    nameTextStyle: { color: textColor },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor },
+                    splitLine: { lineStyle: { color: gridColor } }
+                },
+                series: ssnSeries
             });
 
             // Chart 2: F10.7 Flux with predictions (from Oct 2004)
-            const f107Traces = [
+            const f107Container = document.getElementById('solar-cycle-f107-chart');
+            if (window.echartsInstances['solar-cycle-f107-chart']) {
+                window.echartsInstances['solar-cycle-f107-chart'].dispose();
+            }
+            const f107Chart = echarts.init(f107Container);
+            window.echartsInstances['solar-cycle-f107-chart'] = f107Chart;
+            
+            const f107Series = [
                 {
-                    x: filteredObserved.times,
-                    y: filteredObserved.f107,
-                    type: 'scatter',
-                    mode: 'lines',
                     name: 'Observed F10.7',
-                    line: { color: '#60a5fa', width: 2 },
-                    hovertemplate: 'F10.7: %{y:.1f} SFU<extra></extra>'
+                    type: 'line',
+                    data: filteredObserved.times.map((t, i) => [t, filteredObserved.f107[i]]),
+                    symbol: 'none',
+                    lineStyle: { color: '#60a5fa', width: 2 }
                 }
             ];
-
-            // Add predicted F10.7
+            
             if (predicted.times.length > 0) {
-                f107Traces.push({
-                    x: predicted.times,
-                    y: predicted.f107,
-                    type: 'scatter',
-                    mode: 'lines',
+                f107Series.push({
                     name: 'Predicted F10.7',
-                    line: { color: '#fb923c', width: 2, dash: 'dash' },
-                    hovertemplate: 'Predicted: %{y:.1f} SFU<extra></extra>'
+                    type: 'line',
+                    data: predicted.times.map((t, i) => [t, predicted.f107[i]]),
+                    symbol: 'none',
+                    lineStyle: { color: '#fb923c', width: 2, type: 'dashed' }
                 });
             }
-
-            const f107Layout = {
-                ...commonLayout,
-                yaxis: { 
-                    ...commonLayout.yaxis,
-                    title: 'F10.7 Flux (SFU)'
-                }
-            };
-
-            Plotly.newPlot('solar-cycle-f107-chart', f107Traces, f107Layout, { 
-                responsive: true, 
-                displayModeBar: false,
-                staticPlot: isMobile
+            
+            f107Chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 50, right: 20, top: 40, bottom: 45 },
+                legend: {
+                    show: true,
+                    left: 0,
+                    top: 0,
+                    orient: 'horizontal',
+                    textStyle: { color: textColor, fontSize: 10 }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' },
+                    formatter: function(params) {
+                        let result = '';
+                        params.forEach(p => {
+                            result += `${p.seriesName}: ${p.value[1]?.toFixed(1) || '--'} SFU<br>`;
+                        });
+                        return result;
+                    }
+                },
+                xAxis: {
+                    type: 'time',
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor },
+                    splitLine: { lineStyle: { color: gridColor } }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'F10.7 Flux (SFU)',
+                    nameTextStyle: { color: textColor },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor },
+                    splitLine: { lineStyle: { color: gridColor } }
+                },
+                series: f107Series
             });
         }
 
@@ -4897,31 +4834,57 @@
         }
 
         function plotElectronFlux(times, flux) {
-            const trace = {
-                x: times,
-                y: flux,
-                type: 'scatter',
-                mode: 'lines',
-                line: { color: '#a78bfa', width: 2 },
-                fill: 'tozeroy',
-                fillcolor: 'rgba(167, 139, 250, 0.2)',
-                hovertemplate: '<b>%{x}</b><br>%{y:.2e} e/cm²-s-sr<extra></extra>'
-            };
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: currentTheme === 'dark' ? '#94a3b8' : '#475569' },
-                margin: { t: 10, r: 10, b: 40, l: 60 },
-                xaxis: { gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)' },
-                yaxis: { 
+            const container = document.getElementById('electron-flux-chart');
+            if (window.echartsInstances['electron-flux-chart']) {
+                window.echartsInstances['electron-flux-chart'].dispose();
+            }
+            const chart = echarts.init(container);
+            window.echartsInstances['electron-flux-chart'] = chart;
+            
+            const isDark = currentTheme === 'dark';
+            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)';
+            const textColor = isDark ? '#94a3b8' : '#475569';
+            
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 60, right: 10, top: 15, bottom: 45 },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' },
+                    formatter: function(params) {
+                        return `<b>${params[0].axisValue}</b><br>${params[0].value.toExponential(2)} e/cm²-s-sr`;
+                    }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: times,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor, fontSize: 10 },
+                    splitLine: { lineStyle: { color: gridColor } }
+                },
+                yAxis: {
                     type: 'log',
-                    gridcolor: currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)',
-                    title: 'Electrons/cm²-s-sr'
-                }
-            };
-
-            Plotly.newPlot('electron-flux-chart', [trace], layout, { responsive: true, displayModeBar: false, staticPlot: isMobile });
+                    name: 'Electrons/cm²-s-sr',
+                    nameTextStyle: { color: textColor },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { 
+                        color: textColor,
+                        formatter: (val) => val.toExponential(0)
+                    },
+                    splitLine: { lineStyle: { color: gridColor } }
+                },
+                series: [{
+                    type: 'line',
+                    data: flux,
+                    symbol: 'none',
+                    lineStyle: { color: '#a78bfa', width: 2 },
+                    areaStyle: { color: 'rgba(167, 139, 250, 0.2)' }
+                }]
+            });
         }
 
         // Fetch Region Heatmap
@@ -4939,30 +4902,79 @@
         }
 
         function plotRegionHeatmap(data) {
-            const trace = {
-                x: data.days,
-                y: data.regions,
-                z: data.activity,
-                type: 'heatmap',
-                colorscale: [
-                    [0, '#1e293b'],
-                    [0.3, '#fbbf24'],
-                    [0.6, '#fb923c'],
-                    [1, '#ef4444']
-                ],
-                hovertemplate: '<b>Region %{y}</b><br>%{x}<br>Activity: %{z}<extra></extra>'
-            };
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: currentTheme === 'dark' ? '#94a3b8' : '#475569' },
-                margin: { t: 10, r: 10, b: 60, l: 60 },
-                xaxis: { title: 'Date' },
-                yaxis: { title: 'Active Region' }
-            };
-
-            Plotly.newPlot('region-heatmap', [trace], layout, { responsive: true, displayModeBar: false, staticPlot: isMobile });
+            const container = document.getElementById('region-heatmap');
+            if (window.echartsInstances['region-heatmap']) {
+                window.echartsInstances['region-heatmap'].dispose();
+            }
+            const chart = echarts.init(container);
+            window.echartsInstances['region-heatmap'] = chart;
+            
+            const isDark = currentTheme === 'dark';
+            const textColor = isDark ? '#94a3b8' : '#475569';
+            
+            // Convert 2D array to ECharts heatmap format
+            const heatmapData = [];
+            data.activity.forEach((row, yIndex) => {
+                row.forEach((value, xIndex) => {
+                    heatmapData.push([xIndex, yIndex, value]);
+                });
+            });
+            
+            chart.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: 60, right: 10, top: 15, bottom: 65 },
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                    textStyle: { color: '#f8fafc' },
+                    formatter: function(params) {
+                        const region = data.regions[params.value[1]];
+                        const day = data.days[params.value[0]];
+                        return `<b>Region ${region}</b><br>${day}<br>Activity: ${params.value[2]}`;
+                    }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: data.days,
+                    name: 'Date',
+                    nameLocation: 'center',
+                    nameGap: 45,
+                    nameTextStyle: { color: textColor },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor, fontSize: 10, rotate: 45 },
+                    splitLine: { show: false }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: data.regions,
+                    name: 'Active Region',
+                    nameTextStyle: { color: textColor },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { color: textColor, fontSize: 10 },
+                    splitLine: { show: false }
+                },
+                visualMap: {
+                    show: false,
+                    min: 0,
+                    max: Math.max(...data.activity.flat()),
+                    inRange: {
+                        color: ['#1e293b', '#fbbf24', '#fb923c', '#ef4444']
+                    }
+                },
+                series: [{
+                    type: 'heatmap',
+                    data: heatmapData,
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                        }
+                    }
+                }]
+            });
         }
 
         // Fetch NOAA Scales
@@ -5077,18 +5089,12 @@
             setInterval(checkSystemAlert, 5 * 60 * 1000);
         });
         
-        // Resize charts on window resize
+        // Resize charts on window resize - uses ECharts resize API via resizeAllCharts()
         let solarResizeTimeout;
         window.addEventListener('resize', () => {
             clearTimeout(solarResizeTimeout);
             solarResizeTimeout = setTimeout(() => {
-                const chartIds = ['xray-chart', 'proton-chart'];
-                chartIds.forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element && element.data) {
-                        Plotly.Plots.resize(element);
-                    }
-                });
+                resizeAllCharts();
             }, 150);
         });
 

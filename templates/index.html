@@ -37,7 +37,8 @@
             font-display: swap;
         }
     </style>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- ECharts for charting -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         :root {
             --bg-dark: #0a0a0a;
@@ -494,10 +495,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.75rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 0.25rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+            min-height: 28px;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
+
 
         .card-title {
             font-size: 0.95rem;
@@ -1694,7 +1699,6 @@
     <nav class="navbar">
         <a href="/" class="brand">
             <span></span> WTUS Space Weather Dashboard
-            <span style="margin-left: 0.5rem; font-size: 0.6rem; background: rgba(139, 139, 139, 0.2); color: #8b8b8b; padding: 0.2rem 0.4rem; border-radius: 3px; border: 1px solid rgba(139, 139, 139, 0.3); font-weight: 600; letter-spacing: 0.05em;">BETA</span>
         </a>
         <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
             ☰
@@ -2126,6 +2130,9 @@
             }
         }
         
+        // ECharts instances storage
+        window.echartsInstances = window.echartsInstances || {};
+        
         function plotDstChart(dstData) {
             const times = dstData.map(d => d.time);
             const values = dstData.map(d => d.dst);
@@ -2138,96 +2145,105 @@
                 
                 // Color code based on severity
                 if (currentDst <= -100) {
-                    dstEl.style.color = '#dc2626';  // Strong storm
+                    dstEl.style.color = '#dc2626';
                 } else if (currentDst <= -50) {
-                    dstEl.style.color = '#f97316';  // Moderate storm
+                    dstEl.style.color = '#f97316';
                 } else if (currentDst <= -20) {
-                    dstEl.style.color = '#fbbf24';  // Minor disturbance
+                    dstEl.style.color = '#fbbf24';
                 } else {
-                    dstEl.style.color = '#22c55e';  // Quiet
+                    dstEl.style.color = '#22c55e';
                 }
             }
             
-            // Create gradient fill colors based on Dst values
-            const fillColors = values.map(v => {
-                if (v >= 0) return 'rgba(96, 165, 250, 0.1)';  // Minimal blue for positive
-                if (v >= -20) return 'rgba(34, 197, 94, 0.2)';  // Green for quiet
-                if (v >= -50) return 'rgba(251, 191, 36, 0.3)';  // Yellow for minor disturbance
-                if (v >= -100) return 'rgba(249, 115, 22, 0.4)'; // Orange for moderate storm
-                return 'rgba(220, 38, 38, 0.5)';  // Red for strong storm
-            });
+            const container = document.getElementById('chart-dst');
+            if (window.echartsInstances['chart-dst']) {
+                window.echartsInstances['chart-dst'].dispose();
+            }
+            const chart = echarts.init(container);
+            window.echartsInstances['chart-dst'] = chart;
             
-            // Calculate average fill color intensity for gradient effect
-            const avgFillColor = values.reduce((sum, v) => sum + Math.min(0, v), 0) / values.length;
-            let baseFillColor;
-            if (avgFillColor >= -20) {
-                baseFillColor = 'rgba(96, 165, 250, 0.15)';
-            } else if (avgFillColor >= -50) {
-                baseFillColor = 'rgba(251, 191, 36, 0.25)';
-            } else if (avgFillColor >= -100) {
-                baseFillColor = 'rgba(249, 115, 22, 0.35)';
-            } else {
-                baseFillColor = 'rgba(220, 38, 38, 0.45)';
+            // Calculate Y axis range
+            const minDst = Math.min(...values, -50);
+            const maxDst = Math.max(...values, 50);
+            const yMin = Math.min(minDst - 20, -100);
+            const yMax = Math.max(maxDst + 20, 50);
+            
+            // Normalize function to map Dst values to gradient positions (0 = bottom, 1 = top)
+            // Note: More negative Dst = more severe storm = should be red (at bottom of chart)
+            function normalizeDst(val) {
+                return Math.max(0, Math.min(1, (val - yMin) / (yMax - yMin)));
             }
             
-            const trace = {
-                x: times,
-                y: values,
-                type: 'scatter',
-                mode: 'lines',
-                line: { 
-                    color: '#60a5fa', 
-                    width: 2 
+            const option = {
+                backgroundColor: 'transparent',
+                grid: {
+                    left: 38,
+                    right: 5,
+                    top: 5,
+                    bottom: 25
                 },
-                fill: 'tozeroy',
-                fillcolor: baseFillColor,
-                fillgradient: {
-                    type: 'vertical',
-                    colorscale: [
-                        [0, 'rgba(220, 38, 38, 0.6)'],     // Bottom (strong negative) - Red
-                        [0.3, 'rgba(249, 115, 22, 0.4)'],  // Orange
-                        [0.6, 'rgba(251, 191, 36, 0.3)'],  // Yellow
-                        [0.85, 'rgba(34, 197, 94, 0.2)'],  // Green
-                        [1, 'rgba(96, 165, 250, 0.1)']     // Top (zero line) - Light blue
-                    ]
+                xAxis: {
+                    type: 'category',
+                    data: times.map(t => {
+                        const d = new Date(t);
+                        return d.getUTCHours().toString().padStart(2, '0') + ':' + d.getUTCMinutes().toString().padStart(2, '0');
+                    }),
+                    axisLine: { lineStyle: { color: '#444' } },
+                    axisLabel: { color: '#8b8b8b', fontSize: 8 },
+                    splitLine: { show: false }
                 },
-                hovertemplate: '%{y:.0f} nT<br>%{x|%H:%M UTC}<extra></extra>'
-            };
-            
-            const layout = {
-                margin: { l: 38, r: 5, t: 5, b: 25 },
-                paper_bgcolor: 'transparent',
-                plot_bgcolor: 'transparent',
-                xaxis: {
-                    color: '#8b8b8b',
-                    gridcolor: 'rgba(255,255,255,0.05)',
-                    tickformat: '%H:%M',
-                    tickfont: { size: 8 }
+                yAxis: {
+                    type: 'value',
+                    min: yMin,
+                    max: yMax,
+                    axisLine: { lineStyle: { color: '#444' } },
+                    axisLabel: { color: '#8b8b8b', fontSize: 8 },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
                 },
-                yaxis: {
-                    color: '#8b8b8b',
-                    gridcolor: 'rgba(255,255,255,0.1)',
-                    title: { text: 'nT', font: { size: 9 } },
-                    tickfont: { size: 8 },
-                    zeroline: true,
-                    zerolinecolor: 'rgba(255,255,255,0.2)',
-                    zerolinewidth: 1
-                },
-                shapes: [
-                    {
-                        type: 'line',
-                        x0: times[0],
-                        x1: times[times.length - 1],
-                        y0: -50,
-                        y1: -50,
-                        line: { color: 'rgba(249, 115, 22, 0.3)', width: 1, dash: 'dot' }
+                series: [{
+                    type: 'line',
+                    data: values,
+                    smooth: true,
+                    symbol: 'none',
+                    lineStyle: {
+                        color: '#60a5fa',
+                        width: 2
+                    },
+                    areaStyle: {
+                        // Gradient from bottom (red/severe) to top (blue/quiet)
+                        // Dst thresholds: -100 (severe), -50 (moderate), -20 (minor), 0+ (quiet)
+                        color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
+                            { offset: 0, color: 'rgba(220, 38, 38, 0.5)' },
+                            { offset: normalizeDst(-100), color: 'rgba(220, 38, 38, 0.5)' },
+                            { offset: normalizeDst(-50), color: 'rgba(249, 115, 22, 0.4)' },
+                            { offset: normalizeDst(-20), color: 'rgba(251, 191, 36, 0.3)' },
+                            { offset: normalizeDst(0), color: 'rgba(96, 165, 250, 0.2)' },
+                            { offset: 1, color: 'rgba(96, 165, 250, 0.1)' }
+                        ])
+                    },
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        data: [
+                            { yAxis: 0, lineStyle: { color: 'rgba(255,255,255,0.3)', width: 1 }, label: { show: false } },
+                            { yAxis: -50, lineStyle: { color: 'rgba(249, 115, 22, 0.4)', width: 1, type: 'dashed' }, label: { show: false } },
+                            { yAxis: -100, lineStyle: { color: 'rgba(220, 38, 38, 0.4)', width: 1, type: 'dashed' }, label: { show: false } }
+                        ],
+                        label: { show: false }
                     }
-                ],
-                showlegend: false
+                }],
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    borderColor: '#444',
+                    textStyle: { color: '#fff', fontSize: 11 },
+                    formatter: function(params) {
+                        return params[0].value.toFixed(0) + ' nT<br>' + params[0].axisValue + ' UTC';
+                    }
+                }
             };
             
-            const config = { responsive: true, displayModeBar: false };
-            Plotly.newPlot('chart-dst', [trace], layout, config);
+            chart.setOption(option);
         }
 
         async function refreshDashboard() {
@@ -2531,43 +2547,48 @@
             
             // Mobile-optimized margins and font sizes
             const mobileFontSize = isMobile ? 8 : 10;
-            const mobileMargin = isMobile 
-                ? { t: 5, r: 5, b: 20, l: 30 }
-                : { t: 25, r: 8, b: 25, l: 35 };
             
-            const commonLayout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#94a3b8', family: 'Inter, sans-serif', size: mobileFontSize },
-                margin: mobileMargin,
-                xaxis: { showgrid: false, zeroline: false, tickfont: { size: mobileFontSize }, fixedrange: true },
-                yaxis: { showgrid: true, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, tickfont: { size: mobileFontSize }, fixedrange: true },
-                showlegend: false,
-                autosize: true,
-                responsive: true
-            };
-
-            // Mobile-optimized config - disable scrollZoom for better touch handling
-            const config = { 
-                displayModeBar: false, 
-                responsive: true, 
-                autosizable: true,
-                scrollZoom: false,
-                staticPlot: isMobile // Disable interactions on mobile for performance
-            };
-
-            // Helper for traces
-            const createTrace = (x, y, color, fill = 'tozeroy') => ({
-                x: x, y: y,
-                type: 'scatter',
-                mode: 'lines',
-                fill: fill,
-                line: { color: color, width: isMobile ? 1.5 : 2 },
-                fillcolor: color + '33' // 20% opacity
-            });
+            // Common ECharts grid settings
+            const commonGrid = isMobile 
+                ? { left: 30, right: 5, top: 5, bottom: 20, containLabel: false }
+                : { left: 35, right: 8, top: 25, bottom: 25, containLabel: false };
             
-            // Reduce gradient steps on mobile for better performance
-            const gradientSteps = isMobile ? 50 : 300;
+            // Helper to initialize or get ECharts instance
+            function getChartInstance(id) {
+                const container = document.getElementById(id);
+                if (!container) return null;
+                
+                if (window.echartsInstances[id]) {
+                    window.echartsInstances[id].dispose();
+                }
+                const chart = echarts.init(container);
+                window.echartsInstances[id] = chart;
+                return chart;
+            }
+            
+            // Common axis styles
+            const commonXAxis = {
+                type: 'category',
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: { 
+                    color: '#94a3b8', 
+                    fontSize: mobileFontSize,
+                    formatter: (val) => {
+                        const d = new Date(val);
+                        return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+                    }
+                },
+                splitLine: { show: false }
+            };
+            
+            const commonYAxis = {
+                type: 'value',
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: { color: '#94a3b8', fontSize: mobileFontSize },
+                splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+            };
 
             // 1. Solar Wind Speed with Gradient Fill
             if (data.solar_wind_history && data.solar_wind_history.times && data.solar_wind_history.speeds) {
@@ -2587,30 +2608,18 @@
                 // Remove single-point spikes from speed data
                 const cleanedSpeeds = hist.speeds.map((val, idx, arr) => {
                     if (val === null || val === undefined) return null;
-                    
-                    // Skip first and last points
                     if (idx === 0 || idx === arr.length - 1) return val;
-                    
                     const prev = arr[idx - 1];
                     const next = arr[idx + 1];
-                    
-                    // If neighbors exist, check for isolated spike
                     if (prev !== null && next !== null) {
                         const avgNeighbor = (prev + next) / 2;
                         const deviation = Math.abs(val - avgNeighbor);
-                        
-                        // If point deviates by more than 150 km/s from neighbor average, replace with average
-                        if (deviation > 150) {
-                            return avgNeighbor;
-                        }
+                        if (deviation > 150) return avgNeighbor;
                     }
                     return val;
                 });
-                
-                // Use cleaned speeds for calculations
                 hist.speeds = cleanedSpeeds;
                 
-                // Dynamic Y-axis range
                 const speeds = hist.speeds.filter(s => s !== null && !isNaN(s));
                 if (speeds.length === 0) {
                     console.warn('No valid speed data after filtering');
@@ -2621,108 +2630,47 @@
                 const yMin = Math.max(0, minSpeed - 50);
                 const yMax = maxSpeed + 100;
                 
-                // Create smooth gradient using SVG pattern approach
-                // Use fewer steps on mobile for performance
-                const traces = [];
-                
-                for (let i = 0; i < gradientSteps; i++) {
-                    const yBottom = yMin + (i / gradientSteps) * (yMax - yMin);
-                    const yTop = yMin + ((i + 1) / gradientSteps) * (yMax - yMin);
-                    const yMid = (yBottom + yTop) / 2;
-                    
-                    // Smooth color interpolation across the full range
-                    let r, g, b;
-                    const normalizedY = (yMid - yMin) / (yMax - yMin);
-                    
-                    if (normalizedY < 0.25) {
-                        // Green to light green
-                        const t = normalizedY / 0.25;
-                        r = 74 + (217 - 74) * t;
-                        g = 222 + (249 - 222) * t;
-                        b = 128 + (157 - 128) * t;
-                    } else if (normalizedY < 0.45) {
-                        // Light green to yellow
-                        const t = (normalizedY - 0.25) / 0.20;
-                        r = 217 + (250 - 217) * t;
-                        g = 249 + (204 - 249) * t;
-                        b = 157 + (21 - 157) * t;
-                    } else if (normalizedY < 0.65) {
-                        // Yellow to orange
-                        const t = (normalizedY - 0.45) / 0.20;
-                        r = 250 + (251 - 250) * t;
-                        g = 204 + (146 - 204) * t;
-                        b = 21 + (60 - 21) * t;
-                    } else if (normalizedY < 0.80) {
-                        // Orange to red
-                        const t = (normalizedY - 0.65) / 0.15;
-                        r = 251 + (239 - 251) * t;
-                        g = 146 + (68 - 146) * t;
-                        b = 60 + (68 - 60) * t;
-                    } else if (normalizedY < 0.95) {
-                        // Red to pink
-                        const t = (normalizedY - 0.80) / 0.15;
-                        r = 239 + (236 - 239) * t;
-                        g = 68 + (72 - 68) * t;
-                        b = 68 + (153 - 68) * t;
-                    } else {
-                        // Pink to white
-                        const t = (normalizedY - 0.95) / 0.05;
-                        r = 236 + (255 - 236) * t;
-                        g = 72 + (255 - 72) * t;
-                        b = 153 + (255 - 153) * t;
-                    }
-                    
-                    // Very transparent layers for smooth blending
-                    const opacity = 0.5; // Increased opacity for visibility
-                    const color = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${opacity})`;
-                    
-                    // Create smooth interpolated points for this band
-                    const xPoints = hist.times;
-                    const yPoints = hist.speeds.map(s => {
-                        if (s === null) return yMin;
-                        // Clamp speed value to this band
-                        return Math.min(Math.max(s, yBottom), yTop);
-                    });
-                    
-                    // Build closed polygon
-                    const xFill = [...xPoints, ...xPoints.slice().reverse()];
-                    const yFill = [...yPoints, ...new Array(xPoints.length).fill(yBottom).reverse()];
-                    
-                    traces.push({
-                        x: xFill,
-                        y: yFill,
-                        type: 'scatter',
-                        mode: 'none',
-                        fill: 'toself',
-                        fillcolor: color,
-                        line: { width: 0 },
-                        hoverinfo: 'skip',
-                        showlegend: false
-                    });
+                // Calculate gradient stops based on actual value thresholds mapped to chart range
+                // Speed thresholds: 350 (green), 450 (yellow-green), 600 (yellow), 750 (orange), 850 (red), 1000 (pink)
+                function normalizeValue(val) {
+                    return Math.max(0, Math.min(1, (val - yMin) / (yMax - yMin)));
                 }
                 
-                // White line on top
-                traces.push({
-                    x: hist.times, 
-                    y: hist.speeds,
-                    type: 'scatter',
-                    mode: 'lines',
-                    line: { 
-                        color: '#f8fafc',
-                        width: 2.5,
-                        shape: 'spline',
-                        smoothing: 1.3
-                    },
-                    hovertemplate: '%{y:.0f} km/s<extra></extra>',
-                    name: 'Speed'
-                });
-
-                const layout = { 
-                    ...commonLayout, 
-                    yaxis: { ...commonLayout.yaxis, title: '', range: [yMin, yMax] }
-                };
-                
-                Plotly.newPlot('chart-speed', traces, layout, config);
+                const chart = getChartInstance('chart-speed');
+                if (chart) {
+                    chart.setOption({
+                        backgroundColor: 'transparent',
+                        grid: commonGrid,
+                        xAxis: { ...commonXAxis, data: hist.times },
+                        yAxis: { ...commonYAxis, min: yMin, max: yMax },
+                        tooltip: {
+                            trigger: 'axis',
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            textStyle: { color: '#f8fafc' },
+                            formatter: (params) => `${Math.round(params[0].value)} km/s`
+                        },
+                        series: [{
+                            type: 'line',
+                            data: hist.speeds,
+                            smooth: 0.3,
+                            symbol: 'none',
+                            lineStyle: { color: '#f8fafc', width: 2.5 },
+                            areaStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
+                                    { offset: 0, color: 'rgba(74, 222, 128, 0.6)' },
+                                    { offset: normalizeValue(350), color: 'rgba(74, 222, 128, 0.6)' },
+                                    { offset: normalizeValue(450), color: 'rgba(217, 249, 157, 0.6)' },
+                                    { offset: normalizeValue(600), color: 'rgba(250, 204, 21, 0.6)' },
+                                    { offset: normalizeValue(750), color: 'rgba(251, 146, 60, 0.6)' },
+                                    { offset: normalizeValue(850), color: 'rgba(239, 68, 68, 0.6)' },
+                                    { offset: normalizeValue(1000), color: 'rgba(236, 72, 153, 0.6)' },
+                                    { offset: 1, color: 'rgba(255, 255, 255, 0.6)' }
+                                ])
+                            }
+                        }]
+                    });
+                }
                 
                 const lastVal = hist.speeds[hist.speeds.length - 1];
                 const valElem = document.getElementById('chart-val-speed');
@@ -2745,92 +2693,56 @@
                 if (densities.length === 0) {
                     console.warn('No valid density data');
                 } else {
-                const maxDensity = Math.max(...densities, 1);
-                const minDensity = Math.min(...densities, 0);
-                const range = Math.max(maxDensity - minDensity, 1);
-                const yMin = Math.max(0, minDensity - range * 0.3);
-                const yMax = maxDensity + range * 2;
-                
-                const traces = [];
-                
-                for (let i = 0; i < gradientSteps; i++) {
-                    const yBottom = yMin + (i / gradientSteps) * (yMax - yMin);
-                    const yTop = yMin + ((i + 1) / gradientSteps) * (yMax - yMin);
-                    const yMid = (yBottom + yTop) / 2;
+                    const maxDensity = Math.max(...densities, 1);
+                    const minDensity = Math.min(...densities, 0);
+                    const range = Math.max(maxDensity - minDensity, 1);
+                    const yMin = Math.max(0, minDensity - range * 0.3);
+                    const yMax = maxDensity + range * 2;
                     
-                    // Density color scale based on value
-                    let r, g, b;
-                    if (yMid < 5) {
-                        // 0-5: light green
-                        const t = yMid / 5;
-                        r = 187 + (134 - 187) * t;
-                        g = 247 + (239 - 247) * t;
-                        b = 208 + (160 - 208) * t;
-                    } else if (yMid < 10) {
-                        // 5-10: dark green
-                        const t = (yMid - 5) / 5;
-                        r = 134 + (22 - 134) * t;
-                        g = 239 + (163 - 239) * t;
-                        b = 160 + (74 - 160) * t;
-                    } else if (yMid < 20) {
-                        // 10-20: yellow
-                        const t = (yMid - 10) / 10;
-                        r = 22 + (250 - 22) * t;
-                        g = 163 + (204 - 163) * t;
-                        b = 74 + (21 - 74) * t;
-                    } else if (yMid < 30) {
-                        // 20-30: orange to red
-                        const t = (yMid - 20) / 10;
-                        r = 250 + (239 - 250) * t;
-                        g = 204 + (68 - 204) * t;
-                        b = 21 + (68 - 21) * t;
-                    } else if (yMid < 40) {
-                        // 30-40: dark red
-                        const t = (yMid - 30) / 10;
-                        r = 239 + (153 - 239) * t;
-                        g = 68 + (27 - 68) * t;
-                        b = 68 + (27 - 68) * t;
-                    } else if (yMid < 50) {
-                        // 40-50: purple
-                        const t = (yMid - 40) / 10;
-                        r = 153 + (147 - 153) * t;
-                        g = 27 + (51 - 27) * t;
-                        b = 27 + (234 - 27) * t;
-                    } else {
-                        // 50+: pink
-                        const t = Math.min((yMid - 50) / 20, 1);
-                        r = 147 + (236 - 147) * t;
-                        g = 51 + (72 - 51) * t;
-                        b = 234 + (153 - 234) * t;
+                    // Calculate gradient stops based on density thresholds mapped to y-axis range
+                    const thresholds = [
+                        { value: 2, color: 'rgba(187, 247, 208, 0.6)' },    // Very low (light green)
+                        { value: 5, color: 'rgba(134, 239, 160, 0.6)' },    // Low (green)
+                        { value: 10, color: 'rgba(22, 163, 74, 0.6)' },     // Normal (darker green)
+                        { value: 20, color: 'rgba(250, 204, 21, 0.6)' },    // Elevated (yellow)
+                        { value: 30, color: 'rgba(239, 68, 68, 0.6)' },     // High (red)
+                        { value: 50, color: 'rgba(147, 51, 234, 0.6)' }     // Very high (purple)
+                    ];
+                    
+                    const gradientStops = thresholds.map(t => {
+                        const normalizedPos = (t.value - yMin) / (yMax - yMin);
+                        return { offset: Math.max(0, Math.min(1, normalizedPos)), color: t.color };
+                    }).sort((a, b) => a.offset - b.offset);
+                    
+                    const chart = getChartInstance('chart-density');
+                    if (chart) {
+                        chart.setOption({
+                            backgroundColor: 'transparent',
+                            grid: commonGrid,
+                            xAxis: { ...commonXAxis, data: hist.times },
+                            yAxis: { ...commonYAxis, min: yMin, max: yMax },
+                            tooltip: {
+                                trigger: 'axis',
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                textStyle: { color: '#f8fafc' },
+                                formatter: (params) => params[0].value?.toFixed(1) || '--'
+                            },
+                            series: [{
+                                type: 'line',
+                                data: hist.densities,
+                                smooth: 0.3,
+                                symbol: 'none',
+                                lineStyle: { color: '#f8fafc', width: 2.5 },
+                                areaStyle: {
+                                    color: new echarts.graphic.LinearGradient(0, 1, 0, 0, gradientStops)
+                                }
+                            }]
+                        });
                     }
                     
-                    const color = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0.5)`;
-                    const xPoints = hist.times;
-                    const yPoints = hist.densities.map(d => d === null ? yMin : Math.min(Math.max(d, yBottom), yTop));
-                    const xFill = [...xPoints, ...xPoints.slice().reverse()];
-                    const yFill = [...yPoints, ...new Array(xPoints.length).fill(yBottom).reverse()];
-                    
-                    traces.push({
-                        x: xFill, y: yFill,
-                        type: 'scatter', mode: 'none',
-                        fill: 'toself', fillcolor: color,
-                        line: { width: 0 },
-                        hoverinfo: 'skip', showlegend: false
-                    });
-                }
-                
-                traces.push({
-                    x: hist.times, y: hist.densities,
-                    type: 'scatter', mode: 'lines',
-                    line: { color: '#f8fafc', width: 2.5, shape: 'spline', smoothing: 1.3 },
-                    hovertemplate: '%{y:.1f}<extra></extra>'
-                });
-                
-                const layout = { ...commonLayout, yaxis: { ...commonLayout.yaxis, range: [yMin, yMax] } };
-                Plotly.newPlot('chart-density', traces, layout, config);
-                
-                const lastVal = hist.densities[hist.densities.length - 1];
-                document.getElementById('chart-val-density').textContent = lastVal ? lastVal.toFixed(1) : '--';
+                    const lastVal = hist.densities[hist.densities.length - 1];
+                    document.getElementById('chart-val-density').textContent = lastVal ? lastVal.toFixed(1) : '--';
                 }
             }
 
@@ -2841,221 +2753,248 @@
                 if (bts.length === 0) {
                     console.warn('No valid Bt data');
                 } else {
-                const maxBt = Math.max(...bts, 10);
-                const minBt = Math.min(...bts, 0);
-                const yMin = Math.max(0, minBt - 2);
-                const yMax = maxBt + 3;
-                
-                const traces = [];
-                
-                for (let i = 0; i < gradientSteps; i++) {
-                    const yBottom = yMin + (i / gradientSteps) * (yMax - yMin);
-                    const yTop = yMin + ((i + 1) / gradientSteps) * (yMax - yMin);
-                    const yMid = (yBottom + yTop) / 2;
+                    const maxBt = Math.max(...bts, 10);
+                    const minBt = Math.min(...bts, 0);
+                    const yMin = Math.max(0, minBt - 2);
+                    const yMax = maxBt + 3;
                     
-                    // Bt color scale based on value (same as Density)
-                    let r, g, b;
-                    if (yMid < 5) {
-                        // 0-5: light green
-                        const t = yMid / 5;
-                        r = 187 + (134 - 187) * t;
-                        g = 247 + (239 - 247) * t;
-                        b = 208 + (160 - 208) * t;
-                    } else if (yMid < 10) {
-                        // 5-10: dark green
-                        const t = (yMid - 5) / 5;
-                        r = 134 + (22 - 134) * t;
-                        g = 239 + (163 - 239) * t;
-                        b = 160 + (74 - 160) * t;
-                    } else if (yMid < 20) {
-                        // 10-20: yellow
-                        const t = (yMid - 10) / 10;
-                        r = 22 + (250 - 22) * t;
-                        g = 163 + (204 - 163) * t;
-                        b = 74 + (21 - 74) * t;
-                    } else if (yMid < 30) {
-                        // 20-30: orange to red
-                        const t = (yMid - 20) / 10;
-                        r = 250 + (239 - 250) * t;
-                        g = 204 + (68 - 204) * t;
-                        b = 21 + (68 - 21) * t;
-                    } else if (yMid < 40) {
-                        // 30-40: dark red
-                        const t = (yMid - 30) / 10;
-                        r = 239 + (153 - 239) * t;
-                        g = 68 + (27 - 68) * t;
-                        b = 68 + (27 - 68) * t;
-                    } else if (yMid < 50) {
-                        // 40-50: purple
-                        const t = (yMid - 40) / 10;
-                        r = 153 + (147 - 153) * t;
-                        g = 27 + (51 - 27) * t;
-                        b = 27 + (234 - 27) * t;
-                    } else {
-                        // 50+: pink
-                        const t = Math.min((yMid - 50) / 20, 1);
-                        r = 147 + (236 - 147) * t;
-                        g = 51 + (72 - 51) * t;
-                        b = 234 + (153 - 234) * t;
+                    // Calculate gradient stops based on Bt thresholds mapped to chart range
+                    // Bt thresholds: 5 (quiet), 10 (moderate), 15 (active), 20 (storm), 30+ (severe)
+                    function normalizeBt(val) {
+                        return Math.max(0, Math.min(1, (val - yMin) / (yMax - yMin)));
                     }
                     
-                    const color = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0.5)`;
-                    const xPoints = hist.times;
-                    const yPoints = hist.bts.map(b => b === null ? yMin : Math.min(Math.max(b, yBottom), yTop));
-                    const xFill = [...xPoints, ...xPoints.slice().reverse()];
-                    const yFill = [...yPoints, ...new Array(xPoints.length).fill(yBottom).reverse()];
+                    const chart = getChartInstance('chart-bt');
+                    if (chart) {
+                        chart.setOption({
+                            backgroundColor: 'transparent',
+                            grid: commonGrid,
+                            xAxis: { ...commonXAxis, data: hist.times },
+                            yAxis: { ...commonYAxis, min: yMin, max: yMax },
+                            tooltip: {
+                                trigger: 'axis',
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                textStyle: { color: '#f8fafc' },
+                                formatter: (params) => (params[0].value?.toFixed(1) || '--') + ' nT'
+                            },
+                            series: [{
+                                type: 'line',
+                                data: hist.bts,
+                                smooth: 0.3,
+                                symbol: 'none',
+                                lineStyle: { color: '#f8fafc', width: 2.5 },
+                                areaStyle: {
+                                    color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
+                                        { offset: 0, color: 'rgba(74, 222, 128, 0.5)' },
+                                        { offset: normalizeBt(5), color: 'rgba(74, 222, 128, 0.5)' },
+                                        { offset: normalizeBt(10), color: 'rgba(217, 249, 157, 0.5)' },
+                                        { offset: normalizeBt(15), color: 'rgba(250, 204, 21, 0.5)' },
+                                        { offset: normalizeBt(20), color: 'rgba(251, 146, 60, 0.5)' },
+                                        { offset: normalizeBt(30), color: 'rgba(239, 68, 68, 0.5)' },
+                                        { offset: 1, color: 'rgba(147, 51, 234, 0.5)' }
+                                    ])
+                                }
+                            }]
+                        });
+                    }
                     
-                    traces.push({
-                        x: xFill, y: yFill,
-                        type: 'scatter', mode: 'none',
-                        fill: 'toself', fillcolor: color,
-                        line: { width: 0 },
-                        hoverinfo: 'skip', showlegend: false
-                    });
-                }
-                
-                traces.push({
-                    x: hist.times, y: hist.bts,
-                    type: 'scatter', mode: 'lines',
-                    line: { color: '#f8fafc', width: 2.5, shape: 'spline', smoothing: 1.3 },
-                    hovertemplate: '%{y:.1f} nT<extra></extra>'
-                });
-                
-                const layout = { ...commonLayout, yaxis: { ...commonLayout.yaxis, range: [yMin, yMax] } };
-                Plotly.newPlot('chart-bt', traces, layout, config);
-                
-                const lastVal = hist.bts[hist.bts.length - 1];
-                document.getElementById('chart-val-bt').textContent = lastVal ? lastVal.toFixed(1) + ' nT' : '--';
+                    const lastVal = hist.bts[hist.bts.length - 1];
+                    document.getElementById('chart-val-bt').textContent = lastVal ? lastVal.toFixed(1) + ' nT' : '--';
                 }
             }
 
-            // 4. Bz - Simple solid fills (gradient causes artifacts with bipolar data)
+            // 4. Bz - Bipolar fill (green for positive, red for negative)
             if (data.solar_wind_history && data.solar_wind_history.bzs) {
                 const hist = data.solar_wind_history;
                 const bzs = hist.bzs.filter(b => b !== null && !isNaN(b));
                 if (bzs.length === 0) {
                     console.warn('No valid Bz data');
                 } else {
-                const maxBz = Math.max(...bzs, 5);
-                const minBz = Math.min(...bzs, -5);
-                const yMin = minBz - 2;
-                const yMax = maxBz + 2;
-                
-                const traces = [];
-                
-                // Positive fill - green
-                traces.push({
-                    x: hist.times,
-                    y: hist.bzs.map(v => v > 0 ? v : 0),
-                    type: 'scatter',
-                    mode: 'none',
-                    fill: 'tozeroy',
-                    fillcolor: 'rgba(74, 222, 128, 0.4)',
-                    hoverinfo: 'skip',
-                    showlegend: false,
-                    line: { width: 0 }
-                });
-                
-                // Negative fill - red
-                traces.push({
-                    x: hist.times,
-                    y: hist.bzs.map(v => v < 0 ? v : 0),
-                    type: 'scatter',
-                    mode: 'none',
-                    fill: 'tozeroy',
-                    fillcolor: 'rgba(248, 113, 113, 0.4)',
-                    hoverinfo: 'skip',
-                    showlegend: false,
-                    line: { width: 0 }
-                });
-                
-                traces.push({
-                    x: hist.times, y: hist.bzs,
-                    type: 'scatter', mode: 'lines',
-                    line: { color: '#f8fafc', width: 2.5, shape: 'spline', smoothing: 1.3 },
-                    hovertemplate: '%{y:.1f} nT<extra></extra>'
-                });
-                
-                const layout = { 
-                    ...commonLayout,
-                    yaxis: { ...commonLayout.yaxis, range: [yMin, yMax] },
-                    shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 0, y1: 0, line: { color: 'rgba(255,255,255,0.3)', width: 1 } }],
-                    autosize: true,
-                    margin: { l: 35, r: 10, t: 10, b: 25 }
-                };
-                Plotly.newPlot('chart-bz', traces, layout, config);
-                
-                const lastVal = hist.bzs[hist.bzs.length - 1];
-                const valElem = document.getElementById('chart-val-bz');
-                if (lastVal !== null) {
-                    valElem.textContent = lastVal.toFixed(1) + ' nT';
-                    valElem.style.color = lastVal < 0 ? '#ff4444' : '#4ade80';
-                }
+                    const maxBz = Math.max(...bzs, 5);
+                    const minBz = Math.min(...bzs, -5);
+                    const yMin = minBz - 2;
+                    const yMax = maxBz + 2;
+                    
+                    // Create separate data arrays for positive and negative values
+                    const positiveData = hist.bzs.map(v => (v !== null && v >= 0) ? v : 0);
+                    const negativeData = hist.bzs.map(v => (v !== null && v < 0) ? v : 0);
+                    
+                    const chart = getChartInstance('chart-bz');
+                    if (chart) {
+                        chart.setOption({
+                            backgroundColor: 'transparent',
+                            grid: { left: 35, right: 10, top: 10, bottom: 25, containLabel: false },
+                            xAxis: { ...commonXAxis, data: hist.times },
+                            yAxis: { ...commonYAxis, min: yMin, max: yMax },
+                            tooltip: {
+                                trigger: 'axis',
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                textStyle: { color: '#f8fafc' },
+                                formatter: function(params) {
+                                    // Show the actual Bz value (non-zero from either series)
+                                    const val = params[0].value !== 0 ? params[0].value : params[1]?.value || 0;
+                                    return (val?.toFixed(1) || '--') + ' nT';
+                                }
+                            },
+                            series: [
+                                {
+                                    name: 'Bz Positive',
+                                    type: 'line',
+                                    data: positiveData,
+                                    smooth: 0.3,
+                                    symbol: 'none',
+                                    lineStyle: { width: 0 },
+                                    areaStyle: { 
+                                        color: 'rgba(74, 222, 128, 0.5)',
+                                        origin: 0
+                                    },
+                                    stack: 'bz'
+                                },
+                                {
+                                    name: 'Bz Negative',
+                                    type: 'line',
+                                    data: negativeData,
+                                    smooth: 0.3,
+                                    symbol: 'none',
+                                    lineStyle: { width: 0 },
+                                    areaStyle: { 
+                                        color: 'rgba(248, 113, 113, 0.5)',
+                                        origin: 0
+                                    },
+                                    stack: 'bz'
+                                },
+                                {
+                                    name: 'Bz Line',
+                                    type: 'line',
+                                    data: hist.bzs,
+                                    smooth: 0.3,
+                                    symbol: 'none',
+                                    lineStyle: { color: '#f8fafc', width: 2.5 },
+                                    markLine: {
+                                        silent: true,
+                                        symbol: 'none',
+                                        lineStyle: { color: 'rgba(255,255,255,0.3)', width: 1, type: 'solid' },
+                                        data: [{ yAxis: 0 }],
+                                        label: { show: false }
+                                    }
+                                }
+                            ],
+                            legend: { show: false }
+                        });
+                    }
+                    
+                    const lastVal = hist.bzs[hist.bzs.length - 1];
+                    const valElem = document.getElementById('chart-val-bz');
+                    if (lastVal !== null) {
+                        valElem.textContent = lastVal.toFixed(1) + ' nT';
+                        valElem.style.color = lastVal < 0 ? '#ff4444' : '#4ade80';
+                    }
                 }
             }
 
             // 5. Magnetometer
             if (data.goes_magnetometer) {
                 const mag = data.goes_magnetometer;
-                const trace18 = {
-                    x: mag.goes18_times, y: mag.goes18_hp,
-                    name: 'GOES-18', type: 'scatter', mode: 'lines',
-                    line: { color: '#4477ff', width: 2 }
-                };
-                const trace19 = {
-                    x: mag.goes19_times, y: mag.goes19_hp,
-                    name: 'GOES-19', type: 'scatter', mode: 'lines',
-                    line: { color: '#ff4444', width: 2 }
-                };
                 
-                const layout = { 
-                    ...commonLayout, 
-                    showlegend: true,
-                    legend: { x: 0, y: 1, font: { color: '#fff' }, bgcolor: 'rgba(0,0,0,0)' }
-                };
-                Plotly.newPlot('chart-mag', [trace18, trace19], layout, config);
+                // Validate that we have actual data
+                const has18 = mag.goes18_hp && mag.goes18_hp.length > 0 && mag.goes18_times && mag.goes18_times.length > 0;
+                const has19 = mag.goes19_hp && mag.goes19_hp.length > 0 && mag.goes19_times && mag.goes19_times.length > 0;
+                
+                if (!has18 && !has19) {
+                    console.warn('No magnetometer data available');
+                } else {
+                    // Use the times from whichever dataset we have
+                    const times = has18 ? mag.goes18_times : mag.goes19_times;
+                    
+                    const series = [];
+                    if (has18) {
+                        series.push({
+                            name: 'GOES-18',
+                            type: 'line',
+                            data: mag.goes18_hp,
+                            symbol: 'none',
+                            smooth: 0.3,
+                            lineStyle: { color: '#60a5fa', width: 2 }
+                        });
+                    }
+                    if (has19) {
+                        series.push({
+                            name: 'GOES-19',
+                            type: 'line',
+                            data: mag.goes19_hp,
+                            symbol: 'none',
+                            smooth: 0.3,
+                            lineStyle: { color: '#f87171', width: 2 }
+                        });
+                    }
+                    
+                    const chart = getChartInstance('chart-mag');
+                    if (chart) {
+                        chart.setOption({
+                            backgroundColor: 'transparent',
+                            grid: commonGrid,
+                            legend: {
+                                show: true,
+                                left: 0,
+                                top: 0,
+                                textStyle: { color: '#94a3b8', fontSize: 9 },
+                                itemWidth: 15,
+                                itemHeight: 10
+                            },
+                            xAxis: { ...commonXAxis, data: times },
+                            yAxis: { ...commonYAxis, name: 'nT', nameLocation: 'middle', nameGap: 25 },
+                            tooltip: {
+                                trigger: 'axis',
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                textStyle: { color: '#f8fafc' },
+                                formatter: function(params) {
+                                    let result = '';
+                                    params.forEach(p => {
+                                        result += p.seriesName + ': ' + (p.value?.toFixed(1) || '--') + ' nT<br>';
+                                    });
+                                    return result;
+                                }
+                            },
+                            series: series
+                        });
+                    }
+                }
                 
                 // Substorm detection logic
                 let substormActive = false;
-                const thresholdChange = 40;  // nT spike threshold
+                const thresholdChange = 40;
                 
-                // Check GOES-18
                 if (mag.goes18_hp && mag.goes18_hp.length >= 20) {
                     const recentHp = mag.goes18_hp.slice(-20);
                     const hpMax = Math.max(...recentHp.filter(v => v !== null));
                     const hpMin = Math.min(...recentHp.filter(v => v !== null));
                     const hpChange = hpMax - hpMin;
-                    
                     if (hpChange >= thresholdChange) {
                         const maxIdx = recentHp.indexOf(hpMax);
                         if (maxIdx >= 5) {
                             const currentHp = recentHp[recentHp.length - 1];
-                            if (currentHp >= hpMin + (thresholdChange * 0.5)) {
-                                substormActive = true;
-                            }
+                            if (currentHp >= hpMin + (thresholdChange * 0.5)) substormActive = true;
                         }
                     }
                 }
                 
-                // Check GOES-19
                 if (mag.goes19_hp && mag.goes19_hp.length >= 20) {
                     const recentHp = mag.goes19_hp.slice(-20);
                     const hpMax = Math.max(...recentHp.filter(v => v !== null));
                     const hpMin = Math.min(...recentHp.filter(v => v !== null));
                     const hpChange = hpMax - hpMin;
-                    
                     if (hpChange >= thresholdChange) {
                         const maxIdx = recentHp.indexOf(hpMax);
                         if (maxIdx >= 5) {
                             const currentHp = recentHp[recentHp.length - 1];
-                            if (currentHp >= hpMin + (thresholdChange * 0.5)) {
-                                substormActive = true;
-                            }
+                            if (currentHp >= hpMin + (thresholdChange * 0.5)) substormActive = true;
                         }
                     }
                 }
                 
-                // Update substorm badge
                 const badge = document.getElementById('substorm-badge');
                 if (badge) {
                     if (substormActive) {
@@ -3073,49 +3012,67 @@
             // 6. Hemispheric Power
             if (data.hemispheric_power) {
                 const power = data.hemispheric_power;
-                const count = 20;
-                const times = power.times.slice(-count);
-                const values = power.powers.slice(-count);
                 
-                const colors = values.map(v => {
-                    if (v < 30) return '#888888';
-                    if (v < 50) return '#00ff00';
-                    if (v < 100) return '#ffaa00';
-                    return '#ff0000';
-                });
-
-                const trace = {
-                    x: times, y: values,
-                    type: 'bar',
-                    marker: { color: colors }
-                };
-                
-                Plotly.newPlot('chart-power', [trace], commonLayout, config);
-                
-                const lastVal = values[values.length - 1];
-                document.getElementById('chart-val-power').textContent = lastVal ? Math.round(lastVal) + ' GW' : '--';
+                // Validate data exists
+                if (!power.times || !power.powers || power.times.length === 0 || power.powers.length === 0) {
+                    console.warn('No hemispheric power data available');
+                } else {
+                    const count = 20;
+                    const times = power.times.slice(-count);
+                    const values = power.powers.slice(-count);
+                    
+                    const barData = values.map(v => ({
+                        value: v,
+                        itemStyle: {
+                            color: v < 30 ? '#6b7280' : v < 50 ? '#22c55e' : v < 100 ? '#f59e0b' : '#ef4444'
+                        }
+                    }));
+                    
+                    const chart = getChartInstance('chart-power');
+                    if (chart) {
+                        chart.setOption({
+                            backgroundColor: 'transparent',
+                            grid: commonGrid,
+                            xAxis: { ...commonXAxis, data: times },
+                            yAxis: { ...commonYAxis, min: 0 },
+                            tooltip: {
+                                trigger: 'axis',
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                textStyle: { color: '#f8fafc' },
+                                formatter: (params) => Math.round(params[0].value) + ' GW'
+                            },
+                            series: [{
+                                type: 'bar',
+                                data: barData,
+                                barWidth: '60%'
+                            }]
+                        });
+                    }
+                    
+                    const lastVal = values[values.length - 1];
+                    document.getElementById('chart-val-power').textContent = lastVal ? Math.round(lastVal) + ' GW' : '--';
+                }
             }
             
-            // Force Plotly to resize all charts after render
+            // Force ECharts to resize all charts after render
             setTimeout(() => {
                 resizeAllCharts();
             }, 100);
         }
         
-        // Global resize function for all Plotly charts with mobile optimization
+        // Global resize function for all ECharts instances
         function resizeAllCharts() {
             // Skip if we're in the middle of a resize animation
             if (isResizing) return;
             
-            const chartIds = ['chart-speed', 'chart-density', 'chart-bt', 'chart-bz', 'chart-mag', 'chart-power', 'chart-dst'];
-            
             // Use requestAnimationFrame for smoother resizing
             requestAnimationFrame(() => {
-                chartIds.forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element && element.data) {
+                Object.keys(window.echartsInstances).forEach(id => {
+                    const chart = window.echartsInstances[id];
+                    if (chart && !chart.isDisposed()) {
                         try {
-                            Plotly.Plots.resize(element);
+                            chart.resize();
                         } catch (e) {
                             console.warn(`Failed to resize chart ${id}:`, e);
                         }
@@ -3327,15 +3284,15 @@
                 { id: 'chart-power', x: mapWidth, y: mapHeight, height: bottomHeight, width: chartWidth }
             ];
             
-            // Capture right side charts
+            // Capture right side charts - using ECharts getDataURL
             for (const chart of rightCharts) {
                 try {
-                    const chartEl = document.getElementById(chart.id);
-                    if (chartEl && chartEl._fullLayout) {
-                        const imgData = await Plotly.toImage(chartEl, {
-                            format: 'png',
-                            width: chartWidth,
-                            height: chart.height
+                    const chartInstance = window.echartsInstances[chart.id];
+                    if (chartInstance && !chartInstance.isDisposed()) {
+                        const imgData = chartInstance.getDataURL({
+                            type: 'png',
+                            pixelRatio: 2,
+                            backgroundColor: 'transparent'
                         });
                         const img = await loadImage(imgData);
                         ctx.drawImage(img, chart.x, chart.y, chartWidth, chart.height);
@@ -3345,15 +3302,15 @@
                 }
             }
             
-            // Capture bottom row charts
+            // Capture bottom row charts - using ECharts getDataURL
             for (const chart of bottomCharts) {
                 try {
-                    const chartEl = document.getElementById(chart.id);
-                    if (chartEl && chartEl._fullLayout) {
-                        const imgData = await Plotly.toImage(chartEl, {
-                            format: 'png',
-                            width: chart.width,
-                            height: chart.height
+                    const chartInstance = window.echartsInstances[chart.id];
+                    if (chartInstance && !chartInstance.isDisposed()) {
+                        const imgData = chartInstance.getDataURL({
+                            type: 'png',
+                            pixelRatio: 2,
+                            backgroundColor: 'transparent'
                         });
                         const img = await loadImage(imgData);
                         ctx.drawImage(img, chart.x, chart.y, chart.width, chart.height);

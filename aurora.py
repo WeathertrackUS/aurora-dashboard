@@ -478,18 +478,25 @@ def fetch_json_with_retry(url, retries=3, timeout=30):
 
 def fetch_solar_data():
     """Fetch solar activity data (X-rays, Protons, Sunspots)"""
+    def safe_get_json(url):
+        r = requests.get(url, timeout=10)
+        try:
+            return r.json()
+        except (json.JSONDecodeError, requests.exceptions.JSONDecodeError) as e:
+            if "Extra data" in str(e) and hasattr(e, 'pos'):
+                print(f"JSON Extra data detected for {url}. Attempting recovery.")
+                return json.loads(r.text[:e.pos])
+            raise e
+
     try:
         # Fetch X-ray flux (6-hour)
-        xray_response = requests.get(GOES_XRAY_URL, timeout=10)
-        xray_data = xray_response.json()
+        xray_data = safe_get_json(GOES_XRAY_URL)
 
         # Fetch X-ray flux (1-day)
-        xray_1day_response = requests.get(GOES_XRAY_1DAY_URL, timeout=10)
-        xray_1day_data = xray_1day_response.json()
+        xray_1day_data = safe_get_json(GOES_XRAY_1DAY_URL)
         
         # Fetch Proton flux
-        proton_response = requests.get(GOES_PROTON_URL, timeout=10)
-        proton_data = proton_response.json()
+        proton_data = safe_get_json(GOES_PROTON_URL)
         
         # Fetch Sunspot Regions with retry and longer timeout
         regions_data = fetch_json_with_retry(SOLAR_REGIONS_URL, retries=3, timeout=30)
@@ -1557,7 +1564,14 @@ def get_xray_data():
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
-        data = response.json()
+        try:
+            data = response.json()
+        except (json.JSONDecodeError, requests.exceptions.JSONDecodeError) as e:
+            if "Extra data" in str(e) and hasattr(e, 'pos'):
+                print(f"JSON Extra data detected at pos {e.pos}. Attempting recovery for {time_range}.")
+                data = json.loads(response.text[:e.pos])
+            else:
+                raise e
         
         # Filter data based on time range
         if data and len(data) > 0:
