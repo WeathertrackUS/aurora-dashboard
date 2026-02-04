@@ -1328,20 +1328,19 @@
                 z-index: 1000;
                 backdrop-filter: blur(10px);
                 -webkit-backdrop-filter: blur(10px);
-                transition: transform 0.3s ease;
-            }
-            
-            .navbar.hidden {
-                transform: translateY(-100%);
             }
             
             .mobile-menu-toggle {
                 display: flex;
-                order: -1;
             }
             
             .brand {
-                display: none;
+                font-size: 0.95rem;
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             
             .brand span {
@@ -1763,7 +1762,7 @@
             <!-- Main Content Column -->
             <div class="overview-main">
 
-        <!-- Row 1: X-Ray Flux -->
+        <!-- Row 1: X-Ray & GOES -->
         <div class="content-row">
             <!-- X-Ray Flux Chart -->
             <div class="card">
@@ -1801,9 +1800,29 @@
                     </div>
                 </div>
             </div>
+
+            <!-- GOES Image -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">GOES SUVI 131Å (Solar Flares)</div>
+                </div>
+                <div class="solar-image-container">
+                    <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png" alt="GOES SUVI 131Å" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                </div>
+            </div>
+
+            <!-- GOES CCOR-1 Image -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">GOES-19 CCOR-1 Coronagraph</div>
+                </div>
+                <div class="solar-image-container">
+                    <img src="https://services.swpc.noaa.gov/images/animations/ccor1/latest.jpg" alt="GOES-19 CCOR-1" loading="lazy" onclick="openImageModal(this.src, this.alt)">
+                </div>
+            </div>
         </div>
 
-        <!-- Row 2: Proton Flux -->
+        <!-- Row 2: Proton & SDO -->
         <div class="content-row">
             <!-- Proton Flux Chart -->
             <div class="card">
@@ -1840,31 +1859,8 @@
                     </label>
                 </div>
             </div>
-        </div>
 
-        <!-- Row 3: Solar Images -->
-        <div class="content-row">
-            <!-- GOES SUVI Image -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">GOES SUVI 131Å (Solar Flares)</div>
-                </div>
-                <div class="solar-image-container">
-                    <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png" alt="GOES SUVI 131Å" loading="lazy" onclick="openImageModal(this.src, this.alt)">
-                </div>
-            </div>
-
-            <!-- GOES CCOR-1 Image -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">GOES-19 CCOR-1 Coronagraph</div>
-                </div>
-                <div class="solar-image-container">
-                    <img src="https://services.swpc.noaa.gov/images/animations/ccor1/latest.jpg" alt="GOES-19 CCOR-1" loading="lazy" onclick="openImageModal(this.src, this.alt)">
-                </div>
-            </div>
-
-            <!-- SDO HMI Image -->
+            <!-- SDO Image -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">Sunspots</div>
@@ -5372,32 +5368,6 @@
             const navLinks = document.getElementById('nav-links');
             navLinks.classList.toggle('active');
         }
-        
-        // Auto-hide navbar on scroll (mobile)
-        let lastScrollY = window.scrollY;
-        let scrollTimeout;
-        
-        function handleNavbarScroll() {
-            if (window.innerWidth > 768) return; // Only on mobile
-            
-            const currentScrollY = window.scrollY;
-            const navbar = document.querySelector('.navbar');
-            
-            if (currentScrollY > lastScrollY && currentScrollY > 100) {
-                // Scrolling down & past threshold
-                navbar.classList.add('hidden');
-            } else if (currentScrollY < lastScrollY) {
-                // Scrolling up
-                navbar.classList.remove('hidden');
-            }
-            
-            lastScrollY = currentScrollY;
-        }
-        
-        window.addEventListener('scroll', () => {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(handleNavbarScroll, 10);
-        }, { passive: true });
 
         // System Alert Functions
         async function checkSystemAlert() {

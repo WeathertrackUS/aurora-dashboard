@@ -1088,11 +1088,6 @@
                 z-index: 1000;
                 backdrop-filter: blur(10px);
                 -webkit-backdrop-filter: blur(10px);
-                transition: transform 0.3s ease;
-            }
-            
-            .navbar.hidden {
-                transform: translateY(-100%);
             }
             
             .mobile-menu-toggle {
@@ -1103,11 +1098,15 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                order: -1;
             }
             
             .brand {
-                display: none;
+                font-size: 0.95rem;
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             
             .brand span {
@@ -1172,7 +1171,6 @@
                 border-radius: 6px;
                 min-height: 160px;
                 height: auto !important;
-                max-height: 220px;
                 padding: 0.5rem;
                 position: relative;
             }
@@ -1180,7 +1178,7 @@
             .chart-container {
                 height: 130px !important;
                 min-height: 130px !important;
-                max-height: 130px !important;
+                max-height: none;
                 position: relative !important;
                 bottom: auto !important;
                 left: auto !important;
@@ -3907,32 +3905,6 @@
             const navLinks = document.getElementById('nav-links');
             navLinks.classList.toggle('active');
         }
-        
-        // Auto-hide navbar on scroll (mobile)
-        let lastScrollY = window.scrollY;
-        let scrollTimeout;
-        
-        function handleNavbarScroll() {
-            if (window.innerWidth > 768) return; // Only on mobile
-            
-            const currentScrollY = window.scrollY;
-            const navbar = document.querySelector('.navbar');
-            
-            if (currentScrollY > lastScrollY && currentScrollY > 100) {
-                // Scrolling down & past threshold
-                navbar.classList.add('hidden');
-            } else if (currentScrollY < lastScrollY) {
-                // Scrolling up
-                navbar.classList.remove('hidden');
-            }
-            
-            lastScrollY = currentScrollY;
-        }
-        
-        window.addEventListener('scroll', () => {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(handleNavbarScroll, 10);
-        }, { passive: true });
     </script>
 </body>
 </html>
