@@ -1682,6 +1682,7 @@
         <div class="nav-links" id="nav-links">
             <a href="/" class="nav-link">Geomagnetic Activity</a>
             <a href="/solar" class="nav-link active">Solar Activity</a>
+            <a href="/historical" class="nav-link">Historical Data</a>
         </div>
         <div class="nav-stats">
             <div class="stat-item">
@@ -1716,7 +1717,7 @@
     <!-- Legacy single-banner kept as a hidden template for compatibility -->
     <div id="system-alert-banner" style="display: none; border-radius: 3px; padding: 0.75rem 1rem;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span data-template="icon" style="font-size: 1.5rem;">ℹ️</span>
+            <span data-template="icon" style="font-size: 1.5rem;"></span>
             <div style="flex: 1;">
                 <div data-template="title" style="font-weight: 600; margin-bottom: 0.25rem;">System Notice</div>
                 <div data-template="message" style="color: #e5e5e5; font-size: 0.9rem;"></div>
@@ -1964,7 +1965,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         Recent Solar Flares
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">Solar flares from the past 7 days. C-class are minor, M-class can cause brief radio blackouts, X-class are the most intense.</span>
                         </span>
                     </div>
@@ -2003,7 +2004,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         NOAA Space Weather Scales
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">R=Radio Blackouts (flares), S=Solar Radiation Storms (protons), G=Geomagnetic Storms (Kp)</span>
                         </span>
                     </div>
@@ -2038,7 +2039,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         Planetary K-index History & Forecast
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">Shows past 48 hours of observed K-index values plus 72-hour forecast. Green bars = historical data, colored bars with patterns = predictions.</span>
                         </span>
                     </div>
@@ -2055,7 +2056,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         CME Tracker - Earth-Directed Events
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">Coronal Mass Ejections (CMEs) are large clouds of solar plasma. When they reach Earth, they can cause geomagnetic storms and auroras.</span>
                         </span>
                     </div>
@@ -2071,7 +2072,7 @@
                     <div class="card-header">
                         <div class="card-title">
                             SOHO LASCO C2
-                            <span class="tooltip help-icon">ℹ️
+                            <span class="tooltip help-icon">
                                 <span class="tooltiptext">Inner coronagraph (2-6 solar radii) - best for detecting CMEs near the sun.</span>
                             </span>
                         </div>
@@ -2088,7 +2089,7 @@
                     <div class="card-header">
                         <div class="card-title">
                             SOHO LASCO C3
-                            <span class="tooltip help-icon">ℹ️
+                            <span class="tooltip help-icon">
                                 <span class="tooltiptext">Outer coronagraph (4-30 solar radii) - tracks CMEs as they travel toward Earth.</span>
                             </span>
                         </div>
@@ -2108,7 +2109,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         WSA-ENLIL Solar Wind Forecast
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">3-day prediction model showing solar wind density and CME propagation from the Sun to Earth.</span>
                         </span>
                     </div>
@@ -2138,7 +2139,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         D-Region Absorption (Radio Blackout) Predictions
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">Predictions for high-frequency radio absorption caused by solar flares affecting communications.</span>
                         </span>
                     </div>
@@ -2165,7 +2166,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         F10.7 Solar Radio Flux (Current)
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">10.7 cm radio emission from the sun. Higher values indicate increased solar activity. Measured in Solar Flux Units (SFU).</span>
                         </span>
                     </div>
@@ -2181,7 +2182,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         Solar Cycle History - Sunspot Number
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">Monthly mean sunspot number (blue) and 13-month smoothed average (orange) with NOAA predictions (dashed).</span>
                         </span>
                     </div>
@@ -2194,7 +2195,7 @@
                 <div class="card-header">
                     <div class="card-title">
                         Solar Cycle History - F10.7cm Radio Flux
-                        <span class="tooltip help-icon">ℹ️
+                        <span class="tooltip help-icon">
                             <span class="tooltiptext">Observed F10.7 flux (blue) with NOAA predictions (orange dashed).</span>
                         </span>
                     </div>
@@ -2217,7 +2218,7 @@
                         <div class="card-header">
                             <div class="card-title">
                                 Multi-Wavelength Composite
-                                <span class="tooltip help-icon">ℹ️
+                                <span class="tooltip help-icon">
                                     <span class="tooltiptext">Combined AIA 211Å, 193Å, 171Å showing different atmospheric layers in one image.</span>
                                 </span>
                             </div>
@@ -2235,7 +2236,7 @@
                         <div class="card-header">
                             <div class="card-title">
                                 HMI Magnetogram
-                                <span class="tooltip help-icon">ℹ️
+                                <span class="tooltip help-icon">
                                     <span class="tooltiptext">Magnetic field polarity: white/red = positive, black/blue = negative.</span>
                                 </span>
                             </div>
@@ -2253,7 +2254,7 @@
                         <div class="card-header">
                             <div class="card-title">
                                 Visible Light (Sunspots)
-                                <span class="tooltip help-icon">ℹ️
+                                <span class="tooltip help-icon">
                                     <span class="tooltiptext">Photosphere in visible light showing sunspots as dark regions.</span>
                                 </span>
                             </div>
@@ -5343,7 +5344,7 @@
                                 <strong>Source:</strong> ${flare.source} ${flare.region !== 'N/A' && flare.region !== 'TBD' ? `(Region ${flare.region})` : ''}
                             </div>
                             ${flare.peak_time !== 'N/A' ? `<div style="font-size: 0.85rem; color: var(--text-secondary);">Peak: ${new Date(flare.peak_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
-                            ${flare.linked_events && flare.linked_events.length > 0 ? `<div style="font-size: 0.85rem; color: #86efac; margin-top: 0.25rem;">⚡ Linked to CME</div>` : ''}
+                            ${flare.linked_events && flare.linked_events.length > 0 ? `<div style="font-size: 0.85rem; color: #86efac; margin-top: 0.25rem;">Linked to CME</div>` : ''}
                         </div>
                     `;
                 });

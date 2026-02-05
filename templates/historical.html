@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Historical Data — WTUS SpaceWx</title>
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        @font-face { font-family:'Metropolis'; src:local('Metropolis'),url('/static/fonts/metropolis/Metropolis-Regular.woff2') format('woff2'),url('/static/fonts/metropolis/Metropolis-Regular.woff') format('woff'),url('/static/fonts/metropolis/Metropolis-Regular.ttf') format('truetype'); font-weight:400; font-style:normal; font-display:swap; }
+        @font-face { font-family:'Metropolis'; src:local('Metropolis Bold'),url('/static/fonts/metropolis/Metropolis-Bold.woff2') format('woff2'),url('/static/fonts/metropolis/Metropolis-Bold.woff') format('woff'),url('/static/fonts/metropolis/Metropolis-Bold.ttf') format('truetype'); font-weight:700; font-style:normal; font-display:swap; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg-dark:#0a0a0a; --bg-card:#1a1a1a; --bg-card-hover:#222; --bg-input:#141414;
+            --text-primary:#e5e5e5; --text-secondary:#8b8b8b; --text-muted:#666;
+            --accent-primary:#666; --accent-blue:#3b82f6; --accent-purple:#8b5cf6;
+            --accent-amber:#f59e0b; --accent-red:#ef4444; --accent-green:#22c55e; --accent-cyan:#06b6d4;
+            --success:#22c55e; --warning:#f59e0b; --danger:#ef4444;
+            --border:rgba(255,255,255,0.06); --glass-border:1px solid rgba(255,255,255,0.06);
+            --font-sans:'Inter','Metropolis',system-ui,-apple-system,sans-serif;
+            --font-mono:'JetBrains Mono',monospace;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:var(--bg-dark);color:var(--text-primary);font-family:var(--font-sans);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+        @supports(padding:env(safe-area-inset-bottom)){body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}.navbar{padding-top:max(.875rem,env(safe-area-inset-top))}}
+
+        /* Navbar */
+        .navbar{display:flex;justify-content:space-between;align-items:center;padding:.875rem 2rem;background:var(--bg-card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1000;min-height:56px}
+        .brand{display:flex;align-items:center;gap:.625rem;font-weight:600;font-size:1.125rem;color:var(--text-primary);letter-spacing:-.01em;text-decoration:none}
+        .brand span{font-size:1.25rem}
+        .nav-links{display:flex;gap:1.5rem;margin-left:2rem;margin-right:auto;align-items:center}
+        .nav-link{color:var(--text-secondary);text-decoration:none;font-size:.9rem;font-weight:500;transition:color .2s}
+        .nav-link:hover{color:var(--accent-primary)} .nav-link.active{color:var(--accent-primary);font-weight:600}
+        .nav-stats{display:flex;gap:1.5rem;align-items:center}
+        .stat-item{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--text-secondary)}
+        .stat-value{color:var(--accent-primary);font-family:var(--font-mono);font-weight:600}
+        .mobile-menu-toggle{display:none!important;background:0 0;border:none;color:var(--text-primary);font-size:1.5rem;cursor:pointer;padding:.25rem;z-index:1001}
+
+        /* Page */
+        .page-container{max-width:1600px;margin:0 auto;padding:1.25rem 1.5rem 2rem}
+        .page-header{margin-bottom:1.25rem}
+        .page-header h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.25rem}
+        .page-header p{color:var(--text-secondary);font-size:.9rem}
+
+        /* Date bar */
+        .date-bar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;background:var(--bg-card);border:var(--glass-border);border-radius:6px;padding:.875rem 1.25rem;margin-bottom:1.25rem}
+        .date-bar label{font-size:.85rem;font-weight:600;color:var(--text-secondary);white-space:nowrap}
+        .date-input-group{display:flex;align-items:center;gap:.5rem}
+        .date-input{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);font-family:var(--font-mono);font-size:.85rem;padding:.5rem .75rem;outline:none;transition:border-color .2s}
+        .date-input:focus{border-color:var(--accent-blue)}
+        .date-range-toggle{display:flex;gap:0;border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+        .range-btn{background:var(--bg-input);border:none;color:var(--text-secondary);font-size:.8rem;padding:.45rem .85rem;cursor:pointer;transition:all .2s;font-family:var(--font-sans)}
+        .range-btn:hover{background:var(--bg-card-hover);color:var(--text-primary)} .range-btn.active{background:var(--accent-blue);color:#fff}
+        .featured-select{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);font-family:var(--font-sans);font-size:.85rem;padding:.5rem .75rem;outline:none;cursor:pointer;max-width:320px;transition:border-color .2s}
+        .featured-select:focus{border-color:var(--accent-amber)}
+        .load-btn{background:var(--accent-blue);color:#fff;border:none;border-radius:4px;font-size:.85rem;font-weight:600;font-family:var(--font-sans);padding:.5rem 1.25rem;cursor:pointer;transition:all .2s;white-space:nowrap}
+        .load-btn:hover{background:#2563eb;transform:translateY(-1px)} .load-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+        /* Tabs */
+        .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+        .tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);font-size:.95rem;font-weight:500;font-family:var(--font-sans);padding:.75rem 1.5rem;cursor:pointer;transition:all .2s}
+        .tab-btn:hover{color:var(--text-primary)} .tab-btn.active{color:var(--accent-blue);border-bottom-color:var(--accent-blue);font-weight:600}
+        .tab-content{display:none;animation:fadeIn .35s ease-out} .tab-content.active{display:block}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        /* Cards */
+        .panel-grid{display:grid;gap:1rem} .panel-grid.cols-2{grid-template-columns:1fr 1fr} .panel-grid.cols-1{grid-template-columns:1fr}
+        .card{background:var(--bg-card);border:var(--glass-border);border-radius:6px;padding:1rem;overflow:hidden;transition:background .2s}
+        .card:hover{background:var(--bg-card-hover)}
+        .card-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+        .chart-box{width:100%;height:300px}
+
+        /* Event summary */
+        .event-summary{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:6px;padding:1rem;margin-bottom:1rem}
+        .event-summary h3{font-size:1rem;font-weight:700;margin-bottom:.5rem}
+        .event-summary p{font-size:.85rem;color:var(--text-secondary);line-height:1.5}
+        .event-tag{display:inline-block;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:3px;margin-right:.4rem;margin-bottom:.3rem}
+        .tag-g5{background:rgba(239,68,68,.2);color:#f87171} .tag-g4{background:rgba(239,68,68,.15);color:#f87171}
+        .tag-g3{background:rgba(245,158,11,.2);color:#fbbf24} .tag-x{background:rgba(239,68,68,.2);color:#f87171}
+        .tag-m{background:rgba(245,158,11,.2);color:#fbbf24} .tag-g1{background:rgba(34,197,94,.15);color:#4ade80}
+
+        /* Tables */
+        .data-table-wrapper{overflow-x:auto}
+        .data-table{width:100%;border-collapse:collapse;font-size:.8rem}
+        .data-table th{text-align:left;color:var(--text-secondary);font-weight:600;padding:.5rem .75rem;border-bottom:1px solid var(--border);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none;transition:color .2s}
+        .data-table th:hover{color:var(--text-primary)}
+        .data-table th .sort-arrow{font-size:.6rem;margin-left:.3rem;opacity:.4}
+        .data-table th.sorted .sort-arrow{opacity:1;color:var(--accent-blue)}
+        .data-table td{padding:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text-primary);white-space:nowrap}
+        .data-table tr:hover td{background:rgba(255,255,255,.02)}
+        .flare-x{color:#f87171;font-weight:700} .flare-m{color:#fbbf24;font-weight:700} .flare-c{color:#4ade80;font-weight:700} .flare-b{color:#94a3b8}
+
+        /* Collapsible table */
+        .table-footer{display:flex;justify-content:center;padding:.75rem}
+        .expand-btn{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-secondary);font-size:.8rem;padding:.4rem 1.2rem;cursor:pointer;transition:all .2s;font-family:var(--font-sans)}
+        .expand-btn:hover{color:var(--text-primary);border-color:rgba(255,255,255,.15)}
+
+        /* Storm timeline */
+        .storm-timeline{display:flex;flex-direction:column;gap:.5rem}
+        .storm-entry{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem .75rem;border-left:3px solid var(--border);font-size:.8rem;transition:background .2s;border-radius:0 4px 4px 0}
+        .storm-entry:hover{background:rgba(255,255,255,.02)}
+        .storm-entry .time{color:var(--text-secondary);font-family:var(--font-mono);font-size:.75rem;min-width:130px}
+        .storm-entry .details{flex:1}
+        .storm-entry .kp-val{font-weight:700;font-size:.95rem;min-width:50px;text-align:center}
+        .kp-low{color:#4ade80} .kp-mod{color:#fbbf24} .kp-high{color:#fb923c} .kp-severe{color:#f87171} .kp-extreme{color:#ef4444;font-weight:700}
+
+        /* CME Card */
+        .cme-card{background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:.85rem 1rem;margin-bottom:.5rem;transition:background .2s}
+        .cme-card:hover{background:var(--bg-card-hover)}
+        .cme-card .cme-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem}
+        .cme-card .cme-time{font-family:var(--font-mono);font-size:.8rem;color:var(--text-secondary)}
+        .cme-card .cme-speed{font-weight:700;font-size:.9rem}
+        .cme-speed-fast{color:#ef4444} .cme-speed-mod{color:#fbbf24} .cme-speed-slow{color:#4ade80}
+        .cme-card .cme-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.4rem;font-size:.78rem;color:var(--text-secondary)}
+        .cme-card .cme-note{font-size:.75rem;color:var(--text-muted);margin-top:.5rem;line-height:1.4;max-height:3.6em;overflow:hidden;transition:max-height .3s}
+        .cme-card .cme-note.expanded{max-height:none}
+
+        /* Imagery slider */
+        .imagery-slider-wrap{position:relative}
+        .imagery-mode-toggle{display:flex;gap:.5rem;margin-bottom:.75rem;justify-content:flex-end}
+        .mode-toggle-btn{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-secondary);font-size:.78rem;padding:.35rem .75rem;cursor:pointer;transition:all .2s}
+        .mode-toggle-btn:hover{color:var(--text-primary);border-color:rgba(255,255,255,.15)}
+        .mode-toggle-btn.active{background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)}
+        .imagery-display-container{display:flex;gap:.75rem}
+        .imagery-display-container.single-mode{flex-direction:column}
+        .imagery-display-container.dual-mode{flex-direction:row}
+        .imagery-display-pane{flex:1;display:flex;flex-direction:column}
+        .imagery-display{display:flex;justify-content:center;align-items:center;min-height:400px;background:var(--bg-input);border-radius:6px;overflow:hidden;position:relative}
+        .imagery-display img{max-width:100%;max-height:520px;display:block;transition:opacity .2s;object-fit:contain}
+        .imagery-display .img-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-secondary)}
+        .pane-label{font-size:.8rem;color:var(--text-secondary);margin-bottom:.5rem;text-align:center;font-weight:500}
+        .slider-controls{display:flex;align-items:center;gap:.75rem;margin-top:.75rem}
+        .time-slider{flex:1;-webkit-appearance:none;appearance:none;height:6px;background:var(--bg-input);border-radius:3px;outline:none;cursor:pointer}
+        .time-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent-blue);cursor:pointer;border:2px solid var(--bg-dark)}
+        .time-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent-blue);cursor:pointer;border:2px solid var(--bg-dark)}
+        .slider-time-label{font-family:var(--font-mono);font-size:.8rem;color:var(--text-secondary);min-width:160px;text-align:center}
+        .slider-nav-btn{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);width:32px;height:32px;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+        .slider-nav-btn:hover{background:var(--bg-card-hover);border-color:rgba(255,255,255,.15)}
+        .play-btn{background:var(--accent-blue)!important;border-color:var(--accent-blue)!important;color:#fff}
+        .play-btn.playing{background:var(--accent-red)!important;border-color:var(--accent-red)!important}
+
+        /* Sub-tabs */
+        .sub-tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+        .sub-tab{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-secondary);font-size:.8rem;padding:.4rem .85rem;cursor:pointer;transition:all .2s;font-family:var(--font-sans)}
+        .sub-tab:hover{color:var(--text-primary);border-color:rgba(255,255,255,.15)} .sub-tab.active{background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)}
+
+        /* Lightbox */
+        .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;align-items:center;justify-content:center;cursor:zoom-out}
+        .lightbox.open{display:flex}
+        .lightbox img{max-width:90vw;max-height:90vh;border-radius:4px}
+        .lightbox-close{position:absolute;top:1rem;right:1.5rem;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer;opacity:.7;transition:opacity .2s}
+        .lightbox-close:hover{opacity:1}
+
+        /* Loading / empty */
+        .loading-box,.empty-box{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;color:var(--text-secondary);gap:.75rem}
+        .spinner-sm{width:28px;height:28px;border:3px solid rgba(255,255,255,.1);border-radius:50%;border-top-color:var(--accent-blue);animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .empty-box .icon{font-size:2rem;opacity:.4} .empty-box p{font-size:.9rem}
+
+        /* Footer / Toast */
+        footer{border-top:1px solid rgba(255,255,255,.05);padding:2rem;text-align:center;color:var(--text-secondary);font-size:.9rem;margin-top:2rem;background:rgba(15,23,42,.4)}
+        .toast{position:fixed;bottom:2rem;right:2rem;background:rgba(30,41,59,.9);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:.75rem 1.25rem;font-size:.85rem;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;transform:translateY(100px);opacity:0;transition:all .3s ease;z-index:3000}
+        .toast.show{transform:translateY(0);opacity:1}
+        ::-webkit-scrollbar{width:6px;height:6px} ::-webkit-scrollbar-track{background:0 0} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+
+        /* Responsive */
+        @media(max-width:1024px){
+            .panel-grid.cols-2{grid-template-columns:1fr}
+            .imagery-display-container.dual-mode{flex-direction:column}
+        }
+        @media(max-width:768px){
+            .navbar{padding:.75rem 1rem;flex-wrap:wrap}
+            .mobile-menu-toggle{display:flex!important;min-width:44px;min-height:44px;align-items:center;justify-content:center}
+            .brand{font-size:.95rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+            .nav-links{display:none;width:100%;margin:1rem 0 0;flex-direction:column;gap:.5rem;background:var(--bg-card);padding:.75rem;border-radius:.5rem;border:1px solid var(--border);order:3}
+            .nav-links.active{display:flex}
+            .nav-link{font-size:1rem;padding:.75rem;min-height:44px;display:flex;align-items:center;border-radius:4px}
+            .nav-stats{gap:.75rem} .stat-item{font-size:.75rem}
+            .page-container{padding:.75rem}
+            .date-bar{flex-direction:column;align-items:stretch;gap:.75rem}
+            .date-input-group{flex-wrap:wrap} .featured-select{max-width:100%}
+            .chart-box{height:220px}
+            .imagery-display img{max-height:350px}
+            .imagery-display-container.dual-mode{flex-direction:column}
+        }
+        @media(max-width:480px){
+            .page-header h1{font-size:1.2rem} .tab-btn{font-size:.85rem;padding:.6rem 1rem} .chart-box{height:180px}
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="brand"><span></span> WTUS Space Weather Dashboard</a>
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">&#9776;</button>
+        <div class="nav-links" id="nav-links">
+            <a href="/" class="nav-link">Geomagnetic Activity</a>
+            <a href="/solar" class="nav-link">Solar Activity</a>
+            <a href="/historical" class="nav-link active">Historical Data</a>
+        </div>
+        <div class="nav-stats"><div class="stat-item"><span>Time:</span><span class="stat-value" id="utc-time">--:--</span></div></div>
+    </nav>
+    <script>(function(){try{function t(){const e=document.getElementById('utc-time');if(!e)return;e.textContent=new Date().toISOString().slice(11,16)+' UTC';}t();setInterval(t,1000);}catch(e){}})();</script>
+
+    <div class="page-container">
+        <div class="page-header">
+            <h1>Historical Space Weather Archive</h1>
+            <p>Explore archived solar and geomagnetic data from NOAA, NASA, and the OMNI database.</p>
+        </div>
+
+        <!-- Date Selector -->
+        <div class="date-bar">
+            <label>Date Range</label>
+            <div class="date-input-group">
+                <input type="date" class="date-input" id="start-date" title="Start date">
+                <span style="color:var(--text-secondary)">to</span>
+                <input type="date" class="date-input" id="end-date" title="End date">
+            </div>
+            <div class="date-range-toggle">
+                <button class="range-btn active" data-days="1">1 Day</button>
+                <button class="range-btn" data-days="3">3 Days</button>
+                <button class="range-btn" data-days="7">7 Days</button>
+            </div>
+            <label style="margin-left:auto">Featured Events</label>
+            <select class="featured-select" id="featured-events">
+                <option value="">— Select a notable event —</option>
+                <optgroup label="Extreme Storms (G5)">
+                    <option value="2024-05-10|2024-05-13">May 10-13, 2024 — G5 Extreme Storm</option>
+                    <option value="2003-10-28|2003-11-02">Oct 28–Nov 2, 2003 — Halloween Storms</option>
+                </optgroup>
+                <optgroup label="Severe Storms (G4)">
+                    <option value="2024-10-10|2024-10-12">Oct 10-12, 2024 — G4 Severe Storm</option>
+                    <option value="2023-11-05|2023-11-07">Nov 5-7, 2023 — G3-G4 Storm</option>
+                    <option value="2023-04-23|2023-04-25">Apr 23-25, 2023 — G4 Severe Storm</option>
+                    <option value="2017-09-06|2017-09-11">Sep 6-11, 2017 — X13.3 Flare + G4 Storm</option>
+                    <option value="2015-03-17|2015-03-19">Mar 17-19, 2015 — St. Patrick's Day G4</option>
+                </optgroup>
+                <optgroup label="Major Solar Flares">
+                    <option value="2024-05-14|2024-05-16">May 14-16, 2024 — X8.79 Flare</option>
+                    <option value="2025-01-01|2025-01-03">Jan 1-3, 2025 — New Year X-class Flares</option>
+                    <option value="2024-02-22|2024-02-23">Feb 22, 2024 — X6.3 Flare</option>
+                    <option value="2023-12-31|2023-12-31">Dec 31, 2023 — X5.0 Flare</option>
+                    <option value="2017-09-06|2017-09-07">Sep 6, 2017 — X13.3 Flare</option>
+                    <option value="2014-10-24|2014-10-26">Oct 24-26, 2014 — X3.1 Flare AR 2192</option>
+                </optgroup>
+                <optgroup label="Notable Proton Events">
+                    <option value="2024-05-10|2024-05-14">May 10-14, 2024 — S3 Strong Radiation</option>
+                    <option value="2017-09-10|2017-09-12">Sep 10-12, 2017 — S3 + Ground Level Enhancement</option>
+                </optgroup>
+            </select>
+            <button class="load-btn" id="load-btn" onclick="loadData()">Load Data</button>
+        </div>
+
+        <div class="event-summary" id="event-summary" style="display:none"></div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="geo" onclick="switchTab('geo')">Geomagnetic Data</button>
+            <button class="tab-btn" data-tab="solar" onclick="switchTab('solar')">Solar Data</button>
+        </div>
+
+        <!-- GEOMAGNETIC TAB -->
+        <div class="tab-content active" id="tab-geo">
+            <div class="panel-grid cols-2" style="margin-bottom:1rem">
+                <div class="card"><div class="card-title">Kp Index</div><div class="chart-box" id="chart-kp"></div></div>
+                <div class="card"><div class="card-title">Dst Index</div><div class="chart-box" id="chart-dst"></div></div>
+            </div>
+            <div class="panel-grid cols-2" style="margin-bottom:1rem">
+                <div class="card"><div class="card-title">Solar Wind Speed</div><div class="chart-box" id="chart-sw-speed"></div></div>
+                <div class="card"><div class="card-title">Solar Wind Density</div><div class="chart-box" id="chart-sw-density"></div></div>
+            </div>
+            <div class="panel-grid cols-2" style="margin-bottom:1rem">
+                <div class="card"><div class="card-title">IMF Bz Component</div><div class="chart-box" id="chart-bz"></div></div>
+                <div class="card"><div class="card-title">IMF Bt (Total Field)</div><div class="chart-box" id="chart-bt"></div></div>
+            </div>
+        </div>
+
+        <!-- SOLAR TAB -->
+        <div class="tab-content" id="tab-solar">
+            <div class="panel-grid cols-2" style="margin-bottom:1rem">
+                <div class="card"><div class="card-title">X-Ray Flux (from Flare Data)</div><div class="chart-box" id="chart-xray"></div></div>
+                <div class="card"><div class="card-title">Solar Flare Frequency</div><div class="chart-box" id="chart-flare-freq"></div></div>
+            </div>
+
+            <!-- Flare Table -->
+            <div class="panel-grid cols-1" style="margin-bottom:1rem">
+                <div class="card">
+                    <div class="card-title">Solar Flare List</div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table" id="flare-table">
+                            <thead><tr>
+                                <th data-sort="time" onclick="sortTable('flare',0)">Time (UTC) <span class="sort-arrow">&#9660;</span></th>
+                                <th data-sort="class" onclick="sortTable('flare',1)">Class <span class="sort-arrow">&#9660;</span></th>
+                                <th data-sort="peak" onclick="sortTable('flare',2)">Peak <span class="sort-arrow">&#9660;</span></th>
+                                <th data-sort="end" onclick="sortTable('flare',3)">End <span class="sort-arrow">&#9660;</span></th>
+                                <th data-sort="source" onclick="sortTable('flare',4)">Source <span class="sort-arrow">&#9660;</span></th>
+                                <th data-sort="region" onclick="sortTable('flare',5)">Region <span class="sort-arrow">&#9660;</span></th>
+                            </tr></thead>
+                            <tbody id="flare-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:2rem">No data loaded</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="table-footer" id="flare-table-footer" style="display:none">
+                        <button class="expand-btn" id="flare-expand-btn" onclick="toggleTableExpand('flare')">Show All (0 more)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CME Events -->
+            <div class="panel-grid cols-1" style="margin-bottom:1rem">
+                <div class="card">
+                    <div class="card-title">Coronal Mass Ejection Events</div>
+                    <div id="cme-list"><div class="empty-box"><span class="icon">&#x1F4A8;</span><p>No data loaded</p></div></div>
+                    <div class="table-footer" id="cme-list-footer" style="display:none">
+                        <button class="expand-btn" id="cme-expand-btn" onclick="toggleListExpand('cme')">Show All (0 more)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEP Table -->
+            <div class="panel-grid cols-1" style="margin-bottom:1rem">
+                <div class="card">
+                    <div class="card-title">Solar Energetic Particle Events</div>
+                    <div class="data-table-wrapper">
+                        <table class="data-table" id="sep-table">
+                            <thead><tr>
+                                <th onclick="sortTable('sep',0)">Event Time <span class="sort-arrow">&#9660;</span></th>
+                                <th onclick="sortTable('sep',1)">Instruments <span class="sort-arrow">&#9660;</span></th>
+                                <th onclick="sortTable('sep',2)">Linked Flare <span class="sort-arrow">&#9660;</span></th>
+                            </tr></thead>
+                            <tbody id="sep-tbody"><tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:2rem">No data loaded</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="table-footer" id="sep-table-footer" style="display:none">
+                        <button class="expand-btn" id="sep-expand-btn" onclick="toggleTableExpand('sep')">Show All (0 more)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solar Imagery -->
+            <div class="panel-grid cols-1">
+                <div class="card">
+                    <div class="card-title">Solar Imagery Archive</div>
+                    <div class="imagery-mode-toggle">
+                        <button class="mode-toggle-btn active" onclick="setComparisonMode(false, this)">Single View</button>
+                        <button class="mode-toggle-btn" onclick="setComparisonMode(true, this)">Comparison Mode</button>
+                    </div>
+                    <div id="imagery-tabs-left" class="sub-tabs">
+                        <button class="sub-tab active" data-channel="0193" onclick="switchImagery('0193',this,'left')">AIA 193 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0171" onclick="switchImagery('0171',this,'left')">AIA 171 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0304" onclick="switchImagery('0304',this,'left')">AIA 304 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0094" onclick="switchImagery('0094',this,'left')">AIA 94 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0131" onclick="switchImagery('0131',this,'left')">AIA 131 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0211" onclick="switchImagery('0211',this,'left')">AIA 211 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0335" onclick="switchImagery('0335',this,'left')">AIA 335 &#xC5;</button>
+                        <button class="sub-tab" data-channel="1600" onclick="switchImagery('1600',this,'left')">AIA 1600 &#xC5;</button>
+                        <button class="sub-tab" data-channel="HMIB" onclick="switchImagery('HMIB',this,'left')">HMI Magnetogram</button>
+                        <button class="sub-tab" data-channel="HMIIC" onclick="switchImagery('HMIIC',this,'left')">HMI Continuum</button>
+                    </div>
+                    <div id="imagery-tabs-right" class="sub-tabs" style="display:none">
+                        <button class="sub-tab" data-channel="0193" onclick="switchImagery('0193',this,'right')">AIA 193 &#xC5;</button>
+                        <button class="sub-tab active" data-channel="0171" onclick="switchImagery('0171',this,'right')">AIA 171 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0304" onclick="switchImagery('0304',this,'right')">AIA 304 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0094" onclick="switchImagery('0094',this,'right')">AIA 94 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0131" onclick="switchImagery('0131',this,'right')">AIA 131 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0211" onclick="switchImagery('0211',this,'right')">AIA 211 &#xC5;</button>
+                        <button class="sub-tab" data-channel="0335" onclick="switchImagery('0335',this,'right')">AIA 335 &#xC5;</button>
+                        <button class="sub-tab" data-channel="1600" onclick="switchImagery('1600',this,'right')">AIA 1600 &#xC5;</button>
+                        <button class="sub-tab" data-channel="HMIB" onclick="switchImagery('HMIB',this,'right')">HMI Magnetogram</button>
+                        <button class="sub-tab" data-channel="HMIIC" onclick="switchImagery('HMIIC',this,'right')">HMI Continuum</button>
+                    </div>
+                    <div id="imagery-gallery">
+                        <div class="empty-box"><span class="icon"></span><p>Select a date range and click "Load Data" to browse solar imagery</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+        <img id="lightbox-img" src="" alt="Full-size solar image">
+    </div>
+
+    <footer>
+        <p>Data provided by NOAA SWPC, NASA DONKI API, CDAWeb OMNI &amp; Helioviewer</p>
+        <p style="margin-top:.5rem;opacity:.6">&copy; 2025 Weather Track US</p>
+    </footer>
+
+    <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-message"></span></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   HISTORICAL DATA PAGE — JAVASCRIPT
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── State ──────────────────────────────────────────────────────
+const S = {
+    startDate: null, endDate: null, currentTab: 'geo', currentChannel: '0193',
+    charts: {}, loading: false,
+    flareRows: [], cmeData: [], sepRows: [],
+    flareExpanded: false, cmeExpanded: false, sepExpanded: false,
+    flareSort: { col: 0, asc: false }, sepSort: { col: 0, asc: false },
+    imgData: [], imgDataRight: [], imgIndex: 0, imgPlaying: false, imgTimer: null,
+    comparisonMode: false, rightChannel: '0171', imageScale: 4.0
+};
+const VISIBLE_ROWS = 10;
+
+// ── Event Metadata ─────────────────────────────────────────────
+const eventMeta = {
+    '2024-05-10|2024-05-13': { title:'May 2024 G5 Extreme Geomagnetic Storm', desc:'The most powerful geomagnetic storm since 2003. Multiple Earth-directed CMEs from AR 3664 caused a G5 Extreme storm with Kp=9, visible aurora as far south as Florida and Mexico. Dst reached approximately -412 nT.', tags:['G5 Extreme','Kp 9','X5.8','X3.9','AR 3664'] },
+    '2003-10-28|2003-11-02': { title:'Halloween Solar Storms of 2003', desc:'One of the most powerful solar storm periods in modern history. AR 10486 produced an X17.2 flare (Oct 28) and X28+ flare (Nov 4). Caused G5 conditions, satellite damage, and power grid issues in Sweden.', tags:['G5 Extreme','X17.2','X28+','AR 10486'] },
+    '2024-10-10|2024-10-12': { title:'October 2024 G4 Severe Storm', desc:'A G4 Severe geomagnetic storm driven by CME impacts from AR 3848. Kp reached 8, with aurora visible across northern US states and parts of Europe.', tags:['G4 Severe','Kp 8'] },
+    '2023-11-05|2023-11-07': { title:'November 2023 G3-G4 Storm', desc:'Significant geomagnetic storm reaching G4 conditions briefly, driven by high-speed solar wind and CME passage.', tags:['G4 Severe','G3 Strong'] },
+    '2023-04-23|2023-04-25': { title:'April 2023 G4 Severe Storm', desc:'G4 Severe geomagnetic storm with Kp=8, aurora observed at unusually low latitudes.', tags:['G4 Severe','Kp 8'] },
+    '2017-09-06|2017-09-11': { title:'September 2017 X9.3 Flare & G4 Storm', desc:'AR 2673 produced the strongest flare of Solar Cycle 24 — X9.3 on Sep 6, followed by X8.2 on Sep 10. Associated CMEs drove G4 conditions and S3 radiation storm with a ground-level enhancement.', tags:['G4 Severe','X9.3','X8.2','AR 2673','GLE'] },
+    '2015-03-17|2015-03-19': { title:"St. Patrick's Day Storm 2015", desc:"The strongest geomagnetic storm of Solar Cycle 24 at the time, reaching G4 Severe with Kp=8 and Dst around -223 nT.", tags:['G4 Severe','Kp 8','Dst -223'] },
+    '2024-05-14|2024-05-16': { title:'X8.7 — Largest Flare of Solar Cycle 25', desc:'AR 3664 produced an X8.7 flare on May 14, 2024, the most powerful of Solar Cycle 25 at the time.', tags:['X8.7','AR 3664'] },
+    '2025-01-01|2025-01-03': { title:'New Year 2025 X-class Flares', desc:'Multiple X-class flares rang in 2025, showcasing ongoing activity of Solar Cycle 25 near its expected maximum.', tags:['X-class'] },
+    '2024-02-22|2024-02-23': { title:'X6.3 Flare — Feb 22, 2024', desc:'An X6.3 flare erupted from AR 3590, one of the largest flares of early 2024.', tags:['X6.3','AR 3590'] },
+    '2023-12-31|2023-12-31': { title:"X5.0 New Year's Eve Flare", desc:'A powerful X5.0 flare ended 2023 with a bang, erupting from AR 3536.', tags:['X5.0','AR 3536'] },
+    '2017-09-06|2017-09-07': { title:'X9.3 Flare — Sep 6, 2017', desc:'The largest flare of Solar Cycle 24, an X9.3 from AR 2673. Caused widespread HF radio blackouts.', tags:['X9.3','AR 2673','R3'] },
+    '2014-10-24|2014-10-26': { title:'X3.1 Flare from Giant AR 2192', desc:'AR 2192 was the largest sunspot group in 24 years. Produced X3.1 on Oct 24, 2014, but notably no significant CMEs.', tags:['X3.1','AR 2192'] },
+    '2024-05-10|2024-05-14': { title:'May 2024 S3 Radiation Storm', desc:'Proton flux reached S3 (Strong) levels during the May 2024 extreme event, driven by multiple X-class flares from AR 3664.', tags:['S3 Strong','AR 3664'] },
+    '2017-09-10|2017-09-12': { title:'Sep 2017 S3 Radiation + GLE', desc:'The X8.2 flare on Sep 10 from AR 2673 drove an S3 radiation storm and Ground Level Enhancement #72.', tags:['S3 Strong','GLE #72','X8.2'] }
+};
+
+// ── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const now = new Date(), y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    const fmt = d => d.toISOString().slice(0, 10);
+    document.getElementById('start-date').value = fmt(y);
+    document.getElementById('end-date').value = fmt(y);
+    document.getElementById('start-date').max = fmt(now);
+    document.getElementById('end-date').max = fmt(now);
+    // Allow selecting older historical dates (remove strict 11-day min)
+    // Set a permissive earliest date so users can pick older records if available
+    document.getElementById('start-date').min = '2000-01-01';
+
+    document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const days = parseInt(btn.dataset.days);
+            const endVal = document.getElementById('end-date').value;
+            const end = endVal ? new Date(endVal + 'T00:00:00') : new Date(y);
+            const start = new Date(end);
+            start.setDate(start.getDate() - (days - 1));
+            document.getElementById('start-date').value = fmt(start);
+        });
+    });
+
+    document.getElementById('featured-events').addEventListener('change', e => {
+        if (!e.target.value) { document.getElementById('event-summary').style.display = 'none'; return; }
+        const [s, en] = e.target.value.split('|');
+        document.getElementById('start-date').value = s;
+        document.getElementById('end-date').value = en;
+        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+        showEventSummary(e.target.value);
+    });
+
+    document.getElementById('start-date').addEventListener('change', () => document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active')));
+    document.getElementById('end-date').addEventListener('change', () => document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active')));
+});
+
+function showEventSummary(key) {
+    const box = document.getElementById('event-summary'), meta = eventMeta[key];
+    if (!meta) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    // Do not render compact event badges next to the title — show title and description only.
+    box.innerHTML = '<h3>' + meta.title + '</h3>' + '<p style="margin-top:.5rem">' + meta.desc + '</p>';
+}
+
+// ── Tab switch ──────────────────────────────────────────────────
+function switchTab(tab) {
+    S.currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+    setTimeout(() => Object.values(S.charts).forEach(c => { try { c.resize() } catch (e) {} }), 50);
+}
+
+function setComparisonMode(enabled, btn) {
+    S.comparisonMode = enabled;
+    document.querySelectorAll('.mode-toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('imagery-tabs-right').style.display = enabled ? 'flex' : 'none';
+    if (S.startDate) loadSDOImagery();
+}
+
+function switchImagery(ch, btn, pane) {
+    pane = pane || 'left';
+    if (pane === 'left') {
+        S.currentChannel = ch;
+        document.querySelectorAll('#imagery-tabs-left .sub-tab').forEach(b => b.classList.remove('active'));
+    } else {
+        S.rightChannel = ch;
+        document.querySelectorAll('#imagery-tabs-right .sub-tab').forEach(b => b.classList.remove('active'));
+    }
+    btn.classList.add('active');
+    if (S.startDate) loadSDOImagery();
+}
+
+// ── Main Load ───────────────────────────────────────────────────
+async function loadData() {
+        const startStr = document.getElementById('start-date').value;
+        const endStr = document.getElementById('end-date').value;
+        // Enforce max 11-day range in UI
+        if (startStr && endStr) {
+            const s = new Date(startStr + 'T00:00:00Z');
+            const e = new Date(endStr + 'T23:59:59Z');
+            const diffDays = (e - s) / (1000 * 60 * 60 * 24);
+            if (diffDays > 11) {
+                showToast('Warning', 'Please select a range of 11 days or less.');
+                btn.disabled = false;
+                btn.textContent = 'Load Data';
+                S.loading = false;
+                return;
+            }
+        }
+    if (!startStr || !endStr) { showToast('Warning', 'Please select a date range'); return; }
+    if (new Date(startStr) > new Date(endStr)) { showToast('Warning', 'Start date must be before end date'); return; }
+
+    S.startDate = startStr;
+    S.endDate = endStr;
+    S.loading = true;
+    const btn = document.getElementById('load-btn');
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    showToast('Loading', 'Fetching historical data...');
+
+    try {
+        // Fetch DONKI data sequentially with delays to avoid rate limiting
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+        
+        showToast('Loading', 'Fetching solar flare data...');
+        const flareData = await fetchJSON('/api/historical/donki-flares?start=' + startStr + '&end=' + endStr);
+        await delay(600);
+        
+        showToast('Loading', 'Fetching CME data...');
+        const cmeData = await fetchJSON('/api/historical/donki-cmes?start=' + startStr + '&end=' + endStr);
+        await delay(600);
+        
+        showToast('Loading', 'Fetching geomagnetic storm data...');
+        const stormData = await fetchJSON('/api/historical/donki-storms?start=' + startStr + '&end=' + endStr);
+        await delay(600);
+        
+        showToast('Loading', 'Fetching SEP event data...');
+        const sepData = await fetchJSON('/api/historical/donki-seps?start=' + startStr + '&end=' + endStr);
+        await delay(600);
+        
+        showToast('Loading', 'Fetching solar wind data...');
+        const omniData = await fetchJSON('/api/historical/solar-wind?start=' + startStr + '&end=' + endStr);
+        
+        showToast('Loading', 'Fetching GOES X-ray 1-minute flux...');
+        const goesData = await fetchJSON('/api/historical/goes-xray?start=' + startStr + '&end=' + endStr);
+        console.log('[HISTORICAL] Data loaded:', { flares: flareData.length, cmes: cmeData.length, storms: stormData.length, seps: sepData.length, omni: omniData.length, goes: goesData.length });
+        
+        // Check for rate limit errors
+        const rateLimitHit = [flareData, cmeData, stormData, sepData].some(d => d._error);
+        if (rateLimitHit) {
+            showToast('Warning', 'NASA API rate limit hit - some solar event data may be incomplete. Try again in a few minutes.');
+        }
+
+        // Render Geomagnetic tab
+        renderKpChart(omniData);
+        renderDstChart(omniData);
+        renderSWChart('chart-sw-speed', omniData, 'v', 'Solar Wind Speed', 'km/s', '#3b82f6');
+        renderSWChart('chart-sw-density', omniData, 'n', 'Proton Density', 'p/cc', '#8b5cf6');
+        renderSWChart('chart-bz', omniData, 'bz', 'IMF Bz (GSM)', 'nT', '#06b6d4', true);
+        renderSWChart('chart-bt', omniData, 'bt', 'IMF Bt', 'nT', '#f59e0b');
+
+        // Render Solar tab
+        renderXRayFluxChart(goesData, flareData);
+        renderFlareFreqChart(flareData);
+        S.flareRows = buildFlareRows(flareData); S.flareExpanded = false;
+        renderFlareTable();
+        S.cmeData = cmeData; S.cmeExpanded = false;
+        renderCMEList();
+        S.sepRows = buildSEPRows(sepData); S.sepExpanded = false;
+        renderSEPTable();
+        loadSDOImagery();
+
+        showToast('Done', 'Data loaded for ' + startStr + ' to ' + endStr);
+    } catch (err) {
+        console.error('Load error:', err);
+        showToast('Error', 'Error loading some data sources');
+    } finally {
+        S.loading = false;
+        btn.disabled = false;
+        btn.textContent = 'Load Data';
+    }
+}
+
+async function fetchJSON(url) {
+    try {
+        const r = await fetch(url);
+        if (!r.ok) {
+            console.warn('Fetch error for ' + url + ': ' + r.status);
+            return [];
+        }
+        const data = await r.json();
+        // Handle rate limit errors from DONKI endpoints
+        if (data._error) {
+            console.warn('API rate limit hit for ' + url);
+            const arr = [];
+            arr._error = data._error;  // Attach error to empty array
+            return arr;
+        }
+        // Handle wrapped data format {data: [...]}
+        if (data.data && Array.isArray(data.data)) {
+            return data.data;
+        }
+        return Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error('fetchJSON error:', err);
+        return [];
+    }
+}
+
+// ── Chart Helpers ──────────────────────────────────────────────
+function getChart(id) {
+    if (S.charts[id]) { S.charts[id].dispose(); }
+    const d = document.getElementById(id);
+    if (!d) return null;
+    const c = echarts.init(d, null, { renderer: 'canvas' });
+    S.charts[id] = c;
+    return c;
+}
+
+function kpColor(kp) {
+    if (kp >= 9) return '#ef4444'; if (kp >= 8) return '#f87171'; if (kp >= 7) return '#fb923c';
+    if (kp >= 6) return '#fbbf24'; if (kp >= 5) return '#facc15'; if (kp >= 4) return '#a3e635';
+    if (kp >= 3) return '#4ade80'; if (kp >= 2) return '#34d399'; return '#22d3ee';
+}
+
+const ZOOM = [
+    { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+    { type: 'slider', xAxisIndex: 0, height: 18, bottom: 5, borderColor: '#333', backgroundColor: '#111',
+      fillerColor: 'rgba(59,130,246,0.15)', handleStyle: { color: '#3b82f6' },
+      textStyle: { color: '#666', fontSize: 10 }, dataBackground: { lineStyle: { color: '#333' }, areaStyle: { color: '#1a1a1a' } } }
+];
+
+function emptyChart(chart, msg) {
+    chart.setOption({ title: { text: msg || 'No data available', left: 'center', top: 'middle', textStyle: { color: '#666', fontSize: 13 } }, xAxis: { show: false }, yAxis: { show: false }, series: [] });
+}
+
+// ── Kp Chart ────────────────────────────────────────────────────
+function renderKpChart(omni) {
+    const chart = getChart('chart-kp');
+    if (!chart) return;
+    const kpData = omni.filter(d => d.kp != null);
+    if (!kpData.length) { emptyChart(chart, 'No Kp data'); return; }
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
+            formatter: function(p) { var v = p[0].value; return p[0].name + '<br/>Kp: <b>' + (typeof v === 'number' ? v.toFixed(1) : v) + '</b>'; }
+        },
+        grid: { left: 50, right: 20, top: 30, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: kpData.map(d => fmtTime(d.t)), axisLabel: { color: '#666', fontSize: 10, rotate: 45 }, axisLine: { lineStyle: { color: '#333' } } },
+        yAxis: { type: 'value', min: 0, max: 9, axisLabel: { color: '#666', fontSize: 11 }, splitLine: { lineStyle: { color: '#222' } }, axisLine: { lineStyle: { color: '#333' } } },
+        series: [{
+            type: 'bar',
+            data: kpData.map(d => {
+                var kp = d.kp / 10;
+                return { value: kp, itemStyle: { color: kpColor(kp), borderRadius: [2, 2, 0, 0] } };
+            }),
+            barMaxWidth: 30
+        }]
+    });
+}
+
+// ── Dst Chart ───────────────────────────────────────────────────
+function renderDstChart(omni) {
+    const chart = getChart('chart-dst');
+    if (!chart) return;
+    const dstData = omni.filter(d => d.dst != null);
+    if (!dstData.length) { emptyChart(chart, 'No Dst data'); return; }
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
+            formatter: function(p) { return p[0].name + '<br/>Dst: <b>' + p[0].value + ' nT</b>'; }
+        },
+        grid: { left: 55, right: 20, top: 30, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: dstData.map(d => fmtTime(d.t)), axisLabel: { color: '#666', fontSize: 10, rotate: 45 }, axisLine: { lineStyle: { color: '#333' } } },
+        yAxis: { type: 'value', axisLabel: { color: '#666', fontSize: 11, formatter: '{value} nT' }, splitLine: { lineStyle: { color: '#222' } } },
+        visualMap: { show: false, dimension: 1, pieces: [
+            { lte: -300, color: '#ef4444' }, { gt: -300, lte: -150, color: '#f87171' },
+            { gt: -150, lte: -75, color: '#fb923c' }, { gt: -75, lte: -30, color: '#fbbf24' },
+            { gt: -30, color: '#4ade80' }
+        ]},
+        series: [{
+            type: 'line', data: dstData.map(d => d.dst), smooth: 0.3,
+            lineStyle: { width: 2 }, areaStyle: { opacity: 0.15 }, symbol: 'circle', symbolSize: 4
+        }]
+    });
+}
+
+// ── Solar Wind Chart (reusable) ─────────────────────────────────
+function renderSWChart(id, omni, field, title, unit, color, showZeroLine) {
+    const chart = getChart(id);
+    if (!chart) return;
+    const filtered = omni.filter(d => d[field] != null);
+    if (!filtered.length) {
+        // Show helpful message for recent dates
+        const msg = field !== 'kp' && field !== 'dst'
+            ? 'No data available\n\nOMNI solar wind data has a multi-week delay.\nTry selecting a date range from several months ago.'
+            : 'No data available';
+        emptyChart(chart, msg);
+        return;
+    }
+
+    const vals = filtered.map(d => Number(d[field]));
+    let yMin = Math.min.apply(null, vals);
+    let yMax = Math.max.apply(null, vals);
+    if (!isFinite(yMin)) yMin = 0;
+    if (!isFinite(yMax)) yMax = 1;
+    if (yMin === yMax) { yMax = yMin + 1; }
+
+    // Add padding to y-axis range
+    const range = yMax - yMin;
+    if (field !== 'bz') {
+        yMin = Math.max(0, yMin - range * 0.1);
+        yMax = yMax + range * 0.2;
+    }
+
+    function normalize(val) {
+        return Math.max(0, Math.min(1, (val - yMin) / (yMax - yMin)));
+    }
+
+    let areaGradient, seriesConfig;
+
+    if (field === 'v') {
+        // Solar Wind Speed gradient
+        areaGradient = new echarts.graphic.LinearGradient(0, 1, 0, 0, [
+            { offset: 0, color: 'rgba(74, 222, 128, 0.6)' },
+            { offset: normalize(350), color: 'rgba(74, 222, 128, 0.6)' },
+            { offset: normalize(450), color: 'rgba(217, 249, 157, 0.6)' },
+            { offset: normalize(600), color: 'rgba(250, 204, 21, 0.6)' },
+            { offset: normalize(750), color: 'rgba(251, 146, 60, 0.6)' },
+            { offset: normalize(850), color: 'rgba(239, 68, 68, 0.6)' },
+            { offset: 1, color: 'rgba(236, 72, 153, 0.6)' }
+        ]);
+        seriesConfig = [{
+            type: 'line', data: filtered.map(d => d[field]), smooth: 0.3, symbol: 'none',
+            lineStyle: { color: '#f8fafc', width: 2.5 }, areaStyle: { color: areaGradient }
+        }];
+    } else if (field === 'n') {
+        // Density gradient
+        const thresholds = [
+            { value: 2, color: 'rgba(187, 247, 208, 0.6)' },
+            { value: 5, color: 'rgba(134, 239, 160, 0.6)' },
+            { value: 10, color: 'rgba(22, 163, 74, 0.6)' },
+            { value: 20, color: 'rgba(250, 204, 21, 0.6)' },
+            { value: 30, color: 'rgba(239, 68, 68, 0.6)' },
+            { value: 50, color: 'rgba(147, 51, 234, 0.6)' }
+        ];
+        const gradientStops = thresholds.map(t => ({ offset: normalize(t.value), color: t.color })).sort((a, b) => a.offset - b.offset);
+        areaGradient = new echarts.graphic.LinearGradient(0, 1, 0, 0, gradientStops);
+        seriesConfig = [{
+            type: 'line', data: filtered.map(d => d[field]), smooth: 0.3, symbol: 'none',
+            lineStyle: { color: '#f8fafc', width: 2.5 }, areaStyle: { color: areaGradient }
+        }];
+    } else if (field === 'bt') {
+        // Bt gradient
+        areaGradient = new echarts.graphic.LinearGradient(0, 1, 0, 0, [
+            { offset: 0, color: 'rgba(74, 222, 128, 0.5)' },
+            { offset: normalize(5), color: 'rgba(74, 222, 128, 0.5)' },
+            { offset: normalize(10), color: 'rgba(217, 249, 157, 0.5)' },
+            { offset: normalize(15), color: 'rgba(250, 204, 21, 0.5)' },
+            { offset: normalize(20), color: 'rgba(251, 146, 60, 0.5)' },
+            { offset: normalize(30), color: 'rgba(239, 68, 68, 0.5)' },
+            { offset: 1, color: 'rgba(147, 51, 234, 0.5)' }
+        ]);
+        seriesConfig = [{
+            type: 'line', data: filtered.map(d => d[field]), smooth: 0.3, symbol: 'none',
+            lineStyle: { color: '#f8fafc', width: 2.5 }, areaStyle: { color: areaGradient }
+        }];
+    } else if (field === 'bz') {
+        // Bz: bipolar fill (green=north/positive, red=south/negative)
+        yMin = yMin - 2;
+        yMax = yMax + 2;
+        const positiveData = filtered.map(d => (d[field] !== null && d[field] >= 0) ? d[field] : 0);
+        const negativeData = filtered.map(d => (d[field] !== null && d[field] < 0) ? d[field] : 0);
+        seriesConfig = [
+            {
+                name: 'Bz Positive', type: 'line', data: positiveData, smooth: 0.3, symbol: 'none',
+                lineStyle: { width: 0 }, areaStyle: { color: 'rgba(74, 222, 128, 0.5)', origin: 0 }, stack: 'bz'
+            },
+            {
+                name: 'Bz Negative', type: 'line', data: negativeData, smooth: 0.3, symbol: 'none',
+                lineStyle: { width: 0 }, areaStyle: { color: 'rgba(248, 113, 113, 0.5)', origin: 0 }, stack: 'bz'
+            },
+            {
+                name: 'Bz Line', type: 'line', data: filtered.map(d => d[field]), smooth: 0.3, symbol: 'none',
+                lineStyle: { color: '#f8fafc', width: 2.5 },
+                markLine: { silent: true, symbol: 'none', lineStyle: { color: 'rgba(255,255,255,0.3)', width: 1, type: 'solid' },
+                    data: [{ yAxis: 0 }], label: { show: false } }
+            }
+        ];
+    }
+
+    var opts = {
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
+            formatter: function(p) {
+                if (field === 'bz') {
+                    // For Bz, show the actual value from the line series (last in stack)
+                    const val = p[0].value !== 0 ? p[0].value : (p[1]?.value || 0);
+                    return p[0].name + '<br/>' + title + ': <b>' + (val?.toFixed(1) || '--') + ' ' + unit + '</b>';
+                }
+                return p[0].name + '<br/>' + title + ': <b>' + (p[0].value || '--') + ' ' + unit + '</b>';
+            }
+        },
+        grid: { left: 55, right: 20, top: 20, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: filtered.map(d => fmtTime(d.t)), axisLabel: { color: '#666', fontSize: 10, rotate: 45 }, axisLine: { lineStyle: { color: '#333' } } },
+        yAxis: { type: 'value', min: yMin, max: yMax, axisLabel: { color: '#666', fontSize: 11 }, splitLine: { lineStyle: { color: '#222' } } },
+        series: seriesConfig,
+        legend: { show: false }
+    };
+    chart.setOption(opts);
+}
+
+// ── X-Ray Flux Chart (from DONKI flare data) ───────────────────
+function renderXRayChart(flares) {
+    const chart = getChart('chart-xray');
+    if (!chart) return;
+    if (!flares || !flares.length) { emptyChart(chart, 'No flare data available'); return; }
+
+    function flareToWm2(cls) {
+        if (!cls) return null;
+        var l = cls.charAt(0).toUpperCase(), n = parseFloat(cls.substring(1)) || 1;
+        var b = { X: 1e-4, M: 1e-5, C: 1e-6, B: 1e-7, A: 1e-8 };
+        return (b[l] || 1e-8) * n;
+    }
+    function flareColor(cls) {
+        if (!cls) return '#94a3b8';
+        var c = cls.charAt(0).toUpperCase();
+        return c === 'X' ? '#f87171' : c === 'M' ? '#fbbf24' : c === 'C' ? '#4ade80' : '#94a3b8';
+    }
+
+    var sorted = flares.slice().sort(function(a, b) { return new Date(a.peakTime || a.beginTime) - new Date(b.peakTime || b.beginTime); });
+    var times = sorted.map(function(f) { return fmtTime(f.peakTime || f.beginTime); });
+    var values = sorted.map(function(f) { return flareToWm2(f.classType); });
+    var colors = sorted.map(function(f) { return flareColor(f.classType); });
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
+            formatter: function(p) { var f = sorted[p[0].dataIndex]; return '<b>' + (f.classType || '?') + '</b><br/>' + p[0].name + '<br/>Region: ' + (f.activeRegionNum ? 'AR ' + f.activeRegionNum : 'N/A'); }
+        },
+        grid: { left: 65, right: 20, top: 30, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: times, axisLabel: { color: '#666', fontSize: 10, rotate: 45 } },
+        yAxis: { type: 'log', name: 'W/m\u00B2', nameTextStyle: { color: '#666', fontSize: 10 }, axisLabel: { color: '#666', fontSize: 10, formatter: function(v) { return v.toExponential(0); } }, splitLine: { lineStyle: { color: '#222' } }, axisLine: { lineStyle: { color: '#333' } }, min: 1e-8 },
+        series: [{
+            type: 'line', data: values.map(function(v, i) { return { value: v, itemStyle: { color: colors[i] } }; }), smooth: 0, step: false,
+            lineStyle: { color: '#f59e0b', width: 1.5 }, symbol: 'circle', symbolSize: 8,
+            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(245,158,11,.2)' }, { offset: 1, color: 'rgba(245,158,11,0)' }] } },
+            markLine: { silent: true, symbol: 'none', data: [
+                { yAxis: 1e-4, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { formatter: 'X', color: '#ef4444', position: 'insideEndTop', fontSize: 10 } },
+                { yAxis: 1e-5, lineStyle: { color: '#fbbf24', type: 'dashed', width: 1 }, label: { formatter: 'M', color: '#fbbf24', position: 'insideEndTop', fontSize: 10 } },
+                { yAxis: 1e-6, lineStyle: { color: '#4ade80', type: 'dashed', width: 1 }, label: { formatter: 'C', color: '#4ade80', position: 'insideEndTop', fontSize: 10 } }
+            ]}
+        }]
+    });
+}
+
+// Render continuous GOES X-ray 1-min flux and overlay flare markers from DONKI
+function renderXRayFluxChart(goes, flares) {
+    const chart = getChart('chart-xray');
+    if (!chart) return;
+    // If continuous GOES flux not available, but we have DONKI flare events,
+    // render a flare timeline approximation instead of leaving the box empty.
+    if ((!goes || !goes.length) && flares && flares.length) {
+        renderFlareTimeline(chart, flares);
+        return;
+    }
+    if (!goes || !goes.length) { emptyChart(chart, 'No GOES X-ray flux data'); return; }
+
+    const times = goes.map(d => fmtTime(d.t));
+    const longVals = goes.map(d => d.xrs_long == null ? null : d.xrs_long);
+    const shortVals = goes.map(d => d.xrs_short == null ? null : d.xrs_short);
+
+    // Create flare markers from DONKI flare data
+    let flareMarkers = [];
+    if (flares && flares.length) {
+        flares.forEach(function(f) {
+            const t = f.peakTime || f.beginTime || null;
+            if (!t) return;
+            const fmtT = fmtTime(t);
+            const idx = times.indexOf(fmtT);
+            if (idx >= 0 && longVals[idx] != null) {
+                flareMarkers.push({
+                    name: f.classType || '?',
+                    xAxis: fmtT,
+                    yAxis: longVals[idx],
+                    label: { formatter: '{b}', position: 'top', color: '#ef4444', fontSize: 9 }
+                });
+            }
+        });
+    }
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
+            formatter: function(p) {
+                if (!p || !p.length) return '';
+                let s = '<b>' + p[0].name + '</b><br/>';
+                p.forEach(function(pt) {
+                    if (pt.seriesName && pt.value != null) {
+                        s += pt.seriesName + ': <b>' + pt.value.toExponential(2) + ' W/m²</b><br/>';
+                    }
+                });
+                return s;
+            }
+        },
+        legend: { data: ['Long (1-8Å)', 'Short (0.5-4Å)'], textStyle: { color: '#8b8b8b', fontSize: 11 }, top: 5, right: 10 },
+        grid: { left: 65, right: 20, top: 35, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: times, axisLabel: { color: '#666', fontSize: 10, rotate: 45 }, axisLine: { lineStyle: { color: '#333' } } },
+        yAxis: { type: 'log', name: 'W/m²', nameTextStyle: { color: '#666', fontSize: 10 }, axisLabel: { color: '#666', fontSize: 10, formatter: function(v){ return v.toExponential(0); } }, splitLine: { lineStyle: { color: '#222' } }, axisLine: { lineStyle: { color: '#333' } }, min: 1e-9, max: 1e-2 },
+        series: [
+            { name: 'Long (1-8Å)', type: 'line', data: longVals, smooth: 0.3, showSymbol: false, lineStyle: { color: '#f59e0b', width: 1.5 }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(245,158,11,.2)' }, { offset: 1, color: 'rgba(245,158,11,0)' }] } },
+                markLine: flareMarkers.length > 0 ? { silent: true, symbol: ['none', 'circle'], symbolSize: 6, data: flareMarkers, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 } } : undefined,
+                markPoint: flareMarkers.length > 0 ? { data: flareMarkers.map(m => ({ xAxis: m.xAxis, yAxis: m.yAxis, value: m.name, symbolSize: 8, itemStyle: { color: '#ef4444' }, label: { show: true, formatter: '{c}', position: 'top', color: '#ef4444', fontSize: 9 } })) } : undefined
+            },
+            { name: 'Short (0.5-4Å)', type: 'line', data: shortVals, smooth: 0.3, showSymbol: false, lineStyle: { color: '#06b6d4', width: 1.5 }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(6,182,212,.15)' }, { offset: 1, color: 'rgba(6,182,212,0)' }] } } }
+        ]
+    });
+}
+
+// ── Flare Frequency Chart ───────────────────────────────────────
+function renderFlareFreqChart(flares) {
+    const chart = getChart('chart-flare-freq');
+    if (!chart) return;
+    if (!flares || !flares.length) { emptyChart(chart, 'No flare data'); return; }
+
+    var days = {};
+    flares.forEach(function(f) {
+        var d = (f.beginTime || f.peakTime || '').slice(0, 10);
+        if (!d) return;
+        if (!days[d]) days[d] = { X: 0, M: 0, C: 0, B: 0 };
+        var cls = (f.classType || 'B').charAt(0).toUpperCase();
+        if (days[d][cls] !== undefined) days[d][cls]++;
+    });
+    var dayKeys = Object.keys(days).sort();
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 } },
+        legend: { data: ['B', 'C', 'M', 'X'], textStyle: { color: '#8b8b8b', fontSize: 11 }, top: 5, right: 10 },
+        grid: { left: 40, right: 20, top: 35, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: dayKeys, axisLabel: { color: '#666', fontSize: 10, rotate: 45 } },
+        yAxis: { type: 'value', minInterval: 1, axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#222' } } },
+        series: [
+            { name: 'B', type: 'bar', stack: 'flares', data: dayKeys.map(function(d) { return days[d].B; }), itemStyle: { color: '#64748b' }, barMaxWidth: 30 },
+            { name: 'C', type: 'bar', stack: 'flares', data: dayKeys.map(function(d) { return days[d].C; }), itemStyle: { color: '#4ade80' }, barMaxWidth: 30 },
+            { name: 'M', type: 'bar', stack: 'flares', data: dayKeys.map(function(d) { return days[d].M; }), itemStyle: { color: '#fbbf24' }, barMaxWidth: 30 },
+            { name: 'X', type: 'bar', stack: 'flares', data: dayKeys.map(function(d) { return days[d].X; }), itemStyle: { color: '#f87171' }, barMaxWidth: 30 }
+        ]
+    });
+}
+
+// Fallback: render flare timeline when GOES flux data isn't available
+function renderFlareTimeline(chart, flares) {
+    if (!flares || !flares.length) {
+        emptyChart(chart, 'No flare data');
+        return;
+    }
+    
+    function flareToWm2(cls) {
+        if (!cls) return null;
+        var l = cls.charAt(0).toUpperCase(), n = parseFloat(cls.substring(1)) || 1;
+        var b = { X: 1e-4, M: 1e-5, C: 1e-6, B: 1e-7, A: 1e-8 };
+        return (b[l] || 1e-8) * n;
+    }
+    function flareColor(cls) {
+        if (!cls) return '#94a3b8';
+        var c = cls.charAt(0).toUpperCase();
+        return c === 'X' ? '#f87171' : c === 'M' ? '#fbbf24' : c === 'C' ? '#4ade80' : '#94a3b8';
+    }
+
+    var sorted = flares.slice().sort(function(a, b) { return new Date(a.peakTime || a.beginTime) - new Date(b.peakTime || b.beginTime); });
+    var times = sorted.map(function(f) { return fmtTime(f.peakTime || f.beginTime); });
+    var values = sorted.map(function(f) { return flareToWm2(f.classType); });
+    var colors = sorted.map(function(f) { return flareColor(f.classType); });
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
+        title: { text: 'Flare Events (GOES flux unavailable for this date range)', left: 'center', top: 5, textStyle: { color: '#888', fontSize: 11 } },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
+            formatter: function(p) { var f = sorted[p[0].dataIndex]; return '<b>' + (f.classType || '?') + '</b><br/>' + p[0].name + '<br/>Region: ' + (f.activeRegionNum ? 'AR ' + f.activeRegionNum : 'N/A'); }
+        },
+        grid: { left: 65, right: 20, top: 40, bottom: 45, containLabel: false },
+        dataZoom: ZOOM,
+        xAxis: { type: 'category', data: times, axisLabel: { color: '#666', fontSize: 10, rotate: 45 } },
+        yAxis: { type: 'log', name: 'Approx W/m²', nameTextStyle: { color: '#666', fontSize: 10 }, axisLabel: { color: '#666', fontSize: 10, formatter: function(v) { return v.toExponential(0); } }, splitLine: { lineStyle: { color: '#222' } }, axisLine: { lineStyle: { color: '#333' } }, min: 1e-8 },
+        series: [{
+            type: 'scatter', data: values.map(function(v, i) { return { value: v, itemStyle: { color: colors[i] } }; }), symbolSize: 10,
+            markLine: { silent: true, symbol: 'none', data: [
+                { yAxis: 1e-4, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { formatter: 'X', color: '#ef4444', position: 'insideEndTop', fontSize: 10 } },
+                { yAxis: 1e-5, lineStyle: { color: '#fbbf24', type: 'dashed', width: 1 }, label: { formatter: 'M', color: '#fbbf24', position: 'insideEndTop', fontSize: 10 } },
+                { yAxis: 1e-6, lineStyle: { color: '#4ade80', type: 'dashed', width: 1 }, label: { formatter: 'C', color: '#4ade80', position: 'insideEndTop', fontSize: 10 } }
+            ]}
+        }]
+    });
+}
+
+// ── Flare Table (collapsible + sortable) ────────────────────────
+function buildFlareRows(flares) {
+    if (!flares || !flares.length) return [];
+    return flares.map(function(f) {
+        return {
+            time: f.beginTime || f.peakTime || '',
+            cls: f.classType || '',
+            peak: f.peakTime || '',
+            end: f.endTime || '',
+            source: f.sourceLocation || '',
+            region: f.activeRegionNum || ''
+        };
+    }).sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+}
+
+function renderFlareTable() {
+    var tbody = document.getElementById('flare-tbody');
+    var footer = document.getElementById('flare-table-footer');
+    var btn = document.getElementById('flare-expand-btn');
+    if (!S.flareRows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:2rem">No solar flares found</td></tr>';
+        footer.style.display = 'none'; return;
+    }
+
+    var rows = S.flareExpanded ? S.flareRows : S.flareRows.slice(0, VISIBLE_ROWS);
+    var remaining = S.flareRows.length - VISIBLE_ROWS;
+
+    tbody.innerHTML = rows.map(function(f) {
+        var c = f.cls.charAt(0).toUpperCase();
+        var cc = c === 'X' ? 'flare-x' : c === 'M' ? 'flare-m' : c === 'C' ? 'flare-c' : 'flare-b';
+        return '<tr><td>' + fmtTime(f.time) + '</td><td class="' + cc + '">' + f.cls + '</td><td>' + (f.peak ? new Date(f.peak).toISOString().slice(11, 16) : '\u2014') + '</td><td>' + (f.end ? new Date(f.end).toISOString().slice(11, 16) : '\u2014') + '</td><td>' + (f.source || '\u2014') + '</td><td>' + (f.region ? 'AR ' + f.region : '\u2014') + '</td></tr>';
+    }).join('');
+
+    if (remaining > 0) {
+        footer.style.display = 'flex';
+        btn.textContent = S.flareExpanded ? 'Show Less' : 'Show All (' + remaining + ' more)';
+    } else { footer.style.display = 'none'; }
+}
+
+// ── CME List (card-based, collapsible) ──────────────────────────
+function renderCMEList() {
+    var container = document.getElementById('cme-list');
+    var footer = document.getElementById('cme-list-footer');
+    var btn = document.getElementById('cme-expand-btn');
+    if (!S.cmeData || !S.cmeData.length) {
+        container.innerHTML = '<div class="empty-box"><span class="icon">&#x1F4A8;</span><p>No CME events found</p></div>';
+        footer.style.display = 'none'; return;
+    }
+
+    var sorted = S.cmeData.slice().sort(function(a, b) { return new Date(b.startTime) - new Date(a.startTime); });
+    var visible = S.cmeExpanded ? sorted : sorted.slice(0, VISIBLE_ROWS);
+    var remaining = sorted.length - VISIBLE_ROWS;
+
+    container.innerHTML = visible.map(function(c, i) {
+        var speed = '\u2014', halfAngle = '\u2014', type = '\u2014', lat = '\u2014', lon = '\u2014';
+        if (c.cmeAnalyses && c.cmeAnalyses.length) {
+            var a = c.cmeAnalyses[c.cmeAnalyses.length - 1];
+            speed = a.speed || '\u2014';
+            halfAngle = a.halfAngle ? a.halfAngle + '\u00B0' : '\u2014';
+            type = a.type || '\u2014';
+            if (a.latitude != null) lat = a.latitude + '\u00B0';
+            if (a.longitude != null) lon = a.longitude + '\u00B0';
+        }
+        var speedNum = typeof speed === 'number' ? speed : parseInt(speed) || 0;
+        var speedCls = speedNum > 1500 ? 'cme-speed-fast' : speedNum > 800 ? 'cme-speed-mod' : 'cme-speed-slow';
+        var time = c.startTime ? new Date(c.startTime).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '\u2014';
+        var note = (c.note || '').trim();
+        var linkedCount = c.linkedEvents ? c.linkedEvents.length : 0;
+
+        return '<div class="cme-card"><div class="cme-header"><span class="cme-time">' + time + '</span><span class="cme-speed ' + speedCls + '">' + (typeof speed === 'number' ? speed + ' km/s' : speed) + '</span></div><div class="cme-details"><span><b>Type:</b> ' + type + '</span><span><b>Half-angle:</b> ' + halfAngle + '</span><span><b>Latitude:</b> ' + lat + '</span><span><b>Longitude:</b> ' + lon + '</span><span><b>Analyses:</b> ' + (c.cmeAnalyses ? c.cmeAnalyses.length : 0) + '</span><span><b>Linked:</b> ' + linkedCount + ' event(s)</span></div>' + (note ? '<div class="cme-note" id="cme-note-' + i + '" title="Click to expand" onclick="this.classList.toggle(\'expanded\')" style="cursor:pointer">' + note + '</div>' : '') + '</div>';
+    }).join('');
+
+    if (remaining > 0) {
+        footer.style.display = 'flex';
+        btn.textContent = S.cmeExpanded ? 'Show Less' : 'Show All (' + remaining + ' more)';
+    } else { footer.style.display = 'none'; }
+}
+
+// ── SEP Table (collapsible + sortable) ──────────────────────────
+function buildSEPRows(seps) {
+    if (!seps || !seps.length) return [];
+    return seps.map(function(s) {
+        return {
+            time: s.eventTime || '',
+            instruments: (s.instruments || []).map(function(i) { return i.displayName || i.id; }).join(', ') || '\u2014',
+            linkedFlare: s.linkedEvents ? (function() { var f = s.linkedEvents.find(function(e) { return e.activityID && e.activityID.indexOf('FLR') !== -1; }); return f ? f.activityID : '\u2014'; })() : '\u2014'
+        };
+    }).sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+}
+
+function renderSEPTable() {
+    var tbody = document.getElementById('sep-tbody');
+    var footer = document.getElementById('sep-table-footer');
+    var btn = document.getElementById('sep-expand-btn');
+    if (!S.sepRows.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:2rem">No SEP events found</td></tr>';
+        footer.style.display = 'none'; return;
+    }
+
+    var rows = S.sepExpanded ? S.sepRows : S.sepRows.slice(0, VISIBLE_ROWS);
+    var remaining = S.sepRows.length - VISIBLE_ROWS;
+
+    tbody.innerHTML = rows.map(function(s) {
+        return '<tr><td>' + fmtTime(s.time) + ' UTC</td><td>' + s.instruments + '</td><td style="font-size:.75rem">' + s.linkedFlare + '</td></tr>';
+    }).join('');
+
+    if (remaining > 0) { footer.style.display = 'flex'; btn.textContent = S.sepExpanded ? 'Show Less' : 'Show All (' + remaining + ' more)'; }
+    else { footer.style.display = 'none'; }
+}
+
+// ── Sorting ─────────────────────────────────────────────────────
+function sortTable(tableId, colIdx) {
+    if (tableId === 'flare') {
+        if (S.flareSort.col === colIdx) S.flareSort.asc = !S.flareSort.asc;
+        else { S.flareSort.col = colIdx; S.flareSort.asc = true; }
+        var keys = ['time', 'cls', 'peak', 'end', 'source', 'region'];
+        var key = keys[colIdx];
+        S.flareRows.sort(function(a, b) {
+            var va = a[key], vb = b[key];
+            if (key === 'time' || key === 'peak' || key === 'end') { va = new Date(va || 0).getTime(); vb = new Date(vb || 0).getTime(); }
+            else { va = (va || '').toString().toLowerCase(); vb = (vb || '').toString().toLowerCase(); }
+            return S.flareSort.asc ? (va > vb ? 1 : va < vb ? -1 : 0) : (va < vb ? 1 : va > vb ? -1 : 0);
+        });
+        renderFlareTable();
+        highlightSortHeader('flare-table', colIdx, S.flareSort.asc);
+    } else if (tableId === 'sep') {
+        if (S.sepSort.col === colIdx) S.sepSort.asc = !S.sepSort.asc;
+        else { S.sepSort.col = colIdx; S.sepSort.asc = true; }
+        var keys2 = ['time', 'instruments', 'linkedFlare'];
+        var key2 = keys2[colIdx];
+        S.sepRows.sort(function(a, b) {
+            var va = a[key2], vb = b[key2];
+            if (key2 === 'time') { va = new Date(va || 0).getTime(); vb = new Date(vb || 0).getTime(); }
+            else { va = (va || '').toString().toLowerCase(); vb = (vb || '').toString().toLowerCase(); }
+            return S.sepSort.asc ? (va > vb ? 1 : va < vb ? -1 : 0) : (va < vb ? 1 : va > vb ? -1 : 0);
+        });
+        renderSEPTable();
+        highlightSortHeader('sep-table', colIdx, S.sepSort.asc);
+    }
+}
+
+function highlightSortHeader(tableId, colIdx, asc) {
+    var ths = document.querySelectorAll('#' + tableId + ' th');
+    ths.forEach(function(th, i) {
+        th.classList.toggle('sorted', i === colIdx);
+        var arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.textContent = (i === colIdx) ? (asc ? '\u25B2' : '\u25BC') : '\u25BC';
+    });
+}
+
+// ── Expand/collapse ─────────────────────────────────────────────
+function toggleTableExpand(tableId) {
+    if (tableId === 'flare') { S.flareExpanded = !S.flareExpanded; renderFlareTable(); }
+    else if (tableId === 'sep') { S.sepExpanded = !S.sepExpanded; renderSEPTable(); }
+}
+function toggleListExpand(listId) {
+    if (listId === 'cme') { S.cmeExpanded = !S.cmeExpanded; renderCMEList(); }
+}
+
+// ── SDO Imagery Slider ──────────────────────────────────────────
+async function loadSDOImagery() {
+    var gallery = document.getElementById('imagery-gallery');
+    if (!S.startDate) {
+        gallery.innerHTML = '<div class="empty-box"><span class="icon">&#x1F52D;</span><p>Select a date range and click "Load Data"</p></div>';
+        return;
+    }
+
+    gallery.innerHTML = '<div class="loading-box"><div class="spinner-sm"></div><p>Loading imagery data...</p></div>';
+
+    try {
+        // Fetch left channel data
+        var resp = await fetch('/api/historical/sdo-images?start=' + S.startDate + '&end=' + S.endDate + '&channel=' + S.currentChannel + '&scale=' + encodeURIComponent(S.imageScale));
+        var data = await resp.json();
+        if (!data.images || !data.images.length) {
+            gallery.innerHTML = '<div class="empty-box"><span class="icon">&#x1F52D;</span><p>No imagery found. SDO archive available from 2010 onwards.</p></div>';
+            return;
+        }
+
+        S.imgData = data.images;
+        S.imgIndex = 0;
+        stopPlayback();
+
+        // If comparison mode, fetch right channel data
+        if (S.comparisonMode) {
+            var respRight = await fetch('/api/historical/sdo-images?start=' + S.startDate + '&end=' + S.endDate + '&channel=' + S.rightChannel + '&scale=' + encodeURIComponent(S.imageScale));
+            var dataRight = await respRight.json();
+            S.imgDataRight = dataRight.images || [];
+        }
+
+        var totalDays = data.total_days || 1;
+        
+        if (S.comparisonMode && S.imgDataRight.length) {
+            // Dual comparison mode layout
+            gallery.innerHTML = '<div class="imagery-slider-wrap">' +
+                '<div class="imagery-display-container dual-mode">' +
+                    '<div class="imagery-display-pane">' +
+                        '<div class="pane-label">Left: ' + S.imgData[0].label + '</div>' +
+                        '<div class="imagery-display" id="img-display-left">' +
+                            '<div class="img-loading"><div class="spinner-sm"></div></div>' +
+                            '<img id="slider-img-left" src="' + S.imgData[0].url_thumb + '" alt="Left SDO image" style="cursor:zoom-in" onload="this.previousElementSibling.style.display=\'none\'" onerror="this.previousElementSibling.innerHTML=\'Image unavailable\'">' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="imagery-display-pane">' +
+                        '<div class="pane-label">Right: ' + S.imgDataRight[0].label + '</div>' +
+                        '<div class="imagery-display" id="img-display-right">' +
+                            '<div class="img-loading"><div class="spinner-sm"></div></div>' +
+                            '<img id="slider-img-right" src="' + S.imgDataRight[0].url_thumb + '" alt="Right SDO image" style="cursor:zoom-in" onload="this.previousElementSibling.style.display=\'none\'" onerror="this.previousElementSibling.innerHTML=\'Image unavailable\'">' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="slider-controls">' +
+                    '<button class="slider-nav-btn" onclick="sliderStep(-1)" title="Previous">&#x25C0;</button>' +
+                    '<button class="slider-nav-btn play-btn" id="play-btn" onclick="togglePlayback()" title="Play/Pause">&#x25B6;</button>' +
+                    '<button class="slider-nav-btn" onclick="sliderStep(1)" title="Next">&#x25B6;</button>' +
+                    '<input type="range" class="time-slider" id="time-slider" min="0" max="' + (S.imgData.length - 1) + '" value="0" oninput="sliderSeek(this.value)">' +
+                    '<span class="slider-time-label" id="slider-label">' + S.imgData[0].time + '</span>' +
+                '</div>' +
+                '<div style="text-align:center;margin-top:.4rem;font-size:.75rem;color:var(--text-muted)">' + S.imgData.length + ' frames &middot; ' + totalDays + ' day(s) &middot; Click images to enlarge</div>' +
+            '</div>';
+            
+            // Add click handlers for dual lightbox
+            var imgLeft = document.getElementById('slider-img-left');
+            var imgRight = document.getElementById('slider-img-right');
+            if (imgLeft) imgLeft.addEventListener('click', function() { openLightbox(S.imgData[S.imgIndex].url_full); });
+            if (imgRight) imgRight.addEventListener('click', function() { openLightbox(S.imgDataRight[S.imgIndex].url_full); });
+        } else {
+            // Single mode layout
+            gallery.innerHTML = '<div class="imagery-slider-wrap">' +
+                '<div class="imagery-display-container single-mode">' +
+                    '<div class="imagery-display" id="img-display">' +
+                        '<div class="img-loading"><div class="spinner-sm"></div></div>' +
+                        '<img id="slider-img" src="' + S.imgData[0].url_thumb + '" alt="SDO image" style="cursor:zoom-in" onload="this.previousElementSibling.style.display=\'none\'" onerror="this.previousElementSibling.innerHTML=\'Image unavailable\'">' +
+                    '</div>' +
+                '</div>' +
+                '<div class="slider-controls">' +
+                    '<button class="slider-nav-btn" onclick="sliderStep(-1)" title="Previous">&#x25C0;</button>' +
+                    '<button class="slider-nav-btn play-btn" id="play-btn" onclick="togglePlayback()" title="Play/Pause">&#x25B6;</button>' +
+                    '<button class="slider-nav-btn" onclick="sliderStep(1)" title="Next">&#x25B6;</button>' +
+                    '<input type="range" class="time-slider" id="time-slider" min="0" max="' + (S.imgData.length - 1) + '" value="0" oninput="sliderSeek(this.value)">' +
+                    '<span class="slider-time-label" id="slider-label">' + S.imgData[0].time + '</span>' +
+                '</div>' +
+                '<div style="text-align:center;margin-top:.4rem;font-size:.75rem;color:var(--text-muted)">' + S.imgData.length + ' frames &middot; ' + totalDays + ' day(s) &middot; Click image to enlarge</div>' +
+            '</div>';
+
+            // Add click handler for lightbox
+            var sliderImg = document.getElementById('slider-img');
+            if (sliderImg) {
+                sliderImg.addEventListener('click', function() {
+                    openLightbox(S.imgData[S.imgIndex].url_full);
+                });
+            }
+        }
+    } catch (err) {
+        console.error('SDO imagery error:', err);
+        gallery.innerHTML = '<div class="empty-box"><span class="icon">&#x26A0;</span><p>Failed to load imagery</p></div>';
+    }
+}
+
+function sliderSeek(idx) {
+    idx = parseInt(idx);
+    if (idx < 0 || idx >= S.imgData.length) return;
+    S.imgIndex = idx;
+    
+    var label = document.getElementById('slider-label');
+    if (label) label.textContent = S.imgData[idx].time;
+    
+    var slider = document.getElementById('time-slider');
+    if (slider) slider.value = idx;
+    
+    if (S.comparisonMode && S.imgDataRight.length) {
+        // Update both left and right images
+        var imgLeft = document.getElementById('slider-img-left');
+        var imgRight = document.getElementById('slider-img-right');
+        var loadingLeft = document.querySelector('#img-display-left .img-loading');
+        var loadingRight = document.querySelector('#img-display-right .img-loading');
+        
+        if (imgLeft && idx < S.imgData.length) {
+            if (loadingLeft) loadingLeft.style.display = 'flex';
+            imgLeft.src = S.imgData[idx].url_thumb;
+        }
+        if (imgRight && idx < S.imgDataRight.length) {
+            if (loadingRight) loadingRight.style.display = 'flex';
+            imgRight.src = S.imgDataRight[idx].url_thumb;
+        }
+    } else {
+        // Update single image
+        var img = document.getElementById('slider-img');
+        var loading = document.querySelector('#img-display .img-loading');
+        if (img) {
+            if (loading) loading.style.display = 'flex';
+            img.src = S.imgData[idx].url_thumb;
+        }
+    }
+}
+
+function setImageScale(val) {
+    var f = parseFloat(val);
+    if (isNaN(f) || f <= 0) f = 1.2;
+    S.imageScale = f;
+    // if imagery already loaded, reload with new scale
+    if (S.startDate) loadSDOImagery();
+}
+
+function sliderStep(dir) { sliderSeek(S.imgIndex + dir); }
+
+function togglePlayback() {
+    if (S.imgPlaying) { stopPlayback(); }
+    else {
+        S.imgPlaying = true;
+        var btn = document.getElementById('play-btn');
+        if (btn) { btn.classList.add('playing'); btn.innerHTML = '&#x23F8;'; }
+        S.imgTimer = setInterval(function() {
+            if (S.imgIndex >= S.imgData.length - 1) stopPlayback();
+            else sliderSeek(S.imgIndex + 1);
+        }, 600);
+    }
+}
+
+function stopPlayback() {
+    S.imgPlaying = false;
+    if (S.imgTimer) clearInterval(S.imgTimer);
+    S.imgTimer = null;
+    var b = document.getElementById('play-btn');
+    if (b) { b.classList.remove('playing'); b.innerHTML = '&#x25B6;'; }
+}
+
+// ── Lightbox ────────────────────────────────────────────────────
+function openLightbox(url) {
+    document.getElementById('lightbox-img').src = url;
+    document.getElementById('lightbox').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+
+// ── Utils ───────────────────────────────────────────────────────
+function fmtTime(t) { if (!t) return '\u2014'; try { return new Date(t).toISOString().slice(5, 16).replace('T', ' '); } catch (e) { return t; } }
+function showToast(icon, msg) { var t = document.getElementById('toast'); document.getElementById('toast-icon').textContent = icon; document.getElementById('toast-message').textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3500); }
+function toggleMobileMenu() { document.getElementById('nav-links').classList.toggle('active'); }
+window.addEventListener('resize', function() { Object.values(S.charts).forEach(function(c) { try { c.resize(); } catch (e) {} }); });
+</script>
+</body>
+</html>

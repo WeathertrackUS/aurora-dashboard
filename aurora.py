@@ -63,6 +63,18 @@ app = Flask(__name__)
 _cache = {}
 _cache_timestamps = {}
 
+# Backwards-compatible cache helper used by newer endpoints
+class _SimpleCache:
+    def get(self, key, default=None):
+        v = get_cached(key)
+        return v if v is not None else default
+    def set(self, key, value, timeout=None):
+        # ignore timeout for this simple wrapper; store value
+        set_cached(key, value)
+
+# expose `cache` for code that expects a Flask-like cache object
+cache = _SimpleCache()
+
 # Thread lock for expensive operations to prevent concurrent generation
 import threading
 _map_generation_lock = threading.Lock()
@@ -76,10 +88,29 @@ def get_cached(key, max_age_seconds=30):
             return _cache[key]
     return None
 
+
+def _validate_date_range(start_str, end_str, max_days=11):
+    """Validate that start/end are YYYY-MM-DD and within max_days inclusive."""
+    try:
+        s = datetime.strptime(start_str, '%Y-%m-%d')
+        e = datetime.strptime(end_str, '%Y-%m-%d')
+    except Exception:
+        return False, 'Invalid date format, expected YYYY-MM-DD'
+    delta = (e - s).days
+    if delta < 0:
+        return False, 'End date must be on or after start date'
+    if delta > max_days:
+        return False, f'Date range too large (max {max_days} days)'
+    return True, ''
+
 def set_cached(key, value):
     """Set cached value with current timestamp"""
     _cache[key] = value
     _cache_timestamps[key] = time.time()
+
+# NASA API Key - Get your free API key at https://api.nasa.gov/
+# DEMO_KEY has strict rate limits (30 requests/hour). Set NASA_API_KEY environment variable for better limits.
+NASA_API_KEY = os.environ.get('NASA_API_KEY', 'IBqp2hJRKzEe5n3q9XPGaEtB9awEux3KW70iiQpy')
 
 # SWPC API endpoints
 PLASMA_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
@@ -1526,6 +1557,487 @@ def logo():
 def solar_page():
     """Render the solar activity page"""
     return render_template('solar.html')
+
+@app.route('/historical')
+def historical_page():
+    """Render the historical data archive page"""
+    return render_template('historical.html')
+
+# ── Historical Data API Endpoints ────────────────────────────────────────
+
+@app.route('/api/historical/donki-flares')
+def historical_donki_flares():
+    """Proxy NASA DONKI solar flare data for a date range with caching"""
+    start = request.args.get('start', '')
+    end = request.args.get('end', '')
+    if not start or not end:
+        return jsonify([])
+    ok, msg = _validate_date_range(start, end)
+    if not ok:
+        return jsonify({'error': msg}), 400
+    
+    cache_key = f'donki_flares_{start}_{end}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    
+    try:
+        url = "https://api.nasa.gov/DONKI/FLR"
+        params = {'startDate': start, 'endDate': end, 'api_key': NASA_API_KEY}
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code == 429:
+            print("[HISTORICAL] DONKI flares: rate limit hit")
+            return jsonify({'_error': 'Rate limit - try again shortly'})
+        if resp.status_code == 200:
+            data = resp.json()
+            result = data if isinstance(data, list) else []
+            cache.set(cache_key, result, timeout=3600)
+            print(f"[HISTORICAL] Fetched {len(result)} flares")
+            return jsonify(result)
+        return jsonify([])
+    except Exception as e:
+        print(f"[HISTORICAL] DONKI flares error: {e}")
+        return jsonify([])
+
+@app.route('/api/historical/donki-cmes')
+def historical_donki_cmes():
+    """Proxy NASA DONKI CME data for a date range with caching"""
+    start = request.args.get('start', '')
+    end = request.args.get('end', '')
+    if not start or not end:
+        return jsonify([])
+    ok, msg = _validate_date_range(start, end)
+    if not ok:
+        return jsonify({'error': msg}), 400
+    
+    cache_key = f'donki_cmes_{start}_{end}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    
+    try:
+        url = "https://api.nasa.gov/DONKI/CME"
+        params = {'startDate': start, 'endDate': end, 'api_key': NASA_API_KEY}
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code == 429:
+            print("[HISTORICAL] DONKI CMEs: rate limit hit")
+            return jsonify({'_error': 'Rate limit - try again shortly'})
+        if resp.status_code == 200:
+            data = resp.json()
+            result = data if isinstance(data, list) else []
+            cache.set(cache_key, result, timeout=3600)
+            print(f"[HISTORICAL] Fetched {len(result)} CMEs")
+            return jsonify(result)
+        return jsonify([])
+    except Exception as e:
+        print(f"[HISTORICAL] DONKI CMEs error: {e}")
+        return jsonify([])
+
+@app.route('/api/historical/donki-storms')
+def historical_donki_storms():
+    """Proxy NASA DONKI geomagnetic storm data for a date range with caching"""
+    start = request.args.get('start', '')
+    end = request.args.get('end', '')
+    if not start or not end:
+        return jsonify([])
+    ok, msg = _validate_date_range(start, end)
+    if not ok:
+        return jsonify({'error': msg}), 400
+    
+    cache_key = f'donki_storms_{start}_{end}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    
+    try:
+        url = "https://api.nasa.gov/DONKI/GST"
+        params = {'startDate': start, 'endDate': end, 'api_key': NASA_API_KEY}
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code == 429:
+            print("[HISTORICAL] DONKI storms: rate limit hit")
+            return jsonify({'_error': 'Rate limit - try again shortly'})
+        if resp.status_code == 200:
+            data = resp.json()
+            result = data if isinstance(data, list) else []
+            cache.set(cache_key, result, timeout=3600)
+            print(f"[HISTORICAL] Fetched {len(result)} storms")
+            return jsonify(result)
+        return jsonify([])
+    except Exception as e:
+        print(f"[HISTORICAL] DONKI storms error: {e}")
+        return jsonify([])
+
+@app.route('/api/historical/donki-seps')
+def historical_donki_seps():
+    """Proxy NASA DONKI solar energetic particle data for a date range with caching"""
+    start = request.args.get('start', '')
+    end = request.args.get('end', '')
+    if not start or not end:
+        return jsonify([])
+    ok, msg = _validate_date_range(start, end)
+    if not ok:
+        return jsonify({'error': msg}), 400
+    
+    cache_key = f'donki_seps_{start}_{end}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    
+    try:
+        url = "https://api.nasa.gov/DONKI/SEP"
+        params = {'startDate': start, 'endDate': end, 'api_key': NASA_API_KEY}
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code == 429:
+            print("[HISTORICAL] DONKI SEPs: rate limit hit")
+            return jsonify({'_error': 'Rate limit - try again shortly'})
+        if resp.status_code == 200:
+            data = resp.json()
+            result = data if isinstance(data, list) else []
+            cache.set(cache_key, result, timeout=3600)
+            print(f"[HISTORICAL] Fetched {len(result)} SEP events")
+            return jsonify(result)
+        return jsonify([])
+    except Exception as e:
+        print(f"[HISTORICAL] DONKI SEPs error: {e}")
+        return jsonify([])
+
+@app.route('/api/historical/solar-wind')
+def historical_solar_wind():
+    """Fetch historical solar wind at 1-minute resolution from CDAWeb HAPI OMNI.
+    Combines 1-minute solar wind data with hourly Kp/Dst indices."""
+    start = request.args.get('start', '')
+    end = request.args.get('end', '')
+    if not start or not end:
+        return jsonify({'data': []})
+    ok, msg = _validate_date_range(start, end)
+    if not ok:
+        return jsonify({'data': [], 'error': msg}), 400
+    ok, msg = _validate_date_range(start, end)
+    if not ok:
+        return jsonify({'data': [], 'error': msg}), 400
+    try:
+        hapi_url = "https://cdaweb.gsfc.nasa.gov/hapi/data"
+        
+        # Fetch 1-minute solar wind data (Bt, Bz, speed, density)
+        # Parameters MUST be in schema order: F, BZ_GSM, flow_speed, proton_density
+        params_1min = {
+            'id': 'OMNI_HRO_1MIN',
+            'parameters': 'F,BZ_GSM,flow_speed,proton_density',
+            'time.min': f'{start}T00:00:00Z',
+            'time.max': f'{end}T23:59:59Z',
+            'format': 'json'
+        }
+        resp_1min = requests.get(hapi_url, params=params_1min, timeout=60)
+        
+        # Fetch hourly Kp/Dst data
+        params_hourly = {
+            'id': 'OMNI2_H0_MRG1HR',
+            'parameters': 'KP1800,DST1800',
+            'time.min': f'{start}T00:00:00Z',
+            'time.max': f'{end}T23:59:59Z',
+            'format': 'json'
+        }
+        resp_hourly = requests.get(hapi_url, params=params_hourly, timeout=30)
+        
+        if resp_1min.status_code != 200:
+            print(f"[HISTORICAL] 1-min HAPI error: {resp_1min.status_code}")
+            return jsonify({'data': []})
+        
+        raw_1min = resp_1min.json()
+        rows_1min = raw_1min.get('data', [])
+        
+        # Build hourly Kp/Dst lookup
+        kp_dst_map = {}
+        if resp_hourly.status_code == 200:
+            raw_hourly = resp_hourly.json()
+            for row in raw_hourly.get('data', []):
+                if not row or len(row) < 3:
+                    continue
+                try:
+                    time_str = str(row[0])[:13]  # Hour precision: '2024-05-10T12'
+                    kp_val = float(row[1]) if row[1] is not None else None
+                    dst_val = float(row[2]) if row[2] is not None else None
+                    kp = kp_val if kp_val and kp_val < 90 else None
+                    dst = dst_val if dst_val and abs(dst_val) < 9999 else None
+                    kp_dst_map[time_str] = {'kp': kp, 'dst': dst}
+                except (ValueError, IndexError, TypeError):
+                    continue
+        
+        # Merge 1-minute data with hourly Kp/Dst
+        # Row format: [time, F(bt), BZ_GSM(bz), flow_speed, proton_density]
+        result = []
+        for row in rows_1min:
+            if not row or len(row) < 5:
+                continue
+            try:
+                time_str = str(row[0])
+                hour_key = time_str[:13]
+                bt_val = float(row[1]) if row[1] is not None else None
+                bz_val = float(row[2]) if row[2] is not None else None
+                speed_val = float(row[3]) if row[3] is not None else None
+                density_val = float(row[4]) if row[4] is not None else None
+                
+                # Filter out fill values
+                bt = bt_val if bt_val and bt_val < 999 else None
+                bz = bz_val if bz_val and abs(bz_val) < 999 else None
+                speed = speed_val if speed_val and speed_val < 9999 else None
+                density = density_val if density_val and density_val < 999 else None
+            except (ValueError, IndexError, TypeError):
+                continue
+            
+            # Get Kp/Dst from hourly data for this hour
+            hourly_data = kp_dst_map.get(hour_key, {})
+            result.append({
+                't': time_str,
+                'bt': bt,
+                'bz': bz,
+                'n': density,
+                'v': speed,
+                'kp': hourly_data.get('kp'),
+                'dst': hourly_data.get('dst')
+            })
+        
+        print(f"[HISTORICAL] Fetched {len(result)} 1-minute records")
+        return jsonify({'data': result})
+    except Exception as e:
+        print(f"[HISTORICAL] OMNI solar wind error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'data': []})
+
+@app.route('/api/historical/sdo-images')
+def historical_sdo_images():
+    """Generate SDO solar imagery URLs for a date range and channel via Helioviewer API.
+    Returns images every 30 minutes, spanning up to 11 days."""
+    start_str = request.args.get('start', '')
+    end_str = request.args.get('end', '')
+    channel = request.args.get('channel', '0193')
+    # Optional scale parameter (float). Smaller ~ shows less zoom depending on Helioviewer semantics.
+    try:
+        scale = float(request.args.get('scale', '4.0'))
+    except Exception:
+        scale = 4.0
+    if not start_str:
+        return jsonify({'images': []})
+    try:
+        start_dt = datetime.strptime(start_str, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_str, '%Y-%m-%d') if end_str else start_dt
+
+        # Cap at 11 days
+        max_end = start_dt + timedelta(days=11)
+        if end_dt > max_end:
+            end_dt = max_end
+
+        total_days = (end_dt - start_dt).days + 1
+
+        source_map = {
+            '0094': ('SDO', 'AIA', 'AIA', '94'),
+            '0131': ('SDO', 'AIA', 'AIA', '131'),
+            '0171': ('SDO', 'AIA', 'AIA', '171'),
+            '0193': ('SDO', 'AIA', 'AIA', '193'),
+            '0211': ('SDO', 'AIA', 'AIA', '211'),
+            '0304': ('SDO', 'AIA', 'AIA', '304'),
+            '0335': ('SDO', 'AIA', 'AIA', '335'),
+            '1600': ('SDO', 'AIA', 'AIA', '1600'),
+            '1700': ('SDO', 'AIA', 'AIA', '1700'),
+            'HMIB': ('SDO', 'HMI', 'HMI', 'magnetogram'),
+            'HMIIC': ('SDO', 'HMI', 'HMI', 'continuum'),
+        }
+
+        info = source_map.get(channel, source_map['0193'])
+        obs, inst, det, measurement = info
+        layers_str = f"[{obs},{inst},{det},{measurement},1,100]"
+
+        from urllib.parse import quote
+        layers_encoded = quote(layers_str)
+
+        images = []
+        current = start_dt
+        while current <= end_dt:
+            for hour in range(0, 24):
+                for minute in [0, 30]:
+                    img_dt = current.replace(hour=hour, minute=minute, second=0)
+                    date_iso = img_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+                    # imageScale controls zoom. Use the provided scale parameter.
+                    base_params = f"date={date_iso}&imageScale={scale}&layers={layers_encoded}&x0=0&y0=0&watermark=false"
+                    url_thumb = f"https://api.helioviewer.org/v2/takeScreenshot/?{base_params}&width=512&height=512&display=true"
+                    url_full = f"https://api.helioviewer.org/v2/takeScreenshot/?{base_params}&width=1024&height=1024&display=true"
+
+                    time_label = img_dt.strftime('%Y-%m-%d %H:%M UTC')
+                    images.append({
+                        'url_thumb': url_thumb,
+                        'url_full': url_full,
+                        'label': f'{inst} {measurement}',
+                        'time': time_label,
+                        'timestamp': date_iso
+                    })
+            current += timedelta(days=1)
+
+        # If too many images (long date range), sample down to ~528
+        if len(images) > 528:
+            step = len(images) // 528
+            images = images[::step]
+
+        return jsonify({'images': images, 'total_days': total_days})
+    except Exception as e:
+        print(f"[HISTORICAL] SDO images error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'images': [], 'error': str(e)})
+
+
+@app.route('/api/historical/goes-xray')
+def historical_goes_xray():
+    """Fetch historical GOES X-ray flux (1-minute resolution) for a date range from CDAWeb HAPI.
+    Returns records: {'t': ISO, 'xrs_long': val, 'xrs_short': val}
+    Uses GOES-17 or GOES-16 XRS 1-minute data from CDAWeb.
+    """
+    start = request.args.get('start', '')
+    end = request.args.get('end', '')
+    if not start or not end:
+        return jsonify({'data': []})
+    
+    try:
+        hapi_url = "https://cdaweb.gsfc.nasa.gov/hapi/data"
+        
+        # Try GOES-16 and GOES-17 XRS 1-minute averaged datasets
+        # Parameters: xrsa_flux (0.5-4 Angstrom), xrsb_flux (1-8 Angstrom)
+        candidates = [
+            ('GOES16_XRS_1M', 'xrsa_flux,xrsb_flux'),  # GOES-16 1-min
+            ('GOES17_XRS_1M', 'xrsa_flux,xrsb_flux'),  # GOES-17 1-min
+            ('G16_XRSF_1M', 'xrsa_flux,xrsb_flux'),
+            ('G17_XRSF_1M', 'xrsa_flux,xrsb_flux')
+        ]
+        
+        for dataset_id, params in candidates:
+            try:
+                params_req = {
+                    'id': dataset_id,
+                    'parameters': params,
+                    'time.min': f'{start}T00:00:00Z',
+                    'time.max': f'{end}T23:59:59Z',
+                    'format': 'json'
+                }
+                resp = requests.get(hapi_url, params=params_req, timeout=60)
+                
+                if resp.status_code != 200:
+                    continue
+                
+                data = resp.json()
+                rows = data.get('data', [])
+                if not rows:
+                    continue
+                
+                # Row format: [time, xrsa_flux, xrsb_flux]
+                # xrsa = 0.5-4 Angstrom (short channel)
+                # xrsb = 1-8 Angstrom (long channel)
+                result = []
+                for row in rows:
+                    try:
+                        time_str = row[0]
+                        xrsa = row[1] if row[1] is not None and row[1] > 0 and row[1] < 1 else None  # Filter bad data
+                        xrsb = row[2] if row[2] is not None and row[2] > 0 and row[2] < 1 else None
+                        result.append({
+                            't': time_str,
+                            'xrs_short': xrsa,  # 0.5-4 Angstrom
+                            'xrs_long': xrsb    # 1-8 Angstrom
+                        })
+                    except Exception:
+                        continue
+                
+                if result:
+                    print(f"[HISTORICAL] GOES X-ray: fetched {len(result)} records from {dataset_id}")
+                    return jsonify({'data': result})
+                    
+            except Exception as e:
+                print(f"[HISTORICAL] GOES X-ray attempt error for {dataset_id}: {e}")
+                continue
+        
+        # If CDAWeb fails, try SWPC rolling products as fallback (only for recent dates)
+        swpc_urls = [
+            'https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json',
+            'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json'
+        ]
+        
+        # Parse start/end datetimes for filtering
+        try:
+            start_dt = datetime.fromisoformat(f'{start}T00:00:00+00:00')
+            end_dt = datetime.fromisoformat(f'{end}T23:59:59+00:00')
+        except Exception as e:
+            print(f"[HISTORICAL] GOES X-ray: invalid date format {start}/{end}: {e}")
+            print(f"[HISTORICAL] GOES X-ray: no data found for {start} to {end}")
+            return jsonify({'data': []})
+        
+        for url in swpc_urls:
+            try:
+                resp = requests.get(url, timeout=15)
+                if resp.status_code != 200:
+                    continue
+                
+                swpc_data = resp.json()
+                if not swpc_data or not isinstance(swpc_data, list):
+                    continue
+                
+                # SWPC JSON format: list of dict with time_tag, energy, flux
+                # energy: "0.1-0.8nm" (long/1-8Å) or "0.05-0.4nm" (short/0.5-4Å)
+                by_time = {}
+                filtered_count = 0
+                for item in swpc_data:
+                    if not isinstance(item, dict):
+                        continue
+                    t_str = item.get('time_tag', '')
+                    if not t_str:
+                        continue
+                    
+                    # Filter by date range
+                    try:
+                        item_dt = datetime.fromisoformat(t_str.replace('Z', '+00:00'))
+                        if not (start_dt <= item_dt <= end_dt):
+                            continue
+                        filtered_count += 1
+                    except Exception as e:
+                        # Skip items with unparseable timestamps
+                        continue
+                    
+                    if t_str not in by_time:
+                        by_time[t_str] = {}
+                    
+                    energy = item.get('energy', '')
+                    flux = item.get('flux')
+                    if flux is not None and flux > 0 and flux < 1:
+                        if '0.1-0.8' in energy:  # 0.1-0.8nm = 1-8 Angstrom (long)
+                            by_time[t_str]['xrs_long'] = flux
+                        elif '0.05-0.4' in energy:  # 0.05-0.4nm = 0.5-4 Angstrom (short)
+                            by_time[t_str]['xrs_short'] = flux
+                
+                # Build result array combining both channels
+                result = []
+                for t in sorted(by_time.keys()):
+                    vals = by_time[t]
+                    if 'xrs_long' in vals and 'xrs_short' in vals:
+                        result.append({
+                            't': t,
+                            'xrs_long': vals['xrs_long'],
+                            'xrs_short': vals['xrs_short']
+                        })
+                
+                if result:
+                    print(f"[HISTORICAL] GOES X-ray: fetched {len(result)} records from SWPC {url} (filtered {filtered_count} items in range)")
+                    return jsonify({'data': result})
+                    
+            except Exception as e:
+                print(f"[HISTORICAL] GOES X-ray SWPC error for {url}: {e}")
+                continue
+        
+        print(f"[HISTORICAL] GOES X-ray: no data found for {start} to {end}")
+        return jsonify({'data': []})
+        
+    except Exception as e:
+        print(f"[HISTORICAL] GOES X-ray error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'data': []})
 
 @app.route('/api/solar-data')
 def get_solar_data():
