@@ -635,6 +635,8 @@ function getChart(id) {
 }
 
 function kpColor(kp) {
+    // Treat very high fractional Kp (e.g. 8.7) as Kp9 and color purple
+    if (kp >= 8.7) return '#8b5cf6';
     if (kp >= 9) return '#ef4444'; if (kp >= 8) return '#f87171'; if (kp >= 7) return '#fb923c';
     if (kp >= 6) return '#fbbf24'; if (kp >= 5) return '#facc15'; if (kp >= 4) return '#a3e635';
     if (kp >= 3) return '#4ade80'; if (kp >= 2) return '#34d399'; return '#22d3ee';
@@ -662,7 +664,11 @@ function renderKpChart(omni) {
         backgroundColor: 'transparent',
         textStyle: { fontFamily: 'Inter,system-ui,sans-serif', color: '#8b8b8b' },
         tooltip: { trigger: 'axis', backgroundColor: 'rgba(20,20,20,.95)', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#e5e5e5', fontSize: 12 },
-            formatter: function(p) { var v = p[0].value; return p[0].name + '<br/>Kp: <b>' + (typeof v === 'number' ? v.toFixed(1) : v) + '</b>'; }
+            formatter: function(p) {
+                var v = p[0].value;
+                var display = typeof v === 'number' ? (v >= 8.7 ? '9' : v.toFixed(1)) : v;
+                return p[0].name + '<br/>Kp: <b>' + display + '</b>';
+            }
         },
         grid: { left: 50, right: 20, top: 30, bottom: 45, containLabel: false },
         dataZoom: ZOOM,
@@ -672,7 +678,9 @@ function renderKpChart(omni) {
             type: 'bar',
             data: kpData.map(d => {
                 var kp = d.kp / 10;
-                return { value: kp, itemStyle: { color: kpColor(kp), borderRadius: [2, 2, 0, 0] } };
+                // Promote high fractional Kp (e.g. 8.7) to 9 for display
+                var displayVal = kp >= 8.7 ? 9 : kp;
+                return { value: displayVal, itemStyle: { color: kpColor(kp), borderRadius: [2, 2, 0, 0] } };
             }),
             barMaxWidth: 30
         }]
