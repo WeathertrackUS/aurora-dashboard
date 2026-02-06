@@ -349,6 +349,16 @@
                     <div class="imagery-mode-toggle">
                         <button class="mode-toggle-btn active" onclick="setComparisonMode(false, this)">Single View</button>
                         <button class="mode-toggle-btn" onclick="setComparisonMode(true, this)">Comparison Mode</button>
+                        <div style="display:flex;gap:.5rem;align-items:center;margin-left:auto">
+                            <label style="font-size:.78rem;color:var(--text-secondary);white-space:nowrap">Frame Interval:</label>
+                            <select id="frame-interval-select" class="featured-select" style="max-width:120px;padding:.35rem .5rem;font-size:.78rem" onchange="setFrameInterval(this.value)">
+                                <option value="15">15 min</option>
+                                <option value="30" selected>30 min</option>
+                                <option value="45">45 min</option>
+                                <option value="60">1 hour</option>
+                                <option value="120">2 hours</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="imagery-tabs-left" class="sub-tabs">
                         <button class="sub-tab active" data-channel="0193" onclick="switchImagery('0193',this,'left')">AIA 193 &#xC5;</button>
@@ -408,7 +418,7 @@ const S = {
     flareExpanded: false, cmeExpanded: false, sepExpanded: false,
     flareSort: { col: 0, asc: false }, sepSort: { col: 0, asc: false },
     imgData: [], imgDataRight: [], imgIndex: 0, imgPlaying: false, imgTimer: null,
-    comparisonMode: false, rightChannel: '0171', imageScale: 4.0
+    comparisonMode: false, rightChannel: '0171', imageScale: 4.0, frameInterval: 30
 };
 const VISIBLE_ROWS = 10;
 
@@ -1194,6 +1204,11 @@ function toggleListExpand(listId) {
 }
 
 // ── SDO Imagery Slider ──────────────────────────────────────────
+function setFrameInterval(val) {
+    S.frameInterval = parseInt(val) || 30;
+    if (S.startDate) loadSDOImagery();
+}
+
 async function loadSDOImagery() {
     var gallery = document.getElementById('imagery-gallery');
     if (!S.startDate) {
@@ -1204,8 +1219,8 @@ async function loadSDOImagery() {
     gallery.innerHTML = '<div class="loading-box"><div class="spinner-sm"></div><p>Loading imagery data...</p></div>';
 
     try {
-        // Fetch left channel data
-        var resp = await fetch('/api/historical/sdo-images?start=' + S.startDate + '&end=' + S.endDate + '&channel=' + S.currentChannel + '&scale=' + encodeURIComponent(S.imageScale));
+        // Fetch left channel data with frame interval
+        var resp = await fetch('/api/historical/sdo-images?start=' + S.startDate + '&end=' + S.endDate + '&channel=' + S.currentChannel + '&scale=' + encodeURIComponent(S.imageScale) + '&interval=' + S.frameInterval);
         var data = await resp.json();
         if (!data.images || !data.images.length) {
             gallery.innerHTML = '<div class="empty-box"><span class="icon">&#x1F52D;</span><p>No imagery found. SDO archive available from 2010 onwards.</p></div>';
@@ -1216,9 +1231,9 @@ async function loadSDOImagery() {
         S.imgIndex = 0;
         stopPlayback();
 
-        // If comparison mode, fetch right channel data
+        // If comparison mode, fetch right channel data with frame interval
         if (S.comparisonMode) {
-            var respRight = await fetch('/api/historical/sdo-images?start=' + S.startDate + '&end=' + S.endDate + '&channel=' + S.rightChannel + '&scale=' + encodeURIComponent(S.imageScale));
+            var respRight = await fetch('/api/historical/sdo-images?start=' + S.startDate + '&end=' + S.endDate + '&channel=' + S.rightChannel + '&scale=' + encodeURIComponent(S.imageScale) + '&interval=' + S.frameInterval);
             var dataRight = await respRight.json();
             S.imgDataRight = dataRight.images || [];
         }

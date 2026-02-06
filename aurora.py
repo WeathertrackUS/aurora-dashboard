@@ -1042,8 +1042,8 @@ def generate_aurora_image():
     
     # Lines: Thinner and sharper for a cleaner look
     ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=0.8, alpha=0.8, zorder=1)
-    ax_map.add_feature(cfeature.BORDERS, edgecolor="#8C99AA", linewidth=0.5, alpha=0.6, zorder=1)
-    ax_map.add_feature(cfeature.STATES, edgecolor="#BFC6CF", linewidth=0.5, linestyle=':', alpha=0.9, zorder=1)
+    ax_map.add_feature(cfeature.BORDERS, edgecolor="#8C99AA", linewidth=0.6, alpha=0.6, zorder=1)
+    ax_map.add_feature(cfeature.STATES, edgecolor="#E1E2E2", linewidth=0.8, linestyle=':', alpha=0.9, zorder=1)
     
     # Add lat/lon grid
     gl = ax_map.gridlines(draw_labels=False, linewidth=0.3, color='#475569', 
@@ -1087,8 +1087,8 @@ def generate_aurora_image():
             ])
             
             # Create high-resolution grid for smoother interpolation
-            lon_grid = np.linspace(-180, 180, 1080)  # Higher resolution for smoother oval
-            lat_grid = np.linspace(35, 85, 300)  # Higher resolution for smoother oval
+            lon_grid = np.linspace(-180, 180, 1440)  # Higher resolution for smoother oval
+            lat_grid = np.linspace(35, 85, 600)  # Higher resolution for smoother oval
             lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
             
             # Interpolate using cubic method for smoother results
@@ -1807,8 +1807,8 @@ def historical_solar_wind():
 
 @app.route('/api/historical/sdo-images')
 def historical_sdo_images():
-    """Generate SDO solar imagery URLs for a date range and channel via Helioviewer API.
-    Returns images every 30 minutes, spanning up to 11 days."""
+    """Generate SDO/LASCO solar imagery URLs for a date range and channel via Helioviewer API.
+    Returns images at specified intervals (15, 30, 45, 60, 120 minutes), spanning up to 11 days."""
     start_str = request.args.get('start', '')
     end_str = request.args.get('end', '')
     channel = request.args.get('channel', '0193')
@@ -1817,6 +1817,14 @@ def historical_sdo_images():
         scale = float(request.args.get('scale', '4.0'))
     except Exception:
         scale = 4.0
+    # Frame interval in minutes (15, 30, 45, 60, 120)
+    try:
+        interval = int(request.args.get('interval', '30'))
+        if interval not in [15, 30, 45, 60, 120]:
+            interval = 30
+    except Exception:
+        interval = 30
+    
     if not start_str:
         return jsonify({'images': []})
     try:
@@ -1842,36 +1850,65 @@ def historical_sdo_images():
             '1700': ('SDO', 'AIA', 'AIA', '1700'),
             'HMIB': ('SDO', 'HMI', 'HMI', 'magnetogram'),
             'HMIIC': ('SDO', 'HMI', 'HMI', 'continuum'),
+            'LASCO-C2': ('SOHO', 'LASCO', 'LASCO', 'white-light'),
+            'LASCO-C3': ('SOHO', 'LASCO', 'LASCO', 'white-light'),
         }
 
         info = source_map.get(channel, source_map['0193'])
         obs, inst, det, measurement = info
+        
+        # For LASCO, we need to specify which coronagraph (C2 or C3) in the detector field
+        if channel == 'LASCO-C2':
+            det = 'C2'
+        elif channel == 'LASCO-C3':
+            det = 'C3'
+        
         layers_str = f"[{obs},{inst},{det},{measurement},1,100]"
 
         from urllib.parse import quote
         layers_encoded = quote(layers_str)
 
+        # LASCO imagery requires smaller scale values to show the full coronagraph
+        # Also LASCO has different cadence, so we'll request closest available image
+        if channel.startswith('LASCO'):
+            if channel == 'LASCO-C2':
+                effective_scale = 2.5  # C2: 2-6 solar radii
+            else:  # LASCO-C3
+                effective_scale = 1.0  # C3: 3.7-30 solar radii
+        else:
+            effective_scale = scale
+
         images = []
         current = start_dt
         while current <= end_dt:
-            for hour in range(0, 24):
-                for minute in [0, 30]:
-                    img_dt = current.replace(hour=hour, minute=minute, second=0)
-                    date_iso = img_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+            img_dt = current.replace(hour=0, minute=0, second=0)
+            # Generate frames based on interval
+            while img_dt.date() == current.date():
+                date_iso = img_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-                    # imageScale controls zoom. Use the provided scale parameter.
-                    base_params = f"date={date_iso}&imageScale={scale}&layers={layers_encoded}&x0=0&y0=0&watermark=false"
+                # Use takeScreenshot for SDO/AIA/HMI (regular cadence)
+                # For LASCO, we need closest image matching due to irregular cadence
+                base_params = f"date={date_iso}&imageScale={effective_scale}&layers={layers_encoded}&x0=0&y0=0&watermark=false"
+                
+                if channel.startswith('LASCO'):
+                    # LASCO has irregular cadence, so build URL that works with their data
+                    url_thumb = f"https://api.helioviewer.org/v2/takeScreenshot/?{base_params}&width=512&height=512&display=true"
+                    url_full = f"https://api.helioviewer.org/v2/takeScreenshot/?{base_params}&width=1024&height=1024&display=true"
+                else:
+                    # SDO/AIA/HMI have regular cadence
                     url_thumb = f"https://api.helioviewer.org/v2/takeScreenshot/?{base_params}&width=512&height=512&display=true"
                     url_full = f"https://api.helioviewer.org/v2/takeScreenshot/?{base_params}&width=1024&height=1024&display=true"
 
-                    time_label = img_dt.strftime('%Y-%m-%d %H:%M UTC')
-                    images.append({
-                        'url_thumb': url_thumb,
-                        'url_full': url_full,
-                        'label': f'{inst} {measurement}',
-                        'time': time_label,
-                        'timestamp': date_iso
-                    })
+                time_label = img_dt.strftime('%Y-%m-%d %H:%M UTC')
+                images.append({
+                    'url_thumb': url_thumb,
+                    'url_full': url_full,
+                    'label': f'{inst} {det if channel.startswith("LASCO") else measurement}',
+                    'time': time_label,
+                    'timestamp': date_iso
+                })
+                
+                img_dt += timedelta(minutes=interval)
             current += timedelta(days=1)
 
         # If too many images (long date range), sample down to ~528
@@ -1881,7 +1918,7 @@ def historical_sdo_images():
 
         return jsonify({'images': images, 'total_days': total_days})
     except Exception as e:
-        print(f"[HISTORICAL] SDO images error: {e}")
+        print(f"[HISTORICAL] SDO/LASCO images error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'images': [], 'error': str(e)})
@@ -2903,6 +2940,10 @@ def generate_solar_overview():
 
 def generate_map_image():
     """Generate just the auroral oval map image"""
+    import time
+    start_time = time.time()
+    print("[MAP] Starting generation...")
+    
     ovation_lons, ovation_lats, ovation_aurora, ovation_time = fetch_ovation_data()
     
     # Create figure with transparent background
@@ -2911,16 +2952,37 @@ def generate_map_image():
     ax_map = fig.add_subplot(1, 1, 1, projection=ccrs.Orthographic(-95, 55))
     ax_map.set_extent([-135, -55, 25, 85], crs=ccrs.PlateCarree())
     
-    # Add map features with cleaner look
-    # Land: Dark slate blue/grey, Ocean: Very dark blue/black
-    ax_map.add_feature(cfeature.LAND, facecolor='#1e293b', edgecolor='none', zorder=0)
-    ax_map.add_feature(cfeature.OCEAN, facecolor='#020617', edgecolor='none', zorder=0)
-    ax_map.add_feature(cfeature.LAKES, facecolor='#020617', edgecolor='none', zorder=0)
+    # ── Map features (50m) ────────────────────────────────────────────
+    # Use 50m Natural Earth data for balance of detail and performance (10m is too slow)
+    scale = '50m'
     
-    # Lines: Thinner and sharper for a cleaner look
-    ax_map.add_feature(cfeature.COASTLINE, edgecolor='#38bdf8', linewidth=0.8, alpha=0.8, zorder=1)
-    ax_map.add_feature(cfeature.BORDERS, edgecolor='#475569', linewidth=0.5, alpha=0.5, zorder=1)
-    ax_map.add_feature(cfeature.STATES, edgecolor='#334155', linewidth=0.5, linestyle=':', alpha=0.5, zorder=1)
+    # Use 50m for polygons and primary boundaries
+    land_feature = cfeature.NaturalEarthFeature('physical', 'land', scale,
+                                        facecolor='#1e293b', edgecolor='none')
+    ocean_feature = cfeature.NaturalEarthFeature('physical', 'ocean', scale,
+                                         facecolor='#020617', edgecolor='none')
+    lakes_feature = cfeature.NaturalEarthFeature('physical', 'lakes', scale,
+                                         facecolor='#020617', edgecolor='none')
+    coast_feature = cfeature.NaturalEarthFeature('physical', 'coastline', scale,
+                                         facecolor='none', edgecolor='#38bdf8')
+    borders_feature = cfeature.NaturalEarthFeature('cultural', 'admin_0_boundary_lines_land', scale,
+                                           facecolor='none', edgecolor='#475569')
+    states_feature = cfeature.NaturalEarthFeature('cultural', 'admin_1_states_provinces_lines', scale,
+                                          facecolor='none', edgecolor="#BBBFC5")
+    
+    # Use 50m for rivers
+    rivers_feature = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', scale,
+                                          facecolor='none', edgecolor='#0e4577')
+    
+    ax_map.add_feature(ocean_feature, zorder=0)
+    ax_map.add_feature(land_feature, zorder=0)
+    ax_map.add_feature(lakes_feature, zorder=0)
+    
+    # Lines
+    ax_map.add_feature(rivers_feature, linewidth=0.2, alpha=0.3, zorder=1)
+    ax_map.add_feature(coast_feature, linewidth=0.6, alpha=0.8, zorder=1)
+    ax_map.add_feature(borders_feature, linewidth=0.5, alpha=0.5, zorder=1)
+    ax_map.add_feature(states_feature, linewidth=0.6, linestyle=':', alpha=0.4, zorder=1)
     
     # Add lat/lon grid
     gl = ax_map.gridlines(draw_labels=False, linewidth=0.3, color='#475569', 
@@ -3074,6 +3136,9 @@ def generate_map_image():
     buf.seek(0)
     plt.close(fig)
     
+    elapsed = time.time() - start_time
+    print(f"[MAP] Generation completed in {elapsed:.2f}s")
+    
     return buf
 
 @app.route('/aurora-map.png')
@@ -3092,7 +3157,8 @@ def get_aurora_map_image():
         
         # Try to acquire lock for generation
         # If another request is already generating, wait for it with timeout
-        lock_acquired = _map_generation_lock.acquire(timeout=45)
+        # Increased timeout to 120s to handle high-res map generation/download
+        lock_acquired = _map_generation_lock.acquire(timeout=120)
         
         if not lock_acquired:
             # Timeout waiting for lock - return stale cache if available or error

@@ -58,6 +58,15 @@
             --font-mono: 'JetBrains Mono', monospace;
         }
 
+        /* Simple gray background for Geomagnetic page (disable decorative bubbles) */
+        body.geomag-simple {
+            background-image: none !important;
+            background-color: var(--bg-dark) !important;
+        }
+        body.geomag-simple .bg-noise {
+            display: none !important;
+            opacity: 0 !important;
+        }
         body {
             background-color: var(--bg-dark);
             color: var(--text-primary);
@@ -89,8 +98,8 @@
         .dashboard-grid {
             display: grid;
             grid-template-columns: 1.6fr 1fr;
-            grid-template-rows: minmax(80px, 0.5fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto;
-            gap: 0.5rem;
+            grid-template-rows: minmax(60px, 0.4fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) auto;
+            gap: 0.4rem;
             width: 100%;
             max-width: 2400px;
             margin: 0 auto;
@@ -103,7 +112,7 @@
             border: var(--glass-border);
             border-radius: 3px;
             padding: 0.25rem;
-            min-height: 120px;
+            min-height: 100px;
             height: 100%;
             position: relative;
             overflow: hidden;
@@ -141,8 +150,8 @@
         
         .chart-container {
             width: 100%;
-            height: calc(100% - 35px);
-            min-height: 80px;
+            height: calc(100% - 28px);
+            min-height: 70px;
             position: absolute;
             bottom: 0;
             left: 0;
@@ -151,9 +160,9 @@
 
         .chart-title {
             position: absolute;
-            top: 8px;
+            top: 5px;
             left: 10px;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 500;
             letter-spacing: 0.05em;
             color: var(--text-secondary);
@@ -165,9 +174,9 @@
         
         .chart-value {
             position: absolute;
-            top: 6px;
+            top: 3px;
             right: 10px;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
             color: var(--text-primary);
             z-index: 10;
@@ -928,128 +937,109 @@
         .toast-success { border-left: 4px solid var(--success); }
         .toast-error { border-left: 4px solid var(--danger); }
 
-        /* Geomagnetic Forecast Styles */
+        /* Geomagnetic Forecast Styles — Flat card design */
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
         .forecast-day {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-            flex: 1;
+            align-items: stretch;
+            gap: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .forecast-day-header {
+            padding: 0.5rem 0.5rem 0.35rem;
+            text-align: center;
+            background: var(--bg-card-hover);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
         }
 
         .forecast-date {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: var(--text-secondary);
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            line-height: 1;
         }
 
-        .forecast-bar-container {
-            width: 100%;
+        .forecast-date-sub {
+            font-size: 0.62rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        .forecast-body {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .forecast-bar {
-            width: 100%;
-            height: 120px;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-            border-radius: 6px;
-            border: 1px solid rgba(255,255,255,0.1);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
-
-        .forecast-fill {
-            width: 100%;
-            border-radius: 4px;
-            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
-            display: flex;
             align-items: center;
             justify-content: center;
+            padding: 0.75rem 0.5rem;
+            gap: 0.3rem;
+        }
+
+        .forecast-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
             font-weight: 700;
-            font-size: 1.1rem;
-            color: white;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            font-size: 0.85rem;
+            color: #fff;
+            letter-spacing: 0.3px;
+            min-width: 48px;
         }
 
-        .forecast-fill.g0 {
-            background: linear-gradient(to top, #4ade80, #22c55e);
-            height: 16.67%;
-        }
-
-        .forecast-fill.g1 {
-            background: linear-gradient(to top, #fbbf24, #f59e0b);
-            height: 33.33%;
-        }
-
-        .forecast-fill.g2 {
-            background: linear-gradient(to top, #fb923c, #f97316);
-            height: 50%;
-        }
-
-        .forecast-fill.g3 {
-            background: linear-gradient(to top, #ef4444, #dc2626);
-            height: 66.67%;
-        }
-
-        .forecast-fill.g4 {
-            background: linear-gradient(to top, #dc2626, #b91c1c);
-            height: 83.33%;
-        }
-
-        .forecast-fill.g5 {
-            background: linear-gradient(to top, #991b1b, #7f1d1d);
-            height: 100%;
-        }
-
-        .forecast-label {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-top: 0.25rem;
-        }
+        .forecast-badge.g0 { background: #22c55e; }
+        .forecast-badge.g1 { background: #eab308; }
+        .forecast-badge.g2 { background: #f97316; }
+        .forecast-badge.g3 { background: #ef4444; }
+        .forecast-badge.g4 { background: #dc2626; }
+        .forecast-badge.g5 { background: #991b1b; }
 
         .forecast-kp {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
             font-family: var(--font-mono);
         }
 
-        .forecast-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-            margin-top: 0.5rem;
+        .forecast-severity {
+            font-size: 0.62rem;
+            color: var(--text-secondary);
+            opacity: 0.8;
         }
 
-        .forecast-legend {
+        .forecast-scale {
             display: flex;
             justify-content: center;
-            gap: 0.75rem;
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.7rem;
-            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.6rem;
+            padding-top: 0.6rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
         }
 
-        .legend-item {
+        .forecast-scale-item {
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 3px;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
         }
 
-        .legend-color {
-            width: 12px;
-            height: 12px;
+        .forecast-scale-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 2px;
         }
 
@@ -1259,15 +1249,12 @@
             /* Forecast grid mobile */
             .forecast-grid {
                 grid-template-columns: repeat(3, 1fr);
-                gap: 0.5rem;
+                gap: 0.4rem;
             }
             
-            .forecast-bar {
-                height: 100px;
-            }
-            
-            .forecast-fill {
-                font-size: 0.9rem;
+            .forecast-badge {
+                font-size: 0.8rem;
+                padding: 0.2rem 0.6rem;
             }
             
             /* Time range selector mobile */
@@ -1430,37 +1417,35 @@
             }
             
             .forecast-date {
-                font-size: 0.65rem;
+                font-size: 0.62rem;
             }
             
-            .forecast-bar {
-                height: 80px;
-            }
-            
-            .forecast-fill {
-                font-size: 0.8rem;
+            .forecast-badge {
+                font-size: 0.75rem;
+                padding: 0.15rem 0.5rem;
             }
             
             .forecast-kp {
-                font-size: 0.6rem;
+                font-size: 0.58rem;
             }
             
-            .forecast-legend {
-                gap: 0.5rem;
-                font-size: 0.6rem;
-                flex-wrap: wrap;
-                justify-content: center;
+            .forecast-scale {
+                gap: 0.25rem;
             }
             
-            .legend-color {
-                width: 10px;
-                height: 10px;
+            .forecast-scale-item {
+                font-size: 0.55rem;
+            }
+            
+            .forecast-scale-dot {
+                width: 6px;
+                height: 6px;
             }
             
             /* Improve moon phase card */
-            #moon-image {
-                width: 65px !important;
-                height: 65px !important;
+            #moon-canvas {
+                width: 70px !important;
+                height: 70px !important;
             }
             
             /* Kp meter on mobile */
@@ -1748,7 +1733,6 @@
         <div class="dashboard-grid">
             <!-- Map Panel -->
             <div class="map-panel">
-                <div class="chart-title" style="font-size: 1.1rem; color: var(--accent-primary); top: 20px; left: 20px;">AURORAL OVAL</div>
                 <div class="loading-overlay" id="loading-overlay">
                     <div class="spinner"></div>
                     <p>Updating Data...</p>
@@ -1910,7 +1894,7 @@
                     <div class="card-title">Current Moon Phase</div>
                 </div>
                 <div style="padding: 0.5rem; text-align: center;">
-                    <img id="moon-image" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23333' stroke='%23999' stroke-width='2'/></svg>" alt="Moon Phase" style="width: 75px; height: 75px; margin-bottom: 0.3rem;">
+                    <canvas id="moon-canvas" width="200" height="200" style="width: 90px; height: 90px; margin-bottom: 0.3rem;"></canvas>
                     <div style="font-weight: 600; margin-bottom: 0.15rem; color: var(--text-primary); font-size: 0.9rem;" id="moon-phase-name">New Moon</div>
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;" id="moon-illumination">0% illuminated</div>
                     <div style="font-size: 0.7rem; color: var(--text-secondary); padding: 0.3rem; background: rgba(255,255,255,0.03); border-radius: 3px; line-height: 1.3;" id="moon-visibility-impact"></div>
@@ -1982,6 +1966,16 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             checkMobile();
+
+            // If we're on the Geomagnetic (root) page, remove decorative background
+            try {
+                const path = window.location.pathname || '/';
+                if (path === '/' || path === '' || path.toLowerCase().includes('geomag') || path.toLowerCase().includes('geomagnetic')) {
+                    document.body.classList.add('geomag-simple');
+                }
+            } catch (e) {
+                console.warn('Failed to set geomag-simple class:', e);
+            }
             
             // Show loading overlay immediately for initial map load
             const loadingOverlay = document.getElementById('loading-overlay');
@@ -2009,6 +2003,9 @@
                             mapImage.src = src;
                             mapImage.style.opacity = '1';
                             console.log('Initial map loaded successfully');
+                            // Map image loaded — grid layout will reflow, so resize charts
+                            setTimeout(() => resizeAllCharts(), 100);
+                            setTimeout(() => resizeAllCharts(), 500);
                             return;
                         } catch (e) {
                             console.warn(`Initial map load attempt ${attempt + 1} failed:`, e.message);
@@ -2027,6 +2024,11 @@
                 // Delay to let orientation change complete
                 setTimeout(handleResize, 100);
             });
+            
+            // Resize charts once layout stabilizes (covers map load reflow)
+            setTimeout(() => resizeAllCharts(), 500);
+            setTimeout(() => resizeAllCharts(), 2000);
+            setTimeout(() => resizeAllCharts(), 5000);
             
             refreshDashboard();
             startTimers();
@@ -2187,7 +2189,16 @@
                     type: 'category',
                     data: times.map(t => {
                         const d = new Date(t);
-                        return d.getUTCHours().toString().padStart(2, '0') + ':' + d.getUTCMinutes().toString().padStart(2, '0');
+                        if (currentTimezone === 'UTC') {
+                            return d.getUTCHours().toString().padStart(2, '0') + ':' + d.getUTCMinutes().toString().padStart(2, '0');
+                        } else {
+                            try {
+                                const tz = currentTimezone === 'local' ? undefined : currentTimezone;
+                                return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+                            } catch(e) {
+                                return d.getUTCHours().toString().padStart(2, '0') + ':' + d.getUTCMinutes().toString().padStart(2, '0');
+                            }
+                        }
                     }),
                     axisLine: { lineStyle: { color: '#444' } },
                     axisLabel: { color: '#8b8b8b', fontSize: 8 },
@@ -2207,19 +2218,22 @@
                     smooth: true,
                     symbol: 'none',
                     lineStyle: {
-                        color: '#60a5fa',
+                        color: '#94a3b8',
                         width: 2
                     },
                     areaStyle: {
-                        // Gradient from bottom (red/severe) to top (blue/quiet)
-                        // Dst thresholds: -100 (severe), -50 (moderate), -20 (minor), 0+ (quiet)
+                        // Dst gradient: NOAA-standard storm severity coloring
+                        // Positive/near-zero = quiet (teal), -20 = minor (green), -50 = moderate (amber), 
+                        // -100 = severe (orange-red), -200+ = extreme (deep red)
                         color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
-                            { offset: 0, color: 'rgba(220, 38, 38, 0.5)' },
-                            { offset: normalizeDst(-100), color: 'rgba(220, 38, 38, 0.5)' },
+                            { offset: 0, color: 'rgba(190, 24, 93, 0.55)' },
+                            { offset: normalizeDst(-200), color: 'rgba(220, 38, 38, 0.5)' },
+                            { offset: normalizeDst(-100), color: 'rgba(239, 68, 68, 0.45)' },
                             { offset: normalizeDst(-50), color: 'rgba(249, 115, 22, 0.4)' },
-                            { offset: normalizeDst(-20), color: 'rgba(251, 191, 36, 0.3)' },
-                            { offset: normalizeDst(0), color: 'rgba(96, 165, 250, 0.2)' },
-                            { offset: 1, color: 'rgba(96, 165, 250, 0.1)' }
+                            { offset: normalizeDst(-30), color: 'rgba(234, 179, 8, 0.35)' },
+                            { offset: normalizeDst(-20), color: 'rgba(163, 230, 53, 0.3)' },
+                            { offset: normalizeDst(0), color: 'rgba(20, 184, 166, 0.2)' },
+                            { offset: 1, color: 'rgba(56, 189, 248, 0.1)' }
                         ])
                     },
                     markLine: {
@@ -2381,11 +2395,11 @@
                     console.log('[GEOMAG_ALERTS] Day ' + idx + ' (' + day.date + '): Kp=' + day.max_kp + ', G=' + day.g_scale);
                 });
                 
-                // Build the forecast chart
+                // Build the flat-card forecast
+                const severityLabels = ['Quiet', 'Minor', 'Moderate', 'Strong', 'Severe', 'Extreme'];
                 let html = '<div class="forecast-grid">';
                 
                 data.forecast.forEach((day, index) => {
-                    // Parse the date string in UTC to avoid timezone boundary issues
                     const date = new Date(day.date + 'T00:00:00Z');
                     
                     const dayName = index === 0 ? 'Today' : 
@@ -2393,20 +2407,18 @@
                                    date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
                     const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
                     
-                    const gScale = day.g_scale;
-                    const gClass = `g${gScale}`;
-                    const gLabel = gScale === 0 ? 'Quiet' : `G${gScale}`;
+                    const g = day.g_scale;
+                    const gLabel = g === 0 ? 'G0' : `G${g}`;
                     
                     html += `
                         <div class="forecast-day">
-                            <div class="forecast-date">${dayName}</div>
-                            <div class="forecast-date" style="font-size: 0.65rem; margin-top: -0.25rem;">${dateStr}</div>
-                            <div class="forecast-bar-container">
-                                <div class="forecast-bar">
-                                    <div class="forecast-fill ${gClass}">
-                                        ${gLabel}
-                                    </div>
-                                </div>
+                            <div class="forecast-day-header">
+                                <div class="forecast-date">${dayName}</div>
+                                <div class="forecast-date-sub">${dateStr}</div>
+                            </div>
+                            <div class="forecast-body">
+                                <div class="forecast-badge g${g}">${gLabel}</div>
+                                <div class="forecast-severity">${severityLabels[g]}</div>
                                 <div class="forecast-kp">Kp ${day.max_kp}</div>
                             </div>
                         </div>
@@ -2415,33 +2427,15 @@
                 
                 html += '</div>';
                 
-                // Add legend with separate colors for each G-level
+                // Compact scale legend
                 html += `
-                    <div class="forecast-legend">
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #4ade80;"></div>
-                            <span>G0</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #fbbf24;"></div>
-                            <span>G1</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #fb923c;"></div>
-                            <span>G2</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #ef4444;"></div>
-                            <span>G3</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #dc2626;"></div>
-                            <span>G4</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #991b1b;"></div>
-                            <span>G5</span>
-                        </div>
+                    <div class="forecast-scale">
+                        <div class="forecast-scale-item"><div class="forecast-scale-dot" style="background:#22c55e"></div>G0</div>
+                        <div class="forecast-scale-item"><div class="forecast-scale-dot" style="background:#eab308"></div>G1</div>
+                        <div class="forecast-scale-item"><div class="forecast-scale-dot" style="background:#f97316"></div>G2</div>
+                        <div class="forecast-scale-item"><div class="forecast-scale-dot" style="background:#ef4444"></div>G3</div>
+                        <div class="forecast-scale-item"><div class="forecast-scale-dot" style="background:#dc2626"></div>G4</div>
+                        <div class="forecast-scale-item"><div class="forecast-scale-dot" style="background:#991b1b"></div>G5</div>
                     </div>
                 `;
                 
@@ -2549,10 +2543,58 @@
             // Mobile-optimized margins and font sizes
             const mobileFontSize = isMobile ? 8 : 10;
             
+            // Timezone-aware time formatter for chart axes
+            function chartTimeFormatter(val) {
+                const d = new Date(val);
+                if (currentTimezone === 'UTC') {
+                    return d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+                } else {
+                    try {
+                        const tz = currentTimezone === 'local' ? undefined : currentTimezone;
+                        return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+                    } catch(e) {
+                        return d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+                    }
+                }
+            }
+            
             // Common ECharts grid settings
             const commonGrid = isMobile 
-                ? { left: 30, right: 5, top: 5, bottom: 20, containLabel: false }
-                : { left: 35, right: 8, top: 25, bottom: 25, containLabel: false };
+                ? { left: 30, right: 5, top: 5, bottom: 18, containLabel: false }
+                : { left: 35, right: 8, top: 20, bottom: 20, containLabel: false };
+
+            // Earth reference line - shows which DSCOVR data is currently at Earth
+            // Based on 10-min average solar wind speed to calculate L1->Earth travel time
+            let earthNowTimeIso = null;
+            try {
+                const sw = data.solar_wind_history;
+                if (sw && sw.times && sw.speeds && sw.times.length && sw.speeds.length) {
+                    // Calculate 10-minute average speed (last 10 data points, assuming 1-min intervals)
+                    const count = Math.min(10, sw.speeds.length);
+                    const recentSpeeds = sw.speeds.slice(-count).filter(s => s !== null && !isNaN(s));
+                    
+                    if (recentSpeeds.length > 0) {
+                        const avgSpeed = recentSpeeds.reduce((a, b) => a + b, 0) / recentSpeeds.length;
+                        const lastTime = sw.times[sw.times.length - 1];
+                        
+                        if (avgSpeed > 0 && lastTime) {
+                            // Distance from L1 (DSCOVR) to Earth is ~1.5 million km
+                            const L1_TO_EARTH_KM = 1500000;
+                            const travelSec = L1_TO_EARTH_KM / avgSpeed; // seconds
+                            // Subtract travel time to show what DSCOVR data is at Earth NOW
+                            const earthNowMs = new Date(lastTime).getTime() - travelSec * 1000;
+                            earthNowTimeIso = new Date(earthNowMs).toISOString();
+                            console.log('[EARTH_LINE] Avg Speed:', avgSpeed.toFixed(1), 'km/s, Travel time:', (travelSec/60).toFixed(1), 'min, Earth NOW showing data from:', earthNowTimeIso);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to compute Earth reference time', e);
+            }
+            
+            if (!earthNowTimeIso) {
+                console.warn('[EARTH_LINE] No Earth reference time calculated - check solar wind data');
+            }
             
             // Helper to initialize or get ECharts instance
             function getChartInstance(id) {
@@ -2577,7 +2619,16 @@
                     fontSize: mobileFontSize,
                     formatter: (val) => {
                         const d = new Date(val);
-                        return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+                        if (currentTimezone === 'UTC') {
+                            return d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+                        } else {
+                            try {
+                                const tz = currentTimezone === 'local' ? undefined : currentTimezone;
+                                return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+                            } catch(e) {
+                                return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+                            }
+                        }
                     }
                 },
                 splitLine: { show: false }
@@ -2639,36 +2690,71 @@
                 
                 const chart = getChartInstance('chart-speed');
                 if (chart) {
+                    // Format data for time-based rendering
+                    const timeSeriesData = hist.times.map((time, idx) => [time, hist.speeds[idx]]);
+                    
+                    if (earthNowTimeIso) {
+                        console.log('[EARTH_LINE_DEBUG] Speed chart - Last time:', hist.times[hist.times.length - 1], 
+                                    'Earth NOW:', earthNowTimeIso, 'Earth NOW ms:', new Date(earthNowTimeIso).getTime());
+                    }
+                    
                     chart.setOption({
                         backgroundColor: 'transparent',
                         grid: commonGrid,
-                        xAxis: { ...commonXAxis, data: hist.times },
+                        xAxis: {
+                            type: 'time',
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { 
+                                color: '#94a3b8', 
+                                fontSize: mobileFontSize,
+                                formatter: chartTimeFormatter
+                            },
+                            splitLine: { show: false }
+                        },
                         yAxis: { ...commonYAxis, min: yMin, max: yMax },
                         tooltip: {
                             trigger: 'axis',
                             backgroundColor: 'rgba(15, 23, 42, 0.9)',
                             borderColor: 'rgba(255,255,255,0.1)',
                             textStyle: { color: '#f8fafc' },
-                            formatter: (params) => `${Math.round(params[0].value)} km/s`
+                            formatter: (params) => `${Math.round(params[0].value[1])} km/s`
                         },
                         series: [{
                             type: 'line',
-                            data: hist.speeds,
-                            smooth: 0.3,
+                            data: timeSeriesData,
+                            smooth: 0.2,
                             symbol: 'none',
                             lineStyle: { color: '#f8fafc', width: 2.5 },
                             areaStyle: {
                                 color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
-                                    { offset: 0, color: 'rgba(74, 222, 128, 0.6)' },
-                                    { offset: normalizeValue(350), color: 'rgba(74, 222, 128, 0.6)' },
-                                    { offset: normalizeValue(450), color: 'rgba(217, 249, 157, 0.6)' },
-                                    { offset: normalizeValue(600), color: 'rgba(250, 204, 21, 0.6)' },
-                                    { offset: normalizeValue(750), color: 'rgba(251, 146, 60, 0.6)' },
-                                    { offset: normalizeValue(850), color: 'rgba(239, 68, 68, 0.6)' },
-                                    { offset: normalizeValue(1000), color: 'rgba(236, 72, 153, 0.6)' },
-                                    { offset: 1, color: 'rgba(255, 255, 255, 0.6)' }
+                                    { offset: 0, color: 'rgba(34, 197, 94, 0.5)' },
+                                    { offset: normalizeValue(300), color: 'rgba(34, 197, 94, 0.45)' },
+                                    { offset: normalizeValue(400), color: 'rgba(163, 230, 53, 0.4)' },
+                                    { offset: normalizeValue(500), color: 'rgba(234, 179, 8, 0.45)' },
+                                    { offset: normalizeValue(600), color: 'rgba(249, 115, 22, 0.45)' },
+                                    { offset: normalizeValue(750), color: 'rgba(239, 68, 68, 0.5)' },
+                                    { offset: normalizeValue(900), color: 'rgba(220, 38, 38, 0.55)' },
+                                    { offset: 1, color: 'rgba(190, 24, 93, 0.5)' }
                                 ])
-                            }
+                            },
+                            markLine: earthNowTimeIso ? {
+                                silent: false,
+                                symbol: 'none',
+                                label: {
+                                    show: true,
+                                    formatter: 'Earth',
+                                    color: '#60a5fa',
+                                    fontSize: isMobile ? 9 : 11,
+                                    position: 'end'
+                                },
+                                lineStyle: {
+                                    color: '#60a5fa',
+                                    width: 2,
+                                    type: 'dashed'
+                                },
+                                data: [{ xAxis: new Date(earthNowTimeIso).getTime() }]
+                            } : undefined
                         }]
                     });
                 }
@@ -2702,12 +2788,13 @@
                     
                     // Calculate gradient stops based on density thresholds mapped to y-axis range
                     const thresholds = [
-                        { value: 2, color: 'rgba(187, 247, 208, 0.6)' },    // Very low (light green)
-                        { value: 5, color: 'rgba(134, 239, 160, 0.6)' },    // Low (green)
-                        { value: 10, color: 'rgba(22, 163, 74, 0.6)' },     // Normal (darker green)
-                        { value: 20, color: 'rgba(250, 204, 21, 0.6)' },    // Elevated (yellow)
-                        { value: 30, color: 'rgba(239, 68, 68, 0.6)' },     // High (red)
-                        { value: 50, color: 'rgba(147, 51, 234, 0.6)' }     // Very high (purple)
+                        { value: 1, color: 'rgba(148, 163, 184, 0.25)' },    // Very low (slate)
+                        { value: 3, color: 'rgba(34, 197, 94, 0.35)' },      // Low (green)
+                        { value: 8, color: 'rgba(163, 230, 53, 0.4)' },      // Normal (lime)
+                        { value: 15, color: 'rgba(234, 179, 8, 0.45)' },     // Elevated (amber)
+                        { value: 25, color: 'rgba(249, 115, 22, 0.5)' },     // High (orange)
+                        { value: 40, color: 'rgba(239, 68, 68, 0.5)' },      // Very high (red)
+                        { value: 60, color: 'rgba(168, 85, 247, 0.5)' }      // Extreme (purple)
                     ];
                     
                     const gradientStops = thresholds.map(t => {
@@ -2717,27 +2804,57 @@
                     
                     const chart = getChartInstance('chart-density');
                     if (chart) {
+                        // Format data for time-based rendering
+                        const timeSeriesData = hist.times.map((time, idx) => [time, hist.densities[idx]]);
+                        
                         chart.setOption({
                             backgroundColor: 'transparent',
                             grid: commonGrid,
-                            xAxis: { ...commonXAxis, data: hist.times },
+                            xAxis: {
+                                type: 'time',
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                axisLabel: { 
+                                    color: '#94a3b8', 
+                                    fontSize: mobileFontSize,
+                                    formatter: chartTimeFormatter
+                                },
+                                splitLine: { show: false }
+                            },
                             yAxis: { ...commonYAxis, min: yMin, max: yMax },
                             tooltip: {
                                 trigger: 'axis',
                                 backgroundColor: 'rgba(15, 23, 42, 0.9)',
                                 borderColor: 'rgba(255,255,255,0.1)',
                                 textStyle: { color: '#f8fafc' },
-                                formatter: (params) => params[0].value?.toFixed(1) || '--'
+                                formatter: (params) => params[0].value[1]?.toFixed(1) || '--'
                             },
                             series: [{
                                 type: 'line',
-                                data: hist.densities,
-                                smooth: 0.3,
+                                data: timeSeriesData,
+                                smooth: 0.2,
                                 symbol: 'none',
                                 lineStyle: { color: '#f8fafc', width: 2.5 },
                                 areaStyle: {
                                     color: new echarts.graphic.LinearGradient(0, 1, 0, 0, gradientStops)
-                                }
+                                },
+                                markLine: earthNowTimeIso ? {
+                                    silent: false,
+                                    symbol: 'none',
+                                    label: {
+                                        show: true,
+                                        formatter: 'Earth',
+                                        color: '#60a5fa',
+                                        fontSize: isMobile ? 9 : 11,
+                                        position: 'end'
+                                    },
+                                    lineStyle: {
+                                        color: '#60a5fa',
+                                        width: 2,
+                                        type: 'dashed'
+                                    },
+                                    data: [{ xAxis: new Date(earthNowTimeIso).getTime() }]
+                                } : undefined
                             }]
                         });
                     }
@@ -2767,35 +2884,65 @@
                     
                     const chart = getChartInstance('chart-bt');
                     if (chart) {
+                        // Format data for time-based rendering
+                        const timeSeriesData = hist.times.map((time, idx) => [time, hist.bts[idx]]);
+                        
                         chart.setOption({
                             backgroundColor: 'transparent',
                             grid: commonGrid,
-                            xAxis: { ...commonXAxis, data: hist.times },
+                            xAxis: {
+                                type: 'time',
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                axisLabel: { 
+                                    color: '#94a3b8', 
+                                    fontSize: mobileFontSize,
+                                    formatter: chartTimeFormatter
+                                },
+                                splitLine: { show: false }
+                            },
                             yAxis: { ...commonYAxis, min: yMin, max: yMax },
                             tooltip: {
                                 trigger: 'axis',
                                 backgroundColor: 'rgba(15, 23, 42, 0.9)',
                                 borderColor: 'rgba(255,255,255,0.1)',
                                 textStyle: { color: '#f8fafc' },
-                                formatter: (params) => (params[0].value?.toFixed(1) || '--') + ' nT'
+                                formatter: (params) => (params[0].value[1]?.toFixed(1) || '--') + ' nT'
                             },
                             series: [{
                                 type: 'line',
-                                data: hist.bts,
-                                smooth: 0.3,
+                                data: timeSeriesData,
+                                smooth: 0.2,
                                 symbol: 'none',
                                 lineStyle: { color: '#f8fafc', width: 2.5 },
                                 areaStyle: {
                                     color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
-                                        { offset: 0, color: 'rgba(74, 222, 128, 0.5)' },
-                                        { offset: normalizeBt(5), color: 'rgba(74, 222, 128, 0.5)' },
-                                        { offset: normalizeBt(10), color: 'rgba(217, 249, 157, 0.5)' },
-                                        { offset: normalizeBt(15), color: 'rgba(250, 204, 21, 0.5)' },
-                                        { offset: normalizeBt(20), color: 'rgba(251, 146, 60, 0.5)' },
-                                        { offset: normalizeBt(30), color: 'rgba(239, 68, 68, 0.5)' },
-                                        { offset: 1, color: 'rgba(147, 51, 234, 0.5)' }
+                                        { offset: 0, color: 'rgba(34, 197, 94, 0.35)' },
+                                        { offset: normalizeBt(5), color: 'rgba(34, 197, 94, 0.35)' },
+                                        { offset: normalizeBt(8), color: 'rgba(163, 230, 53, 0.4)' },
+                                        { offset: normalizeBt(12), color: 'rgba(234, 179, 8, 0.45)' },
+                                        { offset: normalizeBt(18), color: 'rgba(249, 115, 22, 0.45)' },
+                                        { offset: normalizeBt(25), color: 'rgba(239, 68, 68, 0.5)' },
+                                        { offset: 1, color: 'rgba(168, 85, 247, 0.5)' }
                                     ])
-                                }
+                                },
+                                markLine: earthNowTimeIso ? {
+                                    silent: false,
+                                    symbol: 'none',
+                                    label: {
+                                        show: true,
+                                        formatter: 'Earth',
+                                        color: '#60a5fa',
+                                        fontSize: isMobile ? 9 : 11,
+                                        position: 'end'
+                                    },
+                                    lineStyle: {
+                                        color: '#60a5fa',
+                                        width: 2,
+                                        type: 'dashed'
+                                    },
+                                    data: [{ xAxis: new Date(earthNowTimeIso).getTime() }]
+                                } : undefined
                             }]
                         });
                     }
@@ -2823,10 +2970,25 @@
                     
                     const chart = getChartInstance('chart-bz');
                     if (chart) {
+                        // Format data for time-based rendering
+                        const timeSeriesDataPos = hist.times.map((time, idx) => [time, positiveData[idx]]);
+                        const timeSeriesDataNeg = hist.times.map((time, idx) => [time, negativeData[idx]]);
+                        const timeSeriesDataBz = hist.times.map((time, idx) => [time, hist.bzs[idx]]);
+                        
                         chart.setOption({
                             backgroundColor: 'transparent',
-                            grid: { left: 35, right: 10, top: 10, bottom: 25, containLabel: false },
-                            xAxis: { ...commonXAxis, data: hist.times },
+                            grid: { left: 35, right: 10, top: 20, bottom: 20, containLabel: false },
+                            xAxis: {
+                                type: 'time',
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                axisLabel: { 
+                                    color: '#94a3b8', 
+                                    fontSize: mobileFontSize,
+                                    formatter: chartTimeFormatter
+                                },
+                                splitLine: { show: false }
+                            },
                             yAxis: { ...commonYAxis, min: yMin, max: yMax },
                             tooltip: {
                                 trigger: 'axis',
@@ -2835,7 +2997,7 @@
                                 textStyle: { color: '#f8fafc' },
                                 formatter: function(params) {
                                     // Show the actual Bz value (non-zero from either series)
-                                    const val = params[0].value !== 0 ? params[0].value : params[1]?.value || 0;
+                                    const val = params[0].value[1] !== 0 ? params[0].value[1] : params[1]?.value[1] || 0;
                                     return (val?.toFixed(1) || '--') + ' nT';
                                 }
                             },
@@ -2843,8 +3005,8 @@
                                 {
                                     name: 'Bz Positive',
                                     type: 'line',
-                                    data: positiveData,
-                                    smooth: 0.3,
+                                    data: timeSeriesDataPos,
+                                    smooth: 0.2,
                                     symbol: 'none',
                                     lineStyle: { width: 0 },
                                     areaStyle: { 
@@ -2856,8 +3018,8 @@
                                 {
                                     name: 'Bz Negative',
                                     type: 'line',
-                                    data: negativeData,
-                                    smooth: 0.3,
+                                    data: timeSeriesDataNeg,
+                                    smooth: 0.2,
                                     symbol: 'none',
                                     lineStyle: { width: 0 },
                                     areaStyle: { 
@@ -2869,8 +3031,8 @@
                                 {
                                     name: 'Bz Line',
                                     type: 'line',
-                                    data: hist.bzs,
-                                    smooth: 0.3,
+                                    data: timeSeriesDataBz,
+                                    smooth: 0.2,
                                     symbol: 'none',
                                     lineStyle: { color: '#f8fafc', width: 2.5 },
                                     markLine: {
@@ -2880,6 +3042,28 @@
                                         data: [{ yAxis: 0 }],
                                         label: { show: false }
                                     }
+                                },
+                                {
+                                    // Earth arrival marker
+                                    type: 'line',
+                                    data: [],
+                                    markLine: earthNowTimeIso ? {
+                                        silent: false,
+                                        symbol: 'none',
+                                        label: {
+                                            show: true,
+                                            formatter: 'Earth',
+                                            color: '#60a5fa',
+                                            fontSize: isMobile ? 9 : 11,
+                                            position: 'end'
+                                        },
+                                        lineStyle: {
+                                            color: '#60a5fa',
+                                            width: 2,
+                                            type: 'dashed'
+                                        },
+                                        data: [{ xAxis: new Date(earthNowTimeIso).getTime() }]
+                                    } : undefined
                                 }
                             ],
                             legend: { show: false }
@@ -2916,7 +3100,7 @@
                             type: 'line',
                             data: mag.goes18_hp,
                             symbol: 'none',
-                            smooth: 0.3,
+                            smooth: 0.2,
                             lineStyle: { color: '#60a5fa', width: 2 }
                         });
                     }
@@ -2926,7 +3110,7 @@
                             type: 'line',
                             data: mag.goes19_hp,
                             symbol: 'none',
-                            smooth: 0.3,
+                            smooth: 0.2,
                             lineStyle: { color: '#f87171', width: 2 }
                         });
                     }
@@ -3057,9 +3241,10 @@
             }
             
             // Force ECharts to resize all charts after render
-            setTimeout(() => {
-                resizeAllCharts();
-            }, 100);
+            // Stagger resize calls to ensure layout is fully settled
+            setTimeout(() => resizeAllCharts(), 50);
+            setTimeout(() => resizeAllCharts(), 300);
+            setTimeout(() => resizeAllCharts(), 1000);
         }
         
         // Global resize function for all ECharts instances
@@ -3496,6 +3681,12 @@
             
             // Update the UTC clock display immediately
             updateUtcTime();
+            
+            // Re-render all charts with new timezone
+            // Redraw Dst chart
+            fetchDstData();
+            // Trigger a full dashboard refresh to update all chart axis labels
+            refreshDashboard();
         }
 
         function updateUtcTime() {
@@ -3565,154 +3756,187 @@
         function calculateMoonPhase() {
             const now = new Date();
             
-            // Known new moon: January 29, 2025 at 12:36 UTC (more recent reference)
+            // Known new moon: January 29, 2025 at 12:36 UTC
             const knownNewMoon = new Date('2025-01-29T12:36:00Z');
-            const lunarCycle = 29.53058867; // days
+            const lunarCycle = 29.53058867; // synodic month in days
             
-            // Calculate days since known new moon
+            // Calculate phase (0-1 through the cycle)
             const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
             const daysInCycle = ((daysSinceNew % lunarCycle) + lunarCycle) % lunarCycle;
-            const phase = daysInCycle / lunarCycle;
+            const phase = daysInCycle / lunarCycle; // 0 = new, 0.5 = full, 1 = new
             
-            // Calculate illumination percentage (more accurate formula)
-            // Illumination increases from 0 at new moon to 100% at full moon (phase 0.5)
-            const illuminationPercent = Math.round(50 * (1 - Math.cos(phase * 2 * Math.PI)));
+            // Illumination: 0% at new, 100% at full
+            const illumination = Math.round(50 * (1 - Math.cos(phase * 2 * Math.PI)));
             
-            // Determine phase name and visibility impact
+            // Phase name and aurora visibility impact
             let phaseName, visibilityImpact;
             
             if (phase < 0.033 || phase > 0.967) {
                 phaseName = 'New Moon';
-                visibilityImpact = 'Excellent for aurora viewing - dark skies';
+                visibilityImpact = 'Excellent for aurora viewing — dark skies';
             } else if (phase < 0.216) {
                 phaseName = 'Waxing Crescent';
-                visibilityImpact = 'Very good - minimal moonlight interference';
+                visibilityImpact = 'Very good — minimal moonlight interference';
             } else if (phase < 0.283) {
                 phaseName = 'First Quarter';
-                visibilityImpact = 'Good - moon sets around midnight';
+                visibilityImpact = 'Good — moon sets around midnight';
             } else if (phase < 0.466) {
                 phaseName = 'Waxing Gibbous';
-                visibilityImpact = 'Fair - bright moon may reduce visibility';
+                visibilityImpact = 'Fair — bright moon may reduce visibility';
             } else if (phase < 0.533) {
                 phaseName = 'Full Moon';
-                visibilityImpact = 'Poor - bright moonlight washes out aurora';
+                visibilityImpact = 'Poor — bright moonlight washes out aurora';
             } else if (phase < 0.716) {
                 phaseName = 'Waning Gibbous';
-                visibilityImpact = 'Fair - moon rises late';
+                visibilityImpact = 'Fair — moon rises late evening';
             } else if (phase < 0.783) {
                 phaseName = 'Last Quarter';
-                visibilityImpact = 'Good - moon rises after midnight';
+                visibilityImpact = 'Good — moon rises after midnight';
             } else {
                 phaseName = 'Waning Crescent';
-                visibilityImpact = 'Very good - moon rises near dawn';
+                visibilityImpact = 'Very good — moon rises near dawn';
             }
             
-            // Generate realistic moon SVG based on phase
-            const moonImgElem = document.getElementById('moon-image');
-            if (moonImgElem) {
-                moonImgElem.src = generateMoonSVG(phase);
-                moonImgElem.alt = phaseName;
-            }
+            // Render the moon on canvas
+            renderMoonCanvas(phase, illumination);
+            
             document.getElementById('moon-phase-name').textContent = phaseName;
-            document.getElementById('moon-illumination').textContent = `${illuminationPercent}% illuminated`;
+            document.getElementById('moon-illumination').textContent = `${illumination}% illuminated`;
             document.getElementById('moon-visibility-impact').textContent = visibilityImpact;
         }
         
-        // Generate a realistic moon SVG based on phase (0-1)
-        function generateMoonSVG(phase) {
-            const size = 100;
-            const cx = size / 2;
-            const cy = size / 2;
-            const r = 42;
-            
-            // Waxing (0-0.5) = right side lit, Waning (0.5-1) = left side lit
-            const isWaxing = phase < 0.5;
-            const adjustedPhase = isWaxing ? phase : phase - 0.5;
-            
-            // Calculate terminator curve
-            // At phase 0 (new) and 0.5 (full relative): terminator at edge
-            // Phase 0.25: half moon (terminator at center)
-            const terminatorX = r * Math.cos(adjustedPhase * 2 * Math.PI);
-            
-            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">`;
-            
-            // Add subtle outer glow
-            svg += `<defs>
-                <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="85%" stop-color="%23e8e4d9" stop-opacity="1"/>
-                    <stop offset="100%" stop-color="%23d0ccc0" stop-opacity="0.8"/>
-                </radialGradient>
-                <radialGradient id="moonDark" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="%231a1a1a"/>
-                    <stop offset="100%" stop-color="%23111"/>
-                </radialGradient>
-                <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.5"/>
-                </filter>
-            </defs>`;
-            
-            // Outer glow ring
-            svg += `<circle cx="${cx}" cy="${cy}" r="${r+4}" fill="none" stroke="%23fff" stroke-width="1" opacity="0.15"/>`;
-            
-            if (phase < 0.02 || phase > 0.98) {
-                // New Moon - dark with subtle outline
-                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(%23moonDark)" stroke="%23444" stroke-width="1.5"/>`;
-                svg += `<circle cx="${cx}" cy="${cy}" r="${r-1}" fill="none" stroke="%23222" stroke-width="0.5" opacity="0.5"/>`;
-            } else if (phase > 0.48 && phase < 0.52) {
-                // Full Moon - fully lit with craters
-                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(%23moonGlow)" stroke="%23ccc" stroke-width="1"/>`;
-                // Add crater details
-                svg += `<circle cx="${cx-12}" cy="${cy-8}" r="8" fill="%23d5d0c5" opacity="0.4"/>`;
-                svg += `<circle cx="${cx+15}" cy="${cy+12}" r="6" fill="%23d5d0c5" opacity="0.3"/>`;
-                svg += `<circle cx="${cx-5}" cy="${cy+18}" r="10" fill="%23d5d0c5" opacity="0.35"/>`;
-                svg += `<circle cx="${cx+8}" cy="${cy-15}" r="4" fill="%23d5d0c5" opacity="0.25"/>`;
-            } else {
-                // Partial phases - use clipping path for smooth terminator
-                const litSide = isWaxing ? 'right' : 'left';
-                
-                // Draw dark background
-                svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(%23moonDark)" stroke="%23444" stroke-width="1"/>`;
-                
-                // Calculate the illuminated portion using ellipse
-                const illuminatedWidth = Math.abs(terminatorX);
-                
-                if (isWaxing) {
-                    // Right side illuminated, growing
-                    if (adjustedPhase < 0.25) {
-                        // Crescent - small illuminated arc on right
-                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 0 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
+        /**
+         * Render the moon using per-pixel sphere shading for a clean, realistic result.
+         *  phase: 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
+         */
+        function renderMoonCanvas(phase, illumination) {
+            const canvas = document.getElementById('moon-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const cx = W / 2;
+            const cy = H / 2;
+            const R = 90;
+
+            ctx.clearRect(0, 0, W, H);
+
+            // Sun direction from phase (viewer looks along -z toward the moon)
+            // phase 0 = new (sun behind moon), 0.25 = first quarter (sun right),
+            // 0.5 = full (sun behind viewer), 0.75 = last quarter (sun left)
+            const sunAngle = phase * 2 * Math.PI;
+            const sunX = Math.sin(sunAngle);
+            const sunZ = -Math.cos(sunAngle);
+
+            // Mare regions in normalized disc coordinates {x, y, radius, intensity}
+            const mare = [
+                { x: -0.28, y: -0.28, r: 0.24, i: 0.48 },  // Imbrium
+                { x:  0.08, y: -0.30, r: 0.15, i: 0.42 },   // Serenitatis
+                { x:  0.22, y: -0.02, r: 0.19, i: 0.44 },    // Tranquillitatis
+                { x:  0.50, y: -0.17, r: 0.10, i: 0.38 },    // Crisium
+                { x: -0.40, y:  0.10, r: 0.28, i: 0.44 },    // Oceanus Procellarum
+                { x: -0.10, y:  0.36, r: 0.17, i: 0.38 },    // Nubium
+                { x: -0.05, y: -0.58, r: 0.20, i: 0.28 },    // Frigoris
+                { x:  0.34, y:  0.20, r: 0.12, i: 0.32 },    // Fecunditatis
+                { x: -0.16, y: -0.06, r: 0.11, i: 0.38 },    // Sinus Aestuum
+                { x: -0.28, y:  0.38, r: 0.10, i: 0.30 },    // Mare Humorum
+                { x:  0.12, y: -0.10, r: 0.07, i: 0.28 },    // Vaporum
+            ];
+
+            // Simple hash for sub-pixel noise
+            const hashMul = [12.9898, 78.233, 43758.5453];
+            function noise(px, py) {
+                const h = Math.sin(px * hashMul[0] + py * hashMul[1]) * hashMul[2];
+                return h - Math.floor(h);
+            }
+
+            const imgData = ctx.createImageData(W, H);
+            const pix = imgData.data;
+
+            for (let py = 0; py < H; py++) {
+                for (let px = 0; px < W; px++) {
+                    const dx = px - cx;
+                    const dy = py - cy;
+                    const dist2 = dx * dx + dy * dy;
+
+                    if (dist2 > (R + 1.5) * (R + 1.5)) continue;
+
+                    // Anti-alias at disc edge
+                    const dist = Math.sqrt(dist2);
+                    const aa = Math.max(0, Math.min(1, R + 0.7 - dist));
+
+                    const nx = dx / R;
+                    const ny = dy / R;
+                    const nzSq = 1 - nx * nx - ny * ny;
+
+                    if (nzSq <= 0) continue;
+                    const nz = Math.sqrt(nzSq);
+
+                    // Lambertian diffuse
+                    const lambert = nx * sunX + nz * sunZ;
+
+                    // Surface texture: highland base
+                    let bR = 228, bG = 222, bB = 206;
+
+                    // Mare darkening
+                    let mf = 0;
+                    for (let m = 0; m < mare.length; m++) {
+                        const mdx = nx - mare[m].x;
+                        const mdy = ny - mare[m].y;
+                        const md = Math.sqrt(mdx * mdx + mdy * mdy);
+                        if (md < mare[m].r) {
+                            const t = 1 - md / mare[m].r;
+                            const s = t * t * (3 - 2 * t); // smoothstep
+                            if (s * mare[m].i > mf) mf = s * mare[m].i;
+                        }
+                    }
+                    if (mf > 0) {
+                        bR *= (1 - mf * 0.52);
+                        bG *= (1 - mf * 0.50);
+                        bB *= (1 - mf * 0.45);
+                    }
+
+                    // Micro-texture noise (very subtle grain)
+                    const n = noise(px * 0.7, py * 0.7);
+                    const micro = 0.93 + n * 0.14;
+
+                    // Limb darkening
+                    const limb = 0.82 + 0.18 * nz;
+
+                    // Earthshine on dark side
+                    const earthshine = 0.014;
+                    const lit = Math.max(earthshine, Math.max(0, lambert)) * limb * micro;
+
+                    let fr, fg, fb;
+                    if (lambert <= 0.005) {
+                        // Dark side — very faint cool earthshine tint
+                        fr = 12 + lit * 55;
+                        fg = 14 + lit * 60;
+                        fb = 22 + lit * 72;
                     } else {
-                        // Gibbous - large illuminated area, small shadow on left
-                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 1 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
+                        fr = bR * lit;
+                        fg = bG * lit;
+                        fb = bB * lit;
                     }
-                } else {
-                    // Left side illuminated, shrinking (waning)
-                    if (adjustedPhase < 0.25) {
-                        // Gibbous waning - large lit area, shadow growing on right
-                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 0 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
-                    } else {
-                        // Crescent waning - small lit arc on left
-                        svg += `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} A ${illuminatedWidth} ${r} 0 0 1 ${cx} ${cy-r}" fill="url(%23moonGlow)" filter="url(%23blur)"/>`;
-                    }
-                }
-                
-                // Add subtle crater details on lit portion
-                if (illuminationPercent > 30) {
-                    const craterOpacity = Math.min(0.3, illuminationPercent / 100 * 0.4);
-                    if (isWaxing || phase > 0.75) {
-                        svg += `<circle cx="${cx+10}" cy="${cy-5}" r="5" fill="%23c5c0b5" opacity="${craterOpacity}"/>`;
-                        svg += `<circle cx="${cx+5}" cy="${cy+15}" r="7" fill="%23c5c0b5" opacity="${craterOpacity * 0.8}"/>`;
-                    }
-                    if (!isWaxing || phase < 0.25) {
-                        svg += `<circle cx="${cx-12}" cy="${cy}" r="6" fill="%23c5c0b5" opacity="${craterOpacity}"/>`;
-                        svg += `<circle cx="${cx-5}" cy="${cy-12}" r="4" fill="%23c5c0b5" opacity="${craterOpacity * 0.7}"/>`;
-                    }
+
+                    const idx = (py * W + px) * 4;
+                    pix[idx]     = Math.min(255, Math.round(fr));
+                    pix[idx + 1] = Math.min(255, Math.round(fg));
+                    pix[idx + 2] = Math.min(255, Math.round(fb));
+                    pix[idx + 3] = Math.round(aa * 255);
                 }
             }
-            
-            svg += '</svg>';
-            
-            return 'data:image/svg+xml,' + encodeURIComponent(svg).replace(/'/g, "%27");
+
+            ctx.putImageData(imgData, 0, 0);
+
+            // Soft outer glow
+            const glow = ctx.createRadialGradient(cx, cy, R - 1, cx, cy, R + 8);
+            glow.addColorStop(0, `rgba(210, 205, 185, ${Math.min(0.07, illumination / 100 * 0.09)})`);
+            glow.addColorStop(1, 'rgba(210, 205, 185, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(cx, cy, R + 8, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         // Alert system
