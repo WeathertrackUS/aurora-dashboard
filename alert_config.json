@@ -15,7 +15,7 @@
   },
   {
     "enabled": true,
-    "message": "We'll be performing routine server maintenance on Tuesday, March 24th at ~10:00am CT. During this time you may experience intermittent disruptions in accessing the site, check the WTUS Twitter for updates."
+    "message": "We'll be performing routine server maintenance on Tuesday, March 24th at ~10:00am CT. During this time you may experience intermittent disruptions in accessing the site, check the WTUS Twitter for updates.",
     "type": "warning",
     "dismissible": true
   }
