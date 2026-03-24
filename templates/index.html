@@ -2003,6 +2003,90 @@
                 font-size: 0.55rem;
             }
         }
+
+        .dashboard-grid.export-desktop {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1.75fr) minmax(360px, 1.08fr) !important;
+            grid-template-rows: minmax(60px, 0.4fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) auto !important;
+            gap: 0.5rem !important;
+            width: 1600px !important;
+            min-width: 1600px !important;
+            max-width: none !important;
+            min-height: 1200px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            position: fixed !important;
+            left: -10000px !important;
+            top: 0 !important;
+            z-index: -1 !important;
+            background: var(--bg-dark) !important;
+        }
+
+        .dashboard-grid.export-desktop .map-panel {
+            grid-row: 1 / span 5 !important;
+            min-height: 400px !important;
+            max-height: none !important;
+            height: auto !important;
+            aspect-ratio: auto !important;
+            padding: 0.55rem !important;
+        }
+
+        .dashboard-grid.export-desktop .chart-panel {
+            min-height: 100px !important;
+            height: 100% !important;
+            padding: 0.25rem !important;
+            position: relative !important;
+            border-radius: 5px !important;
+        }
+
+        .dashboard-grid.export-desktop .chart-container {
+            width: 100% !important;
+            height: calc(100% - 28px) !important;
+            min-height: 70px !important;
+            position: absolute !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        .dashboard-grid.export-desktop .chart-title {
+            top: 5px !important;
+            left: 10px !important;
+            max-width: none !important;
+            font-size: 0.65rem !important;
+        }
+
+        .dashboard-grid.export-desktop .chart-value {
+            top: 3px !important;
+            right: 10px !important;
+            font-size: 1.1rem !important;
+            padding: 0.1rem 0.4rem !important;
+        }
+
+        .dashboard-grid.export-desktop .bottom-charts-panel {
+            min-height: 240px !important;
+            grid-column: 1 / -1 !important;
+        }
+
+        .dashboard-grid.export-desktop .bottom-charts-grid {
+            display: grid !important;
+            grid-template-columns: 2fr 1fr !important;
+            gap: 0.5rem !important;
+            height: 100% !important;
+            min-height: 200px !important;
+        }
+
+        .dashboard-grid.export-desktop .mag-chart-wrapper,
+        .dashboard-grid.export-desktop .power-chart-wrapper {
+            min-height: 180px !important;
+        }
+
+        .dashboard-grid.export-desktop .mag-chart-wrapper .chart-container,
+        .dashboard-grid.export-desktop .power-chart-wrapper .chart-container {
+            height: calc(100% - 28px) !important;
+            min-height: 70px !important;
+        }
     </style>
 </head>
 <body>
@@ -3742,9 +3826,10 @@
 
         async function downloadDashboard() {
             const filename = buildDashboardExportFilename();
+            const forceDesktopLayout = prefersDirectMobileDownload();
 
             try {
-                const canvas = await createDashboardCanvas();
+                const canvas = await createDashboardCanvas({ forceDesktopLayout });
                 const blob = await canvasToBlob(canvas);
                 if (await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
                     showToast('Dashboard ready to save', 'success');
@@ -3754,14 +3839,14 @@
                 triggerBlobDownload(blob, filename);
                 showToast('Dashboard downloaded', 'success');
             } catch (err) {
-                console.warn('Client-side dashboard export failed, trying fallback image route', err);
+                console.error('Dashboard export failed', err);
 
-                try {
-                    await downloadDashboardForMobile(filename);
-                } catch (fallbackError) {
-                    console.error(fallbackError);
-                    showToast('Failed to download dashboard', 'error');
+                if (forceDesktopLayout) {
+                    showToast('Failed to export desktop dashboard image on mobile', 'error');
+                    return;
                 }
+
+                showToast('Failed to download dashboard', 'error');
             }
         }
 
@@ -3773,29 +3858,6 @@
             const mobileViewport = checkMobile();
             const userAgent = navigator.userAgent || '';
             return mobileViewport || /Android|iPhone|iPad|iPod/i.test(userAgent);
-        }
-
-        async function downloadDashboardForMobile(filename) {
-            const serverUrl = `/aurora-image.png?download=1&layout=new&ts=${Date.now()}`;
-
-            try {
-                const response = await fetch(serverUrl, { cache: 'no-store' });
-                if (!response.ok) {
-                    throw new Error(`Mobile download failed with status ${response.status}`);
-                }
-
-                const blob = await response.blob();
-                if (await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
-                    showToast('Dashboard ready to save', 'success');
-                    return;
-                }
-
-                triggerBlobDownload(blob, filename);
-                showToast('Dashboard downloaded', 'success');
-            } catch (error) {
-                console.warn('Mobile blob download failed, falling back to direct image route', error);
-                window.location.assign(serverUrl);
-            }
         }
 
         function canvasToBlob(canvas) {
@@ -3862,7 +3924,15 @@
             }
         }
 
-        async function createDashboardCanvas() {
+        async function createDashboardCanvas(options = {}) {
+            if (options.forceDesktopLayout) {
+                return withDesktopExportLayout(() => createDashboardCanvasInternal());
+            }
+
+            return createDashboardCanvasInternal();
+        }
+
+        async function createDashboardCanvasInternal() {
             const dashboard = document.querySelector('.dashboard-grid');
             if (!dashboard) {
                 throw new Error('Dashboard grid not found');
@@ -3894,6 +3964,45 @@
             const canvas = await createDashboardCanvasFallback();
             stampExportUrl(canvas);
             return canvas;
+        }
+
+        async function withDesktopExportLayout(work) {
+            const dashboard = document.querySelector('.dashboard-grid');
+            if (!dashboard) {
+                throw new Error('Dashboard grid not found');
+            }
+
+            const previousScrollX = window.scrollX;
+            const previousScrollY = window.scrollY;
+
+            dashboard.classList.add('export-desktop');
+
+            try {
+                await waitForAnimationFrames(2);
+                resizeAllCharts();
+                await waitForAnimationFrames(3);
+                return await work();
+            } finally {
+                dashboard.classList.remove('export-desktop');
+                await waitForAnimationFrames(2);
+                resizeAllCharts();
+                window.scrollTo(previousScrollX, previousScrollY);
+            }
+        }
+
+        function waitForAnimationFrames(frameCount = 1) {
+            return new Promise((resolve) => {
+                const advance = (remaining) => {
+                    if (remaining <= 0) {
+                        resolve();
+                        return;
+                    }
+
+                    requestAnimationFrame(() => advance(remaining - 1));
+                };
+
+                advance(frameCount);
+            });
         }
 
         async function createDashboardCanvasFallback() {
