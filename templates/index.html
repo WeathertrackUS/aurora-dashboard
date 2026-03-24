@@ -3742,15 +3742,107 @@
 
         async function downloadDashboard() {
             try {
+                const filename = buildDashboardExportFilename();
+
+                if (prefersDirectMobileDownload()) {
+                    await downloadDashboardForMobile(filename);
+                    return;
+                }
+
                 const canvas = await createDashboardCanvas();
-                const link = document.createElement('a');
-                link.download = `aurora_dashboard_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
+                const blob = await canvasToBlob(canvas);
+                if (await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
+                    showToast('Dashboard ready to save', 'success');
+                    return;
+                }
+
+                triggerBlobDownload(blob, filename);
                 showToast('Dashboard downloaded', 'success');
             } catch (err) {
                 console.error(err);
                 showToast('Failed to download dashboard', 'error');
+            }
+        }
+
+        function buildDashboardExportFilename() {
+            return `aurora_dashboard_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
+        }
+
+        function prefersDirectMobileDownload() {
+            const mobileViewport = checkMobile();
+            const userAgent = navigator.userAgent || '';
+            return mobileViewport || /Android|iPhone|iPad|iPod/i.test(userAgent);
+        }
+
+        async function downloadDashboardForMobile(filename) {
+            const serverUrl = `/aurora-image.png?download=1&ts=${Date.now()}`;
+
+            try {
+                const response = await fetch(serverUrl, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error(`Mobile download failed with status ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                if (await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
+                    showToast('Dashboard ready to save', 'success');
+                    return;
+                }
+
+                triggerBlobDownload(blob, filename);
+                showToast('Dashboard downloaded', 'success');
+            } catch (error) {
+                console.warn('Mobile blob download failed, falling back to direct image route', error);
+                window.location.assign(serverUrl);
+            }
+        }
+
+        function canvasToBlob(canvas) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(blob);
+                        return;
+                    }
+                    reject(new Error('Unable to create image blob'));
+                }, 'image/png');
+            });
+        }
+
+        function triggerBlobDownload(blob, filename) {
+            const objectUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+        }
+
+        async function tryShareBlob(blob, filename, title) {
+            if (!blob || typeof File === 'undefined' || !navigator.share) {
+                return false;
+            }
+
+            try {
+                const file = new File([blob], filename, { type: blob.type || 'image/png' });
+                if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+                    return false;
+                }
+
+                await navigator.share({
+                    title,
+                    files: [file]
+                });
+                return true;
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    return true;
+                }
+
+                console.warn('File share failed:', error);
+                return false;
             }
         }
 

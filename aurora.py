@@ -2240,7 +2240,8 @@ def get_aurora_image():
     """Generate and serve the aurora monitoring image"""
     try:
         img_buffer = generate_aurora_image()
-        return send_file(img_buffer, mimetype='image/png', as_attachment=False, 
+        force_download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
+        return send_file(img_buffer, mimetype='image/png', as_attachment=force_download, 
                         download_name=f'aurora_dashboard_{datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")}.png')
     except Exception as e:
         print(f"Error generating image: {e}")
