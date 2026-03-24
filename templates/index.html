@@ -3775,7 +3775,7 @@
         }
 
         async function downloadDashboardForMobile(filename) {
-            const serverUrl = `/aurora-image.png?download=1&ts=${Date.now()}`;
+            const serverUrl = `/aurora-image.png?download=1&layout=new&ts=${Date.now()}`;
 
             try {
                 const response = await fetch(serverUrl, { cache: 'no-store' });
