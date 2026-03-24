@@ -3826,12 +3826,12 @@
 
         async function downloadDashboard() {
             const filename = buildDashboardExportFilename();
-            const forceDesktopLayout = prefersDirectMobileDownload();
+            const isMobileDownload = prefersDirectMobileDownload();
 
             try {
-                const canvas = await createDashboardCanvas({ forceDesktopLayout });
+                const canvas = await createDashboardCanvas({ forceDesktopLayout: isMobileDownload });
                 const blob = await canvasToBlob(canvas);
-                if (await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
+                if (isMobileDownload && await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
                     showToast('Dashboard ready to save', 'success');
                     return;
                 }
@@ -3841,7 +3841,7 @@
             } catch (err) {
                 console.error('Dashboard export failed', err);
 
-                if (forceDesktopLayout) {
+                if (isMobileDownload) {
                     showToast('Failed to export desktop dashboard image on mobile', 'error');
                     return;
                 }
