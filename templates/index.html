@@ -3926,13 +3926,13 @@
 
         async function createDashboardCanvas(options = {}) {
             if (options.forceDesktopLayout) {
-                return withDesktopExportLayout(() => createDashboardCanvasInternal());
+                return withDesktopExportLayout(() => createDashboardCanvasInternal({ preferManual: true }));
             }
 
-            return createDashboardCanvasInternal();
+            return createDashboardCanvasInternal(options);
         }
 
-        async function createDashboardCanvasInternal() {
+        async function createDashboardCanvasInternal(options = {}) {
             const dashboard = document.querySelector('.dashboard-grid');
             if (!dashboard) {
                 throw new Error('Dashboard grid not found');
@@ -3941,7 +3941,7 @@
             const rootStyles = getComputedStyle(document.documentElement);
             const backgroundColor = rootStyles.getPropertyValue('--bg-dark').trim() || '#0a0a0a';
 
-            if (window.htmlToImage && typeof window.htmlToImage.toCanvas === 'function') {
+            if (!options.preferManual && window.htmlToImage && typeof window.htmlToImage.toCanvas === 'function') {
                 try {
                     const canvas = await window.htmlToImage.toCanvas(dashboard, {
                         cacheBust: true,
@@ -4081,7 +4081,9 @@
                 return chartRect;
             }
 
-            const panelElements = dashboard.querySelectorAll(':scope > .map-panel, :scope > .chart-panel');
+            const panelElements = Array.from(dashboard.children).filter((element) => {
+                return element.classList && (element.classList.contains('map-panel') || element.classList.contains('chart-panel'));
+            });
             panelElements.forEach((panel) => {
                 drawRoundedRect(rectToCanvas(panel), cardColor, borderColor);
             });
@@ -4090,13 +4092,13 @@
             const mapRect = rectToCanvas(mapImage);
             ctx.drawImage(mapImg, mapRect.x, mapRect.y, mapRect.width, mapRect.height);
 
-            const topPanels = Array.from(dashboard.querySelectorAll(':scope > .chart-panel')).filter(
-                (panel) => !panel.classList.contains('bottom-charts-panel')
-            );
+            const topPanels = panelElements.filter((panel) => {
+                return panel.classList.contains('chart-panel') && !panel.classList.contains('bottom-charts-panel');
+            });
             const kpPanel = topPanels[0];
             const rightSidePanels = topPanels.slice(1);
-            const bottomMagWrapper = document.querySelector('.mag-chart-wrapper');
-            const bottomPowerWrapper = document.querySelector('.power-chart-wrapper');
+            const bottomMagWrapper = dashboard.querySelector('.mag-chart-wrapper');
+            const bottomPowerWrapper = dashboard.querySelector('.power-chart-wrapper');
 
             const kpPanelRect = rectToCanvas(kpPanel);
             const kpValue = document.getElementById('kp-value-text').textContent;
