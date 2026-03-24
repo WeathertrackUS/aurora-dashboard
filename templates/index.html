@@ -3741,14 +3741,9 @@
         }
 
         async function downloadDashboard() {
+            const filename = buildDashboardExportFilename();
+
             try {
-                const filename = buildDashboardExportFilename();
-
-                if (prefersDirectMobileDownload()) {
-                    await downloadDashboardForMobile(filename);
-                    return;
-                }
-
                 const canvas = await createDashboardCanvas();
                 const blob = await canvasToBlob(canvas);
                 if (await tryShareBlob(blob, filename, 'Aurora Dashboard')) {
@@ -3759,8 +3754,14 @@
                 triggerBlobDownload(blob, filename);
                 showToast('Dashboard downloaded', 'success');
             } catch (err) {
-                console.error(err);
-                showToast('Failed to download dashboard', 'error');
+                console.warn('Client-side dashboard export failed, trying fallback image route', err);
+
+                try {
+                    await downloadDashboardForMobile(filename);
+                } catch (fallbackError) {
+                    console.error(fallbackError);
+                    showToast('Failed to download dashboard', 'error');
+                }
             }
         }
 
