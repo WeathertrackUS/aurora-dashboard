@@ -41,36 +41,48 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         :root {
-            --bg-dark: #0a0a0a;
-            --bg-card: #1a1a1a;
-            --bg-panel: #1a1a1a;
-            --bg-card-hover: #222222;
-            --bg-panel-hover: #222222;
-            --text-primary: #e5e5e5;
-            --text-secondary: #8b8b8b;
-            --accent-primary: #888888;
-            --accent-blue: #666666;
+            --bg-dark: #0a0d11;
+            --bg-card: #11161b;
+            --bg-panel: #11151a;
+            --bg-card-hover: #172028;
+            --bg-panel-hover: #171c22;
+            --bg-elevated: #0f1419;
+            --bg-gradient-start: #0a0d11;
+            --bg-gradient-end: #0b0f13;
+            --text-primary: #edf3f7;
+            --text-secondary: #8fa2b1;
+            --accent-primary: #8bd3cf;
+            --accent-blue: #5fa6bb;
+            --accent-soft: rgba(139, 211, 207, 0.18);
             --success: #22c55e;
             --warning: #f59e0b;
             --danger: #ef4444;
-            --border: rgba(255, 255, 255, 0.08);
+            --border: rgba(180, 215, 228, 0.10);
             --font-sans: 'Inter', 'Metropolis', system-ui, -apple-system, sans-serif;
+            --font-display: 'Outfit', 'Inter', 'Metropolis', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
 
         [data-theme="light"] {
-            --bg-dark: #fafafa;
+            --bg-dark: #f4f7f8;
             --bg-card: #ffffff;
             --bg-panel: #ffffff;
-            --bg-card-hover: #f5f5f5;
-            --bg-panel-hover: #f5f5f5;
-            --text-primary: #171717;
-            --text-secondary: #737373;
-            --border: rgba(0, 0, 0, 0.08);
+            --bg-card-hover: #eef3f5;
+            --bg-panel-hover: #f3f7f8;
+            --bg-elevated: #ffffff;
+            --bg-gradient-start: #f6f9fa;
+            --bg-gradient-end: #eef3f5;
+            --text-primary: #15202a;
+            --text-secondary: #5f7280;
+            --accent-primary: #2f8e95;
+            --accent-blue: #3d7d90;
+            --accent-soft: rgba(47, 142, 149, 0.12);
+            --border: rgba(15, 23, 42, 0.10);
         }
 
         body {
             background-color: var(--bg-dark);
+            background-image: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
             color: var(--text-primary);
             font-family: var(--font-sans);
             margin: 0;
@@ -81,6 +93,20 @@
             -moz-osx-font-smoothing: grayscale;
             -webkit-tap-highlight-color: transparent;
             touch-action: pan-x pan-y;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .bg-noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.018;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
         /* Safe area insets for notched devices */
@@ -101,24 +127,27 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.875rem 2rem;
-            background: var(--bg-card);
+            padding: 0.7rem 1.5rem;
+            background: var(--bg-elevated);
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
             z-index: 1000;
             min-height: 56px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
         .brand {
             display: flex;
             align-items: center;
             gap: 0.625rem;
-            font-weight: 600;
-            font-size: 1.125rem;
+            font-weight: 700;
+            font-size: 1.05rem;
             color: var(--text-primary);
-            letter-spacing: -0.01em;
+            letter-spacing: 0.02em;
             text-decoration: none;
+            font-family: 'Metropolis', 'Inter', sans-serif;
+            text-transform: uppercase;
         }
 
         .brand span {
@@ -127,8 +156,8 @@
 
         .nav-links {
             display: flex;
-            gap: 1.5rem;
-            margin-left: 2rem;
+            gap: 1.1rem;
+            margin-left: 1.5rem;
             margin-right: auto;
             align-items: center;
         }
@@ -150,6 +179,15 @@
             font-weight: 600;
         }
 
+        .nav-link.active::after {
+            content: '';
+            display: block;
+            height: 2px;
+            margin-top: 0.3rem;
+            border-radius: 999px;
+            background: var(--accent-primary);
+        }
+
         .nav-stats {
             display: flex;
             gap: 1.5rem;
@@ -157,7 +195,6 @@
         }
 
         .stat-item {
-            display: flex;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.85rem;
@@ -165,16 +202,20 @@
         }
 
         .stat-value {
-            color: var(--accent-primary);
+            color: var(--text-primary);
             font-family: var(--font-mono);
             font-weight: 600;
+            padding: 0.2rem 0.42rem;
+            border-radius: 4px;
+            background: rgba(143, 162, 177, 0.10);
+            border: 1px solid rgba(143, 162, 177, 0.12);
         }
 
         .theme-toggle {
-            background: var(--bg-panel-hover);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border);
             color: var(--text-primary);
-            padding: 0.4rem 0.8rem;
+            padding: 0.32rem 0.65rem;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.85rem;
@@ -186,60 +227,63 @@
         }
 
         .theme-toggle:hover {
-            background: var(--bg-panel);
+            background: rgba(255, 255, 255, 0.08);
             border-color: var(--accent-primary);
         }
 
         .dashboard-container {
-            max-width: 2200px;
+            max-width: 2520px;
             margin: 0 auto;
-            padding: 0.9rem 1.5rem;
+            padding: 0.7rem 0.95rem;
             display: flex;
             flex-direction: column;
-            gap: 0.8rem;
+            gap: 0.65rem;
+            position: relative;
+            z-index: 1;
         }
 
         /* Stats Row */
         .stats-overview {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         .stat-card {
             background: var(--bg-panel);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 1rem;
+            border-radius: 5px;
+            padding: 0.75rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            transition: all 0.25s ease;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            transition: none;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
         }
 
         .stat-card:hover {
             background: var(--bg-panel-hover);
-            transform: translateY(-3px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-            border-color: rgba(255, 255, 255, 0.12);
+            transform: none;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+            border-color: rgba(180, 215, 228, 0.12);
         }
 
         /* Tab Navigation */
         .tab-navigation {
             display: flex;
             gap: 0.5rem;
-            background: var(--bg-panel);
-            border-bottom: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.5rem;
+            background: rgba(15, 21, 27, 0.92);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 0.35rem;
             margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            scrollbar-width: thin;
             -ms-overflow-style: none;
+            scroll-snap-type: x proximity;
         }
         
         .tab-navigation::-webkit-scrollbar {
@@ -250,17 +294,18 @@
             background: transparent;
             border: none;
             color: var(--text-secondary);
-            padding: 0.75rem 1.25rem;
+            padding: 0.52rem 0.9rem;
             font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 4px;
             transition: all 0.25s ease;
             font-family: var(--font-sans);
             position: relative;
             overflow: hidden;
             flex-shrink: 0;
             white-space: nowrap;
+            scroll-snap-align: start;
         }
 
         .tab-btn::before {
@@ -277,7 +322,7 @@
 
         .tab-btn:hover {
             color: var(--text-primary);
-            background: var(--bg-panel-hover);
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .tab-btn:hover::before {
@@ -286,7 +331,7 @@
 
         .tab-btn.active {
             color: var(--accent-primary);
-            background: var(--bg-panel-hover);
+            background: rgba(139, 211, 207, 0.10);
         }
 
         .tab-btn.active::before {
@@ -313,12 +358,13 @@
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
-            padding: 0.5rem 1rem;
-            background: var(--bg-panel);
+            padding: 0.4rem 0.75rem;
+            background: rgba(15, 21, 27, 0.92);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 5px;
             font-size: 0.85rem;
             margin-bottom: 0.5rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
         }
 
         .update-time {
@@ -331,10 +377,10 @@
         }
 
         .refresh-btn, .action-btn {
-            background: var(--bg-panel-hover);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border);
             color: var(--text-primary);
-            padding: 0.4rem 0.8rem;
+            padding: 0.3rem 0.65rem;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.8rem;
@@ -344,7 +390,7 @@
         }
 
         .refresh-btn:hover, .action-btn:hover {
-            background: var(--bg-panel);
+            background: rgba(255, 255, 255, 0.08);
             border-color: var(--accent-primary);
             color: var(--accent-primary);
         }
@@ -424,12 +470,14 @@
             opacity: 1;
         }
 
-        /* Notification Banner */
+
         .notification-banner {
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-            color: #000;
-            padding: 1rem;
-            border-radius: 4px;
+            background: rgba(245, 158, 11, 0.18);
+            color: #f6d28b;
+            border: 1px solid rgba(245, 158, 11, 0.28);
+            padding: 0.75rem;
+            border-radius: 5px;
+            background: rgba(139, 211, 207, 0.10);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -451,10 +499,10 @@
         }
 
         .notification-banner button {
-            background: #000;
-            color: #fff;
-            border: none;
-            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            padding: 0.38rem 0.75rem;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
@@ -462,7 +510,7 @@
         }
 
         .notification-banner button:hover {
-            background: #1e293b;
+            background: rgba(255, 255, 255, 0.12);
         }
 
         /* CME Timeline */
@@ -560,19 +608,13 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
         }
-        
-        @media (max-width: 600px) {
+
+        @media (max-width: 1024px) {
             .grid-2 {
                 grid-template-columns: 1fr;
             }
         }
 
-        .grid-3 {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-        }
-        
         @media (max-width: 768px) {
             .grid-3 {
                 grid-template-columns: repeat(2, 1fr);
@@ -581,6 +623,285 @@
         
         @media (max-width: 480px) {
             .grid-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .solar-cycle-hero-card {
+            padding: 0.95rem;
+            background:
+                radial-gradient(circle at top right, rgba(251, 191, 36, 0.18), transparent 30%),
+                radial-gradient(circle at bottom left, rgba(96, 165, 250, 0.14), transparent 28%),
+                linear-gradient(135deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+            overflow: hidden;
+        }
+
+        .solar-cycle-hero-shell {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .solar-cycle-headline {
+            margin: 0.65rem 0 0.35rem 0;
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+        }
+
+        .solar-cycle-subhead {
+            margin: 0;
+            max-width: 900px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 0.98rem;
+        }
+
+        .solar-cycle-hero-aside {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-width: 280px;
+        }
+
+        .solar-cycle-hero-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .solar-cycle-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .solar-cycle-kpi {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.8rem;
+            min-height: 122px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.45rem;
+        }
+
+        .solar-cycle-kpi-label {
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .solar-cycle-kpi-value {
+            font-size: clamp(1.35rem, 2vw, 2rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            line-height: 1.05;
+        }
+
+        .solar-cycle-kpi-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .solar-cycle-trend.up {
+            color: #4ade80;
+        }
+
+        .solar-cycle-trend.down {
+            color: #f97316;
+        }
+
+        .solar-cycle-trend.flat {
+            color: #94a3b8;
+        }
+
+        .solar-cycle-card-note {
+            margin-top: 0.2rem;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .solar-cycle-layer-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .solar-cycle-layer-groups {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.85rem;
+        }
+
+        .solar-cycle-layer-group {
+            padding: 0.9rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-panel-hover);
+        }
+
+        .solar-cycle-layer-group-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.55rem;
+        }
+
+        .solar-cycle-layer-group-title h3 {
+            margin: 0;
+            font-size: 0.88rem;
+            color: var(--text-primary);
+        }
+
+        .solar-cycle-layer-group-title span {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .solar-cycle-layer-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .solar-cycle-layer-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.45rem 0.7rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+        }
+
+        .solar-cycle-layer-chip:hover {
+            transform: translateY(-1px);
+            border-color: rgba(251, 146, 60, 0.45);
+            color: var(--text-primary);
+        }
+
+        .solar-cycle-layer-chip.active {
+            background: rgba(251, 146, 60, 0.16);
+            border-color: rgba(251, 146, 60, 0.5);
+            color: var(--text-primary);
+        }
+
+        .solar-cycle-compare-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        .solar-cycle-compare-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .solar-cycle-compare-toggle {
+            padding: 0.42rem 0.7rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .solar-cycle-compare-toggle.active {
+            background: rgba(96, 165, 250, 0.16);
+            border-color: rgba(96, 165, 250, 0.5);
+            color: var(--text-primary);
+        }
+
+        .solar-cycle-milestone-list,
+        .solar-cycle-insights {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 0.5rem;
+        }
+
+        .solar-cycle-milestone,
+        .solar-cycle-insight {
+            padding: 0.9rem 1rem;
+            border-radius: 6px;
+            background: var(--bg-panel-hover);
+            border: 1px solid var(--border);
+        }
+
+        .solar-cycle-milestone-label {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+
+        .solar-cycle-milestone-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+        }
+
+        .solar-cycle-milestone-detail,
+        .solar-cycle-insight p {
+            margin: 0;
+            color: var(--text-secondary);
+            line-height: 1.55;
+            font-size: 0.9rem;
+        }
+
+        .solar-cycle-insight h4 {
+            margin: 0 0 0.35rem 0;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 1400px) {
+            .solar-cycle-kpi-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .solar-cycle-kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .solar-cycle-hero-aside {
+                min-width: 100%;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .solar-cycle-kpi-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -616,7 +937,7 @@
         /* Grid Layout */
         .content-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
+            grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1.1fr) minmax(300px, 1.1fr);
             gap: 0.85rem;
             align-items: stretch;
         }
@@ -624,8 +945,8 @@
         /* Overview Tab Layout with Sidebar */
         .overview-layout {
             display: grid;
-            grid-template-columns: 1fr 520px;
-            gap: 1rem;
+            grid-template-columns: minmax(0, 1.55fr) minmax(400px, 0.9fr);
+            gap: 0.85rem;
             align-items: start;
         }
         
@@ -656,25 +977,27 @@
         .card {
             background: var(--bg-panel);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 5px;
             padding: 0.5rem;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+            transition: none;
         }
 
         .card:hover {
-            border-color: rgba(255, 255, 255, 0.12);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            background: var(--bg-panel-hover);
+            border-color: rgba(180, 215, 228, 0.12);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+            transform: none;
         }
 
         .chart-stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 0.4rem;
-            margin-top: 0.3rem;
-            padding: 0.3rem 0.2rem 0.2rem;
+            margin-top: 0.2rem;
+            padding: 0.2rem 0.1rem 0.1rem;
             border-top: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -691,22 +1014,22 @@
         }
 
         .mini-stat .label {
-            font-size: 0.7rem;
+            font-size: 0.66rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: 0.15rem;
+            margin-bottom: 0.1rem;
         }
 
         .mini-stat .value {
-            font-size: 1.05rem;
+            font-size: 0.98rem;
             font-weight: 700;
             font-family: var(--font-mono);
             line-height: 1.2;
         }
 
         .flare-filter-row {
-            padding: 0.75rem 1rem;
+            padding: 0.55rem 0.8rem;
             border-bottom: 1px solid var(--border);
             display: flex;
             gap: 0.5rem;
@@ -735,9 +1058,9 @@
         .proton-controls {
             display: flex;
             justify-content: center;
-            gap: 1.5rem;
-            margin-top: 0.3rem;
-            padding: 0.3rem 0.2rem 0.2rem;
+            gap: 0.7rem;
+            margin-top: 0.2rem;
+            padding: 0.2rem 0.1rem 0.1rem;
             border-top: 1px solid var(--border);
             flex-shrink: 0;
             flex-wrap: wrap;
@@ -746,8 +1069,8 @@
         .proton-toggle {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
+            gap: 0.35rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
             cursor: pointer;
             user-select: none;
@@ -765,21 +1088,48 @@
         .time-range-selector {
             display: flex;
             gap: 0.25rem;
-            background: var(--bg-dark);
-            padding: 0.25rem;
+            background: rgba(7, 11, 15, 0.55);
+            padding: 0.18rem;
             border-radius: 4px;
             flex-wrap: wrap;
             justify-content: flex-end;
+            border: 1px solid var(--border);
+        }
+
+        .xray-header-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+
+        .xray-flare-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .xray-flare-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            opacity: 0.7;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
         }
 
         .time-btn {
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text-secondary);
-            padding: 0.35rem 0.7rem;
+            padding: 0.28rem 0.55rem;
             font-size: 0.75rem;
             font-weight: 600;
-            border-radius: 3px;
+            border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s;
             font-family: var(--font-sans);
@@ -792,9 +1142,36 @@
         }
 
         .time-btn.active {
-            background: var(--accent-primary);
-            color: var(--bg-dark);
-            border-color: var(--accent-primary);
+            background: rgba(139, 211, 207, 0.92);
+            color: #041016;
+            border-color: rgba(139, 211, 207, 0.5);
+            box-shadow: 0 3px 10px rgba(139, 211, 207, 0.12);
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.28rem 0.55rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-panel-hover);
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        .filter-btn.active {
+            background: rgba(139, 211, 207, 0.92);
+            color: #041016;
+            border-color: rgba(139, 211, 207, 0.5);
+            box-shadow: 0 3px 10px rgba(139, 211, 207, 0.12);
         }
 
         /* Chart Loading States */
@@ -820,13 +1197,13 @@
         #xray-chart, #proton-chart {
             width: 100% !important;
             height: 100% !important;
-            min-height: 380px;
+            min-height: 280px;
             overflow: hidden;
         }
 
         .solar-image-container {
             width: 100%;
-            flex: 1; /* Fill available vertical space */
+            flex: none;
             background: #000;
             border-radius: 4px;
             overflow: hidden;
@@ -835,7 +1212,12 @@
             justify-content: center;
             border: 1px solid var(--border);
             position: relative;
-            min-height: 200px;
+            min-height: 0;
+            aspect-ratio: 1 / 1;
+        }
+
+        .image-card {
+            align-self: start;
         }
 
         .solar-image-container::before {
@@ -853,11 +1235,14 @@
         }
 
         .solar-image-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain; /* Ensure full sun is visible */
+            width: auto;
+            height: auto;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
             cursor: zoom-in;
-            transition: transform 0.3s ease, opacity 0.3s ease;
+            transition: opacity 0.3s ease;
         }
 
         .solar-image-container img.loaded {
@@ -865,7 +1250,7 @@
         }
 
         .solar-image-container img:hover {
-            transform: scale(1.03);
+            transform: none;
         }
 
         .card-header {
@@ -907,8 +1292,15 @@
         .storm-label.s4 { background: #a855f7; color: #ffffff; }
         .storm-label.s5 { background: #ec4899; color: #ffffff; }
 
+        .sunspot-scroll {
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            max-height: 500px;
+        }
+
         .sunspot-table {
             width: 100%;
+            min-width: 520px;
             border-collapse: collapse;
             font-family: var(--font-mono);
             font-size: 0.8rem;
@@ -917,6 +1309,7 @@
         @media (max-width: 480px) {
             .sunspot-table {
                 font-size: 0.7rem;
+                min-width: 460px;
             }
             
             .sunspot-table th,
@@ -1187,6 +1580,70 @@
         .lightbox-close:hover {
             opacity: 1;
         }
+
+        .imagery-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .imagery-section-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 0.7rem 0;
+            padding-bottom: 0.45rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .imagery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 0.7rem;
+            align-items: start;
+        }
+
+        .imagery-tile {
+            padding: 0.4rem;
+            gap: 0.35rem;
+        }
+
+        .imagery-tile .card-header {
+            margin-bottom: 0.15rem;
+            padding-bottom: 0.15rem;
+            min-height: 0;
+        }
+
+        .imagery-tile .card-title {
+            font-size: 0.9rem;
+            line-height: 1.25;
+        }
+
+        .imagery-thumb {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #000;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .imagery-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            cursor: pointer;
+        }
+
+        .imagery-caption {
+            padding: 0.25rem 0.1rem 0.05rem;
+            text-align: center;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+        }
         
         @media (max-width: 480px) {
             .lightbox-close {
@@ -1200,6 +1657,19 @@
             .lightbox-caption {
                 font-size: 0.9rem;
                 padding: 0 1rem;
+            }
+
+            .imagery-grid {
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 0.6rem;
+            }
+
+            .imagery-tile .card-title {
+                font-size: 0.82rem;
+            }
+
+            .imagery-caption {
+                font-size: 0.68rem;
             }
         }
         
@@ -1393,7 +1863,7 @@
             }
             
             .dashboard-container {
-                padding: 0.5rem;
+                padding: 0.5rem 0.55rem 0.85rem;
                 gap: 0.5rem;
             }
             
@@ -1418,6 +1888,7 @@
                 gap: 0.5rem;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                padding-bottom: 0.35rem;
             }
             
             .tab-btn {
@@ -1441,6 +1912,10 @@
             }
             .dashboard-container {
                 padding: 0.5rem;
+            }
+
+            .sunspot-scroll {
+                max-height: none;
             }
             
             /* Enhanced modal mobile styles */
@@ -1507,7 +1982,12 @@
             }
             
             .dashboard-container {
-                padding: 0.25rem;
+                padding: 0.4rem;
+            }
+
+            .tab-navigation {
+                margin-left: -0.05rem;
+                margin-right: -0.05rem;
             }
             
             h1 {
@@ -1553,8 +2033,8 @@
             }
             
             .solar-image-container {
-                min-height: 250px;
-                max-height: 350px;
+                min-height: 0;
+                max-height: none;
             }
             
             .chart-stats-grid {
@@ -1604,7 +2084,7 @@
             }
             
             /* Active states for touch feedback */
-            button:active, .btn:active, .time-btn:active, .tab-btn:active {
+            button:active, .btn:active, .time-btn:active, .tab-btn:active, .filter-btn:active {
                 opacity: 0.8;
                 transform: scale(0.98);
             }
@@ -1616,6 +2096,12 @@
             
             /* Better touch targets for time buttons */
             .time-btn {
+                min-height: 44px;
+                padding: 0.5rem 1rem;
+            }
+
+            /* Better touch targets for filter buttons */
+            .filter-btn {
                 min-height: 44px;
                 padding: 0.5rem 1rem;
             }
@@ -1652,6 +2138,9 @@
             font-size: 0.8rem;
             border-top: 1px solid var(--border);
             margin-top: 2rem;
+            background: rgba(15, 21, 27, 0.72);
+            position: relative;
+            z-index: 1;
         }
 
         /* System alert link styles: brighter blue/purple for visibility */
@@ -1769,14 +2258,25 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">GOES X-Ray Flux</div>
-                    <div class="time-range-selector">
-                        <button class="time-btn active" data-range="2h" onclick="setXrayRange('2h')">2h</button>
-                        <button class="time-btn" data-range="6h" onclick="setXrayRange('6h')">6h</button>
-                        <button class="time-btn" data-range="12h" onclick="setXrayRange('12h')">12h</button>
-                        <button class="time-btn" data-range="24h" onclick="setXrayRange('24h')">24h</button>
-                        <button class="time-btn" data-range="2d" onclick="setXrayRange('2d')">2d</button>
-                        <button class="time-btn" data-range="5d" onclick="setXrayRange('5d')">5d</button>
-                        <button class="time-btn" data-range="7d" onclick="setXrayRange('7d')">7d</button>
+                    <div class="xray-header-controls">
+                        <div class="xray-flare-controls">
+                            <div class="xray-flare-label">Flare Markers</div>
+                            <div class="time-range-selector" style="justify-content: flex-start;">
+                                <button class="filter-btn active" data-filter="all" onclick="setFlareFilter('all')">All</button>
+                                <button class="filter-btn" data-filter="c+" onclick="setFlareFilter('c+')">C+</button>
+                                <button class="filter-btn" data-filter="m+" onclick="setFlareFilter('m+')">M+</button>
+                                <button class="filter-btn" data-filter="x" onclick="setFlareFilter('x')">X</button>
+                            </div>
+                        </div>
+                        <div class="time-range-selector">
+                            <button class="time-btn active" data-range="2h" onclick="setXrayRange('2h')">2h</button>
+                            <button class="time-btn" data-range="6h" onclick="setXrayRange('6h')">6h</button>
+                            <button class="time-btn" data-range="12h" onclick="setXrayRange('12h')">12h</button>
+                            <button class="time-btn" data-range="24h" onclick="setXrayRange('24h')">24h</button>
+                            <button class="time-btn" data-range="2d" onclick="setXrayRange('2d')">2d</button>
+                            <button class="time-btn" data-range="5d" onclick="setXrayRange('5d')">5d</button>
+                            <button class="time-btn" data-range="7d" onclick="setXrayRange('7d')">7d</button>
+                        </div>
                     </div>
                 </div>
                 <div class="chart-container loading" id="xray-chart"></div>
@@ -1803,7 +2303,7 @@
             </div>
 
             <!-- GOES Image -->
-            <div class="card">
+            <div class="card image-card">
                 <div class="card-header">
                     <div class="card-title">GOES SUVI 131Å (Solar Flares)</div>
                 </div>
@@ -1813,7 +2313,7 @@
             </div>
 
             <!-- GOES CCOR-1 Image -->
-            <div class="card">
+            <div class="card image-card">
                 <div class="card-header">
                     <div class="card-title">GOES-19 CCOR-1 Coronagraph</div>
                 </div>
@@ -1862,7 +2362,7 @@
             </div>
 
             <!-- SDO Image -->
-            <div class="card">
+            <div class="card image-card">
                 <div class="card-header">
                     <div class="card-title">Sunspots</div>
                 </div>
@@ -1876,7 +2376,7 @@
             </div>
 
             <!-- SDO AIA 193 Image -->
-            <div class="card">
+            <div class="card image-card">
                 <div class="card-header">
                     <div class="card-title">Coronal Holes</div>
                 </div>
@@ -1896,7 +2396,7 @@
                     <div class="card-header">
                         <div class="card-title">Active Solar Regions</div>
                     </div>
-                    <div style="overflow-y: auto; max-height: 500px;">
+                    <div class="sunspot-scroll" style="overflow-y: auto; max-height: 500px;">
                         <table class="sunspot-table">
                             <thead>
                                 <tr>
@@ -2160,47 +2660,56 @@
 
         <!-- Tab: Solar Cycle & Research -->
         <div id="tab-solar-cycle" class="tab-content">
-            
-            <!-- F10.7 Solar Radio Flux -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">
-                        F10.7 Solar Radio Flux (Current)
-                        <span class="tooltip help-icon">
-                            <span class="tooltiptext">10.7 cm radio emission from the sun. Higher values indicate increased solar activity. Measured in Solar Flux Units (SFU).</span>
-                        </span>
+                    <div>
+                        <div class="card-title">Solar Cycle 25</div>
+                        <div id="solar-cycle-summary-text" class="solar-cycle-card-note">Loading the latest NOAA observed solar-cycle trend.</div>
+                    </div>
+                    <div class="time-range-selector" id="solar-cycle-range-selector">
+                        <button class="time-btn active" data-range="cycle25" onclick="setSolarCycleRange('cycle25')">Cycle 25</button>
+                        <button class="time-btn" data-range="cycle24" onclick="setSolarCycleRange('cycle24')">Cycle 24 + 25</button>
+                        <button class="time-btn" data-range="15y" onclick="setSolarCycleRange('15y')">15 Years</button>
+                        <button class="time-btn" data-range="full" onclick="setSolarCycleRange('full')">Full Record</button>
                     </div>
                 </div>
-                <div style="text-align: center; padding: 2rem;">
-                    <div style="font-size: 3rem; font-weight: 700; font-family: var(--font-mono); color: var(--accent-primary);" id="f107-flux">--</div>
-                    <div style="font-size: 1rem; color: var(--text-secondary); margin-top: 0.5rem;">SFU (10⁻²² W/m²/Hz)</div>
+                <div class="solar-cycle-kpi-grid">
+                    <div class="solar-cycle-kpi">
+                        <div class="solar-cycle-kpi-label">Monthly Sunspot Number</div>
+                        <div id="solar-cycle-current-ssn" class="solar-cycle-kpi-value">--</div>
+                        <div id="solar-cycle-current-time" class="solar-cycle-kpi-meta">Latest observed month</div>
+                    </div>
+                    <div class="solar-cycle-kpi">
+                        <div class="solar-cycle-kpi-label">Smoothed Cycle Signal</div>
+                        <div id="solar-cycle-smoothed-ssn" class="solar-cycle-kpi-value">--</div>
+                        <div id="solar-cycle-6m-trend" class="solar-cycle-kpi-meta">6-month trend loading...</div>
+                    </div>
+                    <div class="solar-cycle-kpi">
+                        <div class="solar-cycle-kpi-label">F10.7 Radio Flux</div>
+                        <div id="f107-flux" class="solar-cycle-kpi-value">--</div>
+                        <div id="f107-flux-note" class="solar-cycle-kpi-meta">Latest monthly NOAA value</div>
+                    </div>
+                    <div class="solar-cycle-kpi">
+                        <div class="solar-cycle-kpi-label">Cycle Phase</div>
+                        <div id="solar-cycle-phase" class="solar-cycle-kpi-value">--</div>
+                        <div id="solar-cycle-phase-note" class="solar-cycle-kpi-meta">Cycle state loading...</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Sunspot Number Chart -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">
-                        Solar Cycle History - Sunspot Number
-                        <span class="tooltip help-icon">
-                            <span class="tooltiptext">Monthly mean sunspot number (blue) and 13-month smoothed average (orange) with NOAA predictions (dashed).</span>
-                        </span>
+                    <div>
+                        <div class="card-title">
+                            Cycle Trend
+                            <span class="tooltip help-icon">
+                                <span class="tooltiptext">Observed monthly and smoothed sunspot numbers from NOAA, with the official NOAA forecast shown for context.</span>
+                            </span>
+                        </div>
+                        <div class="solar-cycle-card-note">This view stays focused on the measured cycle trend and the official forecast reference.</div>
                     </div>
                 </div>
-                <div id="solar-cycle-ssn-chart" style="width: 100%; height: 400px;"></div>
-            </div>
-
-            <!-- F10.7 Flux Chart -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        Solar Cycle History - F10.7cm Radio Flux
-                        <span class="tooltip help-icon">
-                            <span class="tooltiptext">Observed F10.7 flux (blue) with NOAA predictions (orange dashed).</span>
-                        </span>
-                    </div>
-                </div>
-                <div id="solar-cycle-f107-chart" style="width: 100%; height: 400px;"></div>
+                <div id="solar-cycle-combined-chart" style="width: 100%; height: 460px;"></div>
             </div>
 
         </div>
@@ -2210,11 +2719,11 @@
         <div id="tab-solar-imagery" class="tab-content">
 
             <!-- Section: Featured Views -->
-            <div style="margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">Featured Views</h2>
-                <div class="grid-3">
+            <div class="imagery-section">
+                <h2 class="imagery-section-title">Featured Views</h2>
+                <div class="imagery-grid">
                     <!-- SDO Composite -->
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">
                                 Multi-Wavelength Composite
@@ -2223,16 +2732,15 @@
                                 </span>
                             </div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_211193171.jpg" 
                                  alt="SDO Composite" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_211193171.jpg', 'SDO Multi-Wavelength Composite')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg'">
                         </div>
                     </div>
                     <!-- HMI Magnetogram -->
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">
                                 HMI Magnetogram
@@ -2241,16 +2749,15 @@
                                 </span>
                             </div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg" 
                                  alt="HMI Magnetogram" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_HMIBC.jpg', 'SDO HMI Magnetogram')"
                                  loading="lazy" onerror="this.src='https://jsoc1.stanford.edu/data/hmi/images/latest/HMI_latest_color_Mag_4096x4096.jpg'">
                         </div>
                     </div>
                     <!-- HMI Continuum -->
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">
                                 Visible Light (Sunspots)
@@ -2259,10 +2766,9 @@
                                 </span>
                             </div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg" 
                                  alt="HMI Continuum" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_HMII.jpg', 'SDO HMI Visible Light')"
                                  loading="lazy" onerror="this.src='https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg'">
                         </div>
@@ -2271,205 +2777,190 @@
             </div>
 
             <!-- Section: SDO AIA Extreme UV -->
-            <div style="margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">SDO AIA Extreme UV (by Temperature)</h2>
-                <div class="grid-3">
-                    <div class="card">
+            <div class="imagery-section">
+                <h2 class="imagery-section-title">SDO AIA Extreme UV</h2>
+                <div class="imagery-grid">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">304Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~60,000K</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg" 
                                  alt="AIA 304Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0304.jpg', 'SDO AIA 304Å - Chromosphere (~60,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0304.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Chromosphere & prominences</div>
+                        <div class="imagery-caption">Chromosphere & prominences</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">171Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~600,000K</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg" 
                                  alt="AIA 171Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0171.jpg', 'SDO AIA 171Å - Quiet Corona (~600,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0171.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Quiet corona & loops</div>
+                        <div class="imagery-caption">Quiet corona & loops</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">193Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~1MK</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg" 
                                  alt="AIA 193Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0193.jpg', 'SDO AIA 193Å - Hot Corona (~1,000,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0193.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Corona & coronal holes</div>
+                        <div class="imagery-caption">Corona & coronal holes</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">211Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~2MK</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0211.jpg" 
                                  alt="AIA 211Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0211.jpg', 'SDO AIA 211Å - Active Regions (~2,000,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0211.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Active regions</div>
+                        <div class="imagery-caption">Active regions</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">335Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~2.5MK</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0335.jpg" 
                                  alt="AIA 335Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0335.jpg', 'SDO AIA 335Å - Very Hot Plasma (~2,500,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0335.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Very hot plasma</div>
+                        <div class="imagery-caption">Very hot plasma</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">94Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~6MK</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0094.jpg" 
                                  alt="AIA 94Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0094.jpg', 'SDO AIA 94Å - Flare Plasma (~6,000,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0094.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Flare plasma (hottest)</div>
+                        <div class="imagery-caption">Flare plasma (hottest)</div>
                     </div>
                 </div>
                 
                 <!-- Additional AIA wavelengths -->
-                <div class="grid-3" style="margin-top: 0.75rem;">
-                    <div class="card">
+                <div class="imagery-grid" style="margin-top: 0.75rem;">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">131Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~10MK</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0131.jpg" 
                                  alt="AIA 131Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_0131.jpg', 'SDO AIA 131Å - Flaring Regions (~10,000,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l0131.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Flaring regions</div>
+                        <div class="imagery-caption">Flaring regions</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">1600Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~100,000K</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_1600.jpg" 
                                  alt="AIA 1600Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_1600.jpg', 'SDO AIA 1600Å - Transition Region (~100,000K)')"
                                  loading="lazy" onerror="this.src='https://suntoday.lmsal.com/sdomedia/SunInTime/mostrecent/l1600.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Transition region</div>
+                        <div class="imagery-caption">Transition region</div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">1700Å <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.8rem;">~5,000K</span></div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_1700.jpg" 
                                  alt="AIA 1700Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal('https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_1700.jpg', 'SDO AIA 1700Å - Photosphere & Sunspots (~5,000K)')"
                                  loading="lazy" onerror="this.src='https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg'">
                         </div>
-                        <div style="padding: 0.4rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">Photosphere & sunspots</div>
+                        <div class="imagery-caption">Photosphere & sunspots</div>
                     </div>
                 </div>
             </div>
 
             <!-- Section: GOES SUVI -->
-            <div style="margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.75rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">GOES SUVI Real-Time</h2>
-                <div class="grid-3">
-                    <div class="card">
+            <div class="imagery-section">
+                <h2 class="imagery-section-title">GOES SUVI</h2>
+                <div class="imagery-grid">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">SUVI 94Å</div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/094/latest.png" 
                                  alt="GOES SUVI 94Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal(this.src, 'GOES SUVI 94Å - Hot Flare Plasma')"
                                  loading="lazy">
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">SUVI 195Å</div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/195/latest.png" 
                                  alt="GOES SUVI 195Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal(this.src, 'GOES SUVI 195Å - Active Regions & Coronal Holes')"
                                  loading="lazy">
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">SUVI 284Å</div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/284/latest.png" 
                                  alt="GOES SUVI 284Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal(this.src, 'GOES SUVI 284Å - Filaments & Active Regions')"
                                  loading="lazy">
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">SUVI 131Å</div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png" 
                                  alt="GOES SUVI 131Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal(this.src, 'GOES SUVI 131Å - Flares')"
                                  loading="lazy">
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">SUVI 171Å</div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/171/latest.png" 
                                  alt="GOES SUVI 171Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal(this.src, 'GOES SUVI 171Å - Coronal Loops')"
                                  loading="lazy">
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card imagery-tile">
                         <div class="card-header">
                             <div class="card-title">SUVI 304Å</div>
                         </div>
-                        <div style="width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div class="imagery-thumb">
                             <img src="https://services.swpc.noaa.gov/images/animations/suvi/primary/304/latest.png" 
                                  alt="GOES SUVI 304Å" 
-                                 style="width: 100%; height: 100%; object-fit: contain; cursor: pointer;"
                                  onclick="openImageModal(this.src, 'GOES SUVI 304Å - Chromosphere & Prominences')"
                                  loading="lazy">
                         </div>
@@ -2603,8 +3094,13 @@
         // Time range state
         let currentXrayRange = '2h';
         let currentProtonRange = '24h';
+        let currentFlareFilter = 'all'; // 'all', 'c+', 'm+', 'x'
         let xrayData = null;
         let protonData = null;
+        const solarCycleState = {
+            range: 'cycle25',
+            data: null
+        };
         let isMobile = window.innerWidth <= 768;
         let isResizing = false;
         let resizeDebounceTimer = null;
@@ -2670,9 +3166,20 @@
             if (protonChart) protonChart.classList.add('loading');
             
             try {
-                // Fetch sunspot data from original endpoint
-                const solarResponse = await fetch('/api/solar-data', { signal: AbortSignal.timeout(15000) });
-                const solarData = await solarResponse.json();
+                const [solarResponse, xrayResponse, xray24hResponse, protonResponse] = await Promise.all([
+                    fetch('/api/solar-data', { signal: AbortSignal.timeout(15000) }),
+                    fetch(`/api/xray-data?range=${currentXrayRange || '2h'}`, { signal: AbortSignal.timeout(15000) }),
+                    fetch('/api/xray-data?range=24h', { signal: AbortSignal.timeout(15000) }),
+                    fetch(`/api/proton-data?range=${currentProtonRange || '24h'}`, { signal: AbortSignal.timeout(15000) })
+                ]);
+
+                const [solarData, nextXrayData, xray24hData, nextProtonData] = await Promise.all([
+                    solarResponse.json(),
+                    xrayResponse.json(),
+                    xray24hResponse.json(),
+                    protonResponse.json()
+                ]);
+
                 if (solarData && solarData.sunspots) {
                     updateSunspots(solarData.sunspots);
                     // Fill returning regions: prefer API-provided list if available
@@ -2690,17 +3197,12 @@
                         updateReturningRegions(solarData.sunspots);
                     }
                 }
-                
-                // Fetch X-ray data with current range
-                const xrayResponse = await fetch(`/api/xray-data?range=${currentXrayRange || '2h'}`, { signal: AbortSignal.timeout(15000) });
-                xrayData = await xrayResponse.json();
+
+                xrayData = nextXrayData;
                 if (Array.isArray(xrayData)) {
                     updateXrayChart(xrayData);
                     if (xrayChart) xrayChart.classList.remove('loading');
-                    
-                    // Fetch 1-day X-ray data for stats (always use 24h for stats)
-                    const xray24hResponse = await fetch(`/api/xray-data?range=24h`, { signal: AbortSignal.timeout(15000) });
-                    const xray24hData = await xray24hResponse.json();
+
                     if (Array.isArray(xray24hData)) {
                         updateXrayStats(xrayData, xray24hData);
                     }
@@ -2710,8 +3212,7 @@
                 }
                 
                 // Fetch proton data with current range
-                const protonResponse = await fetch(`/api/proton-data?range=${currentProtonRange || '24h'}`, { signal: AbortSignal.timeout(15000) });
-                protonData = await protonResponse.json();
+                protonData = nextProtonData;
                 if (Array.isArray(protonData)) {
                     updateProtonChart(protonData);
                     if (protonChart) protonChart.classList.remove('loading');
@@ -2802,7 +3303,17 @@
             
             // Detect flares for annotations - use markPoints at the peak position
             const flares = detectFlares(long);
-            const flareMarkPoints = flares.map(flare => {
+            
+            // Filter flares based on current filter setting
+            const filteredFlares = flares.filter(flare => {
+                if (currentFlareFilter === 'all') return true;
+                if (currentFlareFilter === 'c+') return flare.flux >= 1e-6; // C or higher
+                if (currentFlareFilter === 'm+') return flare.flux >= 1e-5; // M or higher
+                if (currentFlareFilter === 'x') return flare.flux >= 1e-4;  // X only
+                return true;
+            });
+            
+            const flareMarkPoints = filteredFlares.map(flare => {
                 const flareClass = getFlareClass(flare.flux);
                 const color = getFlareColor(flare.flux);
                 // Find the index of this flare in our data
@@ -3256,6 +3767,22 @@
                 updateXrayChart(xrayData);
             } catch (error) {
                 console.error('Error fetching X-ray data:', error);
+            }
+        }
+
+        function setFlareFilter(filter) {
+            currentFlareFilter = filter;
+            console.log(`Setting flare filter to: ${filter}`);
+            
+            // Update button states
+            const card = document.querySelector('#xray-chart').parentElement;
+            card.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+            
+            // Re-render chart with current data
+            if (xrayData) {
+                updateXrayChart(xrayData);
             }
         }
 
@@ -3990,6 +4517,7 @@
         fetchKpHistoryExtended();
         fetchSolarCycleData();
         fetchF107Data();
+        fetchCMEData();
         
         // Refresh every 5 minutes
         setInterval(fetchSolarData, 300000);
@@ -4005,20 +4533,45 @@
             const lightboxImage = document.getElementById('lightbox-img');
             const lightboxCaption = document.getElementById('lightbox-caption');
 
-            lightboxImage.src = imageUrl;
-            lightboxCaption.textContent = caption || '';
+            if (!lightbox || !lightboxImage || !lightboxCaption) {
+                return;
+            }
 
+            lightboxCaption.textContent = caption || '';
             lightbox.style.display = 'flex';
+            lightboxImage.removeAttribute('src');
+            lightboxImage.alt = caption || 'Expanded solar image';
+
+            const preload = new Image();
+            preload.onload = () => {
+                lightboxImage.src = imageUrl;
+            };
+            preload.onerror = () => {
+                lightboxCaption.textContent = caption ? `${caption} (image failed to load)` : 'Image failed to load';
+            };
+            preload.src = imageUrl;
         }
 
         function closeLightbox() {
             document.getElementById('image-lightbox').style.display = 'none';
+            const lightboxImage = document.getElementById('lightbox-img');
+            if (lightboxImage) {
+                lightboxImage.removeAttribute('src');
+            }
+        }
+
+        function openImageModal(imageUrl, caption) {
+            openLightbox(imageUrl, caption);
+        }
+
+        function closeImageModal() {
+            closeLightbox();
         }
 
         // Open lightbox on image click
         document.querySelectorAll('.solar-image-container img').forEach(img => {
             img.addEventListener('click', function() {
-                const src = this.src;
+                const src = this.currentSrc || this.src;
                 const caption = this.alt;
                 openLightbox(src, caption);
             });
@@ -4107,6 +4660,7 @@
                     if (allFlares.length === 0) {
                         loadSolarFlares();
                     }
+                    fetchCMEData();
                     // Resize the K-index chart
                     setTimeout(() => {
                         const kpChart = window.echartsInstances['kp-history-chart'];
@@ -4299,7 +4853,6 @@
             
             // Fetch new data
             await Promise.all([
-                fetchKpHistory(),
                 fetchKpHistoryExtended(),
                 fetchF107Data(),
                 fetchCMEData(),
@@ -4631,10 +5184,156 @@
                 const data = await response.json();
                 
                 if (data.observed && data.observed.times.length > 0) {
-                    plotSolarCycleCharts(data.observed, data.predicted);
+                    solarCycleState.data = data;
+                    renderSolarCycleDashboard(data);
+                } else {
+                    setSolarCycleUnavailable('Solar cycle data is currently unavailable.');
                 }
             } catch (error) {
                 console.error('Error fetching solar cycle data:', error);
+                setSolarCycleUnavailable('Error loading solar cycle data.');
+            }
+        }
+
+        function parseSolarCycleTime(value) {
+            if (!value) return null;
+            if (value.length === 7) return new Date(`${value}-01T00:00:00Z`);
+            if (value.length === 10) return new Date(`${value}T00:00:00Z`);
+            return new Date(value);
+        }
+
+        function formatSolarCycleMonth(value) {
+            const date = parseSolarCycleTime(value);
+            if (!date || Number.isNaN(date.getTime())) return value || '--';
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+        }
+
+        function formatSolarCycleSigned(value, digits = 1) {
+            if (value === null || value === undefined || Number.isNaN(Number(value))) return '--';
+            const numeric = Number(value);
+            const rounded = Math.abs(numeric) >= 100 ? Math.round(numeric).toString() : numeric.toFixed(digits);
+            return `${numeric > 0 ? '+' : ''}${rounded}`;
+        }
+
+        function getSolarCycleTrendClass(value) {
+            if (value === null || value === undefined || Number.isNaN(Number(value))) return 'flat';
+            if (value > 1) return 'up';
+            if (value < -1) return 'down';
+            return 'flat';
+        }
+
+        function setSolarCycleRange(range) {
+            solarCycleState.range = range;
+            updateSolarCycleRangeButtons();
+            if (solarCycleState.data) {
+                renderSolarCycleDashboard(solarCycleState.data);
+            }
+        }
+
+        function updateSolarCycleRangeButtons() {
+            document.querySelectorAll('#solar-cycle-range-selector [data-range]').forEach(button => {
+                button.classList.toggle('active', button.dataset.range === solarCycleState.range);
+            });
+        }
+
+        function filterSolarCycleSeries(observed, predicted, range) {
+            const latestTime = observed.times[observed.times.length - 1];
+            const latestDate = parseSolarCycleTime(latestTime);
+            let startDate = null;
+
+            if (range === 'cycle25') {
+                startDate = new Date('2019-12-01T00:00:00Z');
+            } else if (range === 'cycle24') {
+                startDate = new Date('2008-12-01T00:00:00Z');
+            } else if (range === '15y' && latestDate) {
+                startDate = new Date(Date.UTC(latestDate.getUTCFullYear() - 15, latestDate.getUTCMonth(), 1));
+            }
+
+            const filterObserved = { times: [], sunspot_numbers: [], smoothed_ssn: [], f107: [] };
+            observed.times.forEach((time, index) => {
+                const date = parseSolarCycleTime(time);
+                if (!startDate || (date && date >= startDate)) {
+                    filterObserved.times.push(time);
+                    filterObserved.sunspot_numbers.push(observed.sunspot_numbers[index]);
+                    filterObserved.smoothed_ssn.push(observed.smoothed_ssn[index]);
+                    filterObserved.f107.push(observed.f107[index]);
+                }
+            });
+
+            const filterPredicted = { times: [], smoothed_ssn: [], f107: [] };
+            (predicted?.times || []).forEach((time, index) => {
+                const date = parseSolarCycleTime(time);
+                if (!startDate || (date && date >= startDate)) {
+                    filterPredicted.times.push(time);
+                    filterPredicted.smoothed_ssn.push(predicted.smoothed_ssn[index]);
+                    filterPredicted.f107.push(predicted.f107[index]);
+                }
+            });
+
+            return { observed: filterObserved, predicted: filterPredicted };
+        }
+
+        function setSolarCycleUnavailable(message) {
+            const summaryEl = document.getElementById('solar-cycle-summary-text');
+            if (summaryEl) summaryEl.textContent = message;
+
+            const container = document.getElementById('solar-cycle-combined-chart');
+            if (container) {
+                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-style:italic;">${message}</div>`;
+            }
+        }
+
+        function renderSolarCycleDashboard(data) {
+            updateSolarCycleRangeButtons();
+            updateSolarCycleSummary(data.summary || {});
+            plotSolarCycleCharts(data.observed, data.predicted, data.summary || {});
+        }
+
+        function updateSolarCycleSummary(summary) {
+            const current = summary.current || {};
+            const cycle25 = summary.cycle25 || {};
+
+            const summaryText = document.getElementById('solar-cycle-summary-text');
+            const currentSsn = document.getElementById('solar-cycle-current-ssn');
+            const currentTime = document.getElementById('solar-cycle-current-time');
+            const smoothed = document.getElementById('solar-cycle-smoothed-ssn');
+            const sixMonthTrend = document.getElementById('solar-cycle-6m-trend');
+            const f107 = document.getElementById('f107-flux');
+            const f107Note = document.getElementById('f107-flux-note');
+            const phase = document.getElementById('solar-cycle-phase');
+            const phaseNote = document.getElementById('solar-cycle-phase-note');
+
+            if (summaryText) {
+                summaryText.textContent = cycle25.phase_detail
+                    ? cycle25.phase_detail
+                    : `Solar Cycle 25 is ${cycle25.phase ? cycle25.phase.toLowerCase() : 'active'} in the latest NOAA observations.`;
+            }
+
+            if (currentSsn) currentSsn.textContent = current.ssn ?? '--';
+            if (currentTime) currentTime.textContent = current.time ? `Observed month: ${formatSolarCycleMonth(current.time)}` : 'Latest observed month';
+            if (smoothed) smoothed.textContent = current.smoothed_ssn ?? '--';
+
+            if (sixMonthTrend) {
+                sixMonthTrend.className = `solar-cycle-kpi-meta solar-cycle-trend ${getSolarCycleTrendClass(current.six_month_change)}`;
+                sixMonthTrend.textContent = current.six_month_change === null || current.six_month_change === undefined
+                    ? '6-month momentum unavailable'
+                    : `${formatSolarCycleSigned(current.six_month_change)} in smoothed SSN over 6 months`;
+            }
+
+            if (f107 && current.f107 !== null && current.f107 !== undefined) {
+                f107.textContent = Math.round(current.f107);
+            }
+            if (f107Note) {
+                f107Note.textContent = current.time ? `Observed month: ${formatSolarCycleMonth(current.time)}` : 'Latest monthly NOAA value';
+            }
+
+            if (phase) phase.textContent = cycle25.phase || '--';
+            if (phaseNote) {
+                if (cycle25.observed_peak_time && cycle25.observed_peak_ssn !== null && cycle25.observed_peak_ssn !== undefined) {
+                    phaseNote.textContent = `Observed smoothed high so far: ${cycle25.observed_peak_ssn} in ${formatSolarCycleMonth(cycle25.observed_peak_time)}`;
+                } else {
+                    phaseNote.textContent = 'Observed peak reference unavailable';
+                }
             }
         }
 
@@ -4643,81 +5342,85 @@
                 console.warn('No solar cycle data available');
                 return;
             }
-            
+
+            const filtered = filterSolarCycleSeries(observed, predicted || { times: [], smoothed_ssn: [], f107: [] }, solarCycleState.range);
             const isDark = currentTheme === 'dark';
-            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)';
+            const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
             const textColor = isDark ? '#94a3b8' : '#475569';
-            
-            // Filter data from October 2004 onwards for F10.7 chart
-            const oct2004 = new Date('2004-10-01');
-            const filteredObserved = {
-                times: [],
-                f107: []
-            };
-            
-            observed.times.forEach((time, index) => {
-                const date = new Date(time);
-                if (date >= oct2004) {
-                    filteredObserved.times.push(time);
-                    filteredObserved.f107.push(observed.f107[index]);
-                }
-            });
-            
-            // Chart 1: Sunspot Number with predictions
-            const ssnContainer = document.getElementById('solar-cycle-ssn-chart');
-            if (window.echartsInstances['solar-cycle-ssn-chart']) {
-                window.echartsInstances['solar-cycle-ssn-chart'].dispose();
+            const panelColor = isDark ? 'rgba(15, 23, 42, 0.94)' : 'rgba(255, 255, 255, 0.96)';
+            const borderColor = isDark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(71, 85, 105, 0.16)';
+
+            const combinedContainer = document.getElementById('solar-cycle-combined-chart');
+            if (window.echartsInstances['solar-cycle-combined-chart']) {
+                window.echartsInstances['solar-cycle-combined-chart'].dispose();
             }
-            const ssnChart = echarts.init(ssnContainer);
-            window.echartsInstances['solar-cycle-ssn-chart'] = ssnChart;
-            
-            const ssnSeries = [
+            const combinedChart = echarts.init(combinedContainer);
+            window.echartsInstances['solar-cycle-combined-chart'] = combinedChart;
+
+            const combinedSeries = [
                 {
                     name: 'Monthly SSN',
-                    type: 'line',
-                    data: observed.times.map((t, i) => [t, observed.sunspot_numbers[i]]),
-                    symbol: 'none',
-                    lineStyle: { color: '#60a5fa', width: 1 }
+                    type: 'bar',
+                    data: filtered.observed.times.map((time, index) => [time, filtered.observed.sunspot_numbers[index]]),
+                    itemStyle: { color: 'rgba(96, 165, 250, 0.35)' },
+                    emphasis: { itemStyle: { color: 'rgba(96, 165, 250, 0.6)' } }
                 },
                 {
                     name: 'Smoothed SSN',
                     type: 'line',
-                    data: observed.times.map((t, i) => [t, observed.smoothed_ssn[i]]),
+                    smooth: true,
                     symbol: 'none',
-                    lineStyle: { color: '#fb923c', width: 2.5 }
+                    data: filtered.observed.times.map((time, index) => [time, filtered.observed.smoothed_ssn[index]]),
+                    lineStyle: { color: '#f97316', width: 3 }
+                },
+                {
+                    name: 'NOAA Forecast',
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'none',
+                    data: filtered.predicted.times.map((time, index) => [time, filtered.predicted.smoothed_ssn[index]]),
+                    lineStyle: { color: '#fbbf24', width: 2.2, type: 'dashed' }
                 }
             ];
-            
-            if (predicted.times.length > 0) {
-                ssnSeries.push({
-                    name: 'Predicted SSN',
-                    type: 'line',
-                    data: predicted.times.map((t, i) => [t, predicted.smoothed_ssn[i]]),
-                    symbol: 'none',
-                    lineStyle: { color: '#fbbf24', width: 2, type: 'dashed' }
-                });
-            }
-            
-            ssnChart.setOption({
+
+            combinedChart.setOption({
                 backgroundColor: 'transparent',
-                grid: { left: 50, right: 20, top: 40, bottom: 45 },
+                animationDuration: 500,
+                color: ['#60a5fa', '#f97316', '#fbbf24'],
+                grid: { left: 52, right: 20, top: 56, bottom: 86 },
                 legend: {
-                    show: true,
-                    left: 0,
-                    top: 0,
-                    orient: 'horizontal',
-                    textStyle: { color: textColor, fontSize: 10 }
+                    top: 10,
+                    left: 8,
+                    textStyle: { color: textColor, fontSize: 11 }
+                },
+                toolbox: {
+                    right: 10,
+                    top: 8,
+                    iconStyle: { borderColor: textColor },
+                    feature: {
+                        dataZoom: { yAxisIndex: 'none' },
+                        restore: {},
+                        saveAsImage: {}
+                    }
                 },
                 tooltip: {
                     trigger: 'axis',
-                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                    borderColor: 'rgba(51, 65, 85, 0.8)',
-                    textStyle: { color: '#f8fafc' }
+                    axisPointer: { type: 'cross' },
+                    backgroundColor: panelColor,
+                    borderColor: borderColor,
+                    textStyle: { color: isDark ? '#e2e8f0' : '#0f172a' },
+                    formatter: function(params) {
+                        const lines = [`<b>${formatSolarCycleMonth(params[0].axisValue)}</b>`];
+                        params.forEach(point => {
+                            const value = Array.isArray(point.value) ? point.value[1] : point.value;
+                            lines.push(`${point.marker}${point.seriesName}: ${value ?? '--'}`);
+                        });
+                        return lines.join('<br>');
+                    }
                 },
                 xAxis: {
                     type: 'time',
-                    axisLine: { show: false },
-                    axisTick: { show: false },
+                    axisLine: { lineStyle: { color: gridColor } },
                     axisLabel: { color: textColor },
                     splitLine: { lineStyle: { color: gridColor } }
                 },
@@ -4725,82 +5428,10 @@
                     type: 'value',
                     name: 'Sunspot Number',
                     nameTextStyle: { color: textColor },
-                    axisLine: { show: false },
-                    axisTick: { show: false },
                     axisLabel: { color: textColor },
                     splitLine: { lineStyle: { color: gridColor } }
                 },
-                series: ssnSeries
-            });
-
-            // Chart 2: F10.7 Flux with predictions (from Oct 2004)
-            const f107Container = document.getElementById('solar-cycle-f107-chart');
-            if (window.echartsInstances['solar-cycle-f107-chart']) {
-                window.echartsInstances['solar-cycle-f107-chart'].dispose();
-            }
-            const f107Chart = echarts.init(f107Container);
-            window.echartsInstances['solar-cycle-f107-chart'] = f107Chart;
-            
-            const f107Series = [
-                {
-                    name: 'Observed F10.7',
-                    type: 'line',
-                    data: filteredObserved.times.map((t, i) => [t, filteredObserved.f107[i]]),
-                    symbol: 'none',
-                    lineStyle: { color: '#60a5fa', width: 2 }
-                }
-            ];
-            
-            if (predicted.times.length > 0) {
-                f107Series.push({
-                    name: 'Predicted F10.7',
-                    type: 'line',
-                    data: predicted.times.map((t, i) => [t, predicted.f107[i]]),
-                    symbol: 'none',
-                    lineStyle: { color: '#fb923c', width: 2, type: 'dashed' }
-                });
-            }
-            
-            f107Chart.setOption({
-                backgroundColor: 'transparent',
-                grid: { left: 50, right: 20, top: 40, bottom: 45 },
-                legend: {
-                    show: true,
-                    left: 0,
-                    top: 0,
-                    orient: 'horizontal',
-                    textStyle: { color: textColor, fontSize: 10 }
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                    borderColor: 'rgba(51, 65, 85, 0.8)',
-                    textStyle: { color: '#f8fafc' },
-                    formatter: function(params) {
-                        let result = '';
-                        params.forEach(p => {
-                            result += `${p.seriesName}: ${p.value[1]?.toFixed(1) || '--'} SFU<br>`;
-                        });
-                        return result;
-                    }
-                },
-                xAxis: {
-                    type: 'time',
-                    axisLine: { show: false },
-                    axisTick: { show: false },
-                    axisLabel: { color: textColor },
-                    splitLine: { lineStyle: { color: gridColor } }
-                },
-                yAxis: {
-                    type: 'value',
-                    name: 'F10.7 Flux (SFU)',
-                    nameTextStyle: { color: textColor },
-                    axisLine: { show: false },
-                    axisTick: { show: false },
-                    axisLabel: { color: textColor },
-                    splitLine: { lineStyle: { color: gridColor } }
-                },
-                series: f107Series
+                series: combinedSeries
             });
         }
 
@@ -4812,6 +5443,15 @@
                 
                 const container = document.getElementById('cme-timeline');
                 if (!container) return;
+
+                if (data.error) {
+                    container.innerHTML = `
+                        <p style="color: #fb923c; font-style: italic; text-align: center; padding: 2rem;">
+                            CME data is temporarily unavailable. ${data.error}
+                        </p>
+                    `;
+                    return;
+                }
                 
                 if (!data.events || data.events.length === 0) {
                     container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 2rem;">No Earth-directed CMEs detected in the past 7 days.</p>';
@@ -4842,6 +5482,10 @@
                 }).join('');
             } catch (error) {
                 console.error('Error fetching CME data:', error);
+                const container = document.getElementById('cme-timeline');
+                if (container) {
+                    container.innerHTML = '<p style="color: #ef4444; font-style: italic; text-align: center; padding: 2rem;">Error loading CME data. Check console for details.</p>';
+                }
             }
         }
 
@@ -5145,6 +5789,35 @@
                     this.parentElement.classList.add('loaded');
                 });
             });
+        }
+
+        function openImageModal(src, caption = '') {
+            const overlay = document.getElementById('image-lightbox');
+            const image = document.getElementById('lightbox-img');
+            const captionEl = document.getElementById('lightbox-caption');
+
+            if (!overlay || !image || !captionEl) {
+                return;
+            }
+
+            image.src = src;
+            image.alt = caption || image.alt || 'Expanded solar image';
+            captionEl.textContent = caption || '';
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImageModal() {
+            const overlay = document.getElementById('image-lightbox');
+            const image = document.getElementById('lightbox-img');
+
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+            if (image) {
+                image.src = '';
+            }
+            document.body.style.overflow = '';
         }
 
         // Initialize image handlers after DOM is ready

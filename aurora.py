@@ -1,7 +1,8 @@
-from flask import Flask, render_template, jsonify, send_file, request
+from flask import Flask, render_template, jsonify, send_file, request, Response
 import requests
 import re
 from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor
 import json
 import time
 import matplotlib
@@ -12,7 +13,7 @@ from matplotlib.patches import Circle, Polygon
 import matplotlib.patheffects
 import numpy as np
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageFilter
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from matplotlib.gridspec import GridSpec
@@ -58,6 +59,26 @@ if os.path.isdir(METROPOLIS_DIR):
         print('Error registering local fonts:', e)
 
 app = Flask(__name__)
+
+# External data endpoints
+PLASMA_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
+MAG_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json"
+PLASMA_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json"
+MAG_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json"
+SCALES_URL = "https://services.swpc.noaa.gov/products/noaa-scales.json"
+GOES_XRAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json"
+GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
+GOES_PROTON_URL = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
+SOLAR_REGIONS_URL = "https://services.swpc.noaa.gov/json/solar_regions.json"
+SOLAR_REGION_SUMMARY_URLS = [
+    "https://services.swpc.noaa.gov/text/solar-region-summary.txt",
+    "https://services.swpc.noaa.gov/text/solar-regions.txt",
+]
+OVATION_URL = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json"
+HEMI_POWER_URL = "https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt"
+GOES_MAG_PRIMARY_URL = "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json"
+GOES_MAG_SECONDARY_URL = "https://services.swpc.noaa.gov/json/goes/secondary/magnetometers-6-hour.json"
+NASA_API_KEY = os.getenv('NASA_API_KEY', 'bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm')
 
 # Simple in-memory cache for expensive operations
 _cache = {}
@@ -108,83 +129,38 @@ def set_cached(key, value):
     _cache[key] = value
     _cache_timestamps[key] = time.time()
 
-# NASA API Key - Get your free API key at https://api.nasa.gov/
-# DEMO_KEY has strict rate limits (30 requests/hour). Set NASA_API_KEY environment variable for better limits.
-NASA_API_KEY = os.environ.get('NASA_API_KEY', 'IBqp2hJRKzEe5n3q9XPGaEtB9awEux3KW70iiQpy')
 
-# SWPC API endpoints
-PLASMA_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
-MAG_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json"
-PLASMA_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json"
-MAG_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json"
-KP_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
-SCALES_URL = "https://services.swpc.noaa.gov/products/noaa-scales.json"
-OVATION_URL = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json"
-HEMI_POWER_URL = "https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt"
-GOES_MAG_PRIMARY_URL = "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json"
-GOES_MAG_SECONDARY_URL = "https://services.swpc.noaa.gov/json/goes/secondary/magnetometers-6-hour.json"
-GOES_XRAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json"
-GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
-GOES_PROTON_URL = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
-SOLAR_REGIONS_URL = "https://services.swpc.noaa.gov/json/solar_regions.json"
-# Possible text summary endpoints (SWPC sometimes publishes a text summary alongside JSON)
-SOLAR_REGION_SUMMARY_URLS = [
-    "https://services.swpc.noaa.gov/text/solar_region_summary.txt",
-    "https://services.swpc.noaa.gov/text/solar-region-summary.txt",
-    "https://services.swpc.noaa.gov/text/solar_region_summary/solar_region_summary.txt",
-    "https://services.swpc.noaa.gov/text/solar-region-summary/solar-region-summary.txt",
-]
 
 def interpolate_gaps(values, max_gap_minutes=10, time_interval_minutes=1):
-    """
-    Interpolate missing/None/NaN values in a data series.
-    Only interpolates gaps up to max_gap_minutes in duration.
-    Larger gaps are left as NaN to avoid showing misleading data.
-    
-    Args:
-        values: List of numeric values (may contain None or NaN)
-        max_gap_minutes: Maximum gap size to interpolate (in minutes)
-        time_interval_minutes: Time between data points (default 1 minute for SWPC data)
-    
-    Returns:
-        List with interpolated values
-    """
-    if not values or len(values) == 0:
+    """Linearly fill short None/NaN gaps while leaving extended outages untouched."""
+    if not values:
         return values
-    
-    # Convert to numpy array with NaN for None values
-    arr = np.array([float(v) if v is not None and v != '' else np.nan for v in values], dtype=float)
-    
-    # Find indices of valid (non-NaN) values
-    valid_mask = ~np.isnan(arr)
-    valid_indices = np.where(valid_mask)[0]
-    
+
+    arr = np.array([
+        np.nan if value is None else float(value)
+        for value in values
+    ], dtype=float)
+
+    valid_indices = np.where(~np.isnan(arr))[0]
     if len(valid_indices) < 2:
-        # Not enough valid points to interpolate
-        return arr.tolist()
-    
-    # Calculate max gap size in data points
-    max_gap_points = int(max_gap_minutes / time_interval_minutes)
-    
-    # Interpolate gaps
+        return values
+
+    max_gap_points = max(1, int(max_gap_minutes / max(time_interval_minutes, 1)))
     result = arr.copy()
-    
+
     for i in range(len(valid_indices) - 1):
         start_idx = valid_indices[i]
         end_idx = valid_indices[i + 1]
         gap_size = end_idx - start_idx - 1
-        
-        # Only interpolate if gap is within acceptable range
+
         if gap_size > 0 and gap_size <= max_gap_points:
             start_val = arr[start_idx]
             end_val = arr[end_idx]
-            
-            # Linear interpolation
             for j in range(1, gap_size + 1):
                 alpha = j / (gap_size + 1)
                 result[start_idx + j] = start_val + alpha * (end_val - start_val)
-    
-    return result.tolist()
+
+    return [None if np.isnan(value) else float(value) for value in result]
 
 
 def fetch_solar_wind_data():
@@ -520,23 +496,34 @@ def fetch_solar_data():
             raise e
 
     try:
-        # Fetch X-ray flux (6-hour)
-        xray_data = safe_get_json(GOES_XRAY_URL)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                'xray': executor.submit(safe_get_json, GOES_XRAY_URL),
+                'xray_1day': executor.submit(safe_get_json, GOES_XRAY_1DAY_URL),
+                'proton': executor.submit(safe_get_json, GOES_PROTON_URL),
+                'regions': executor.submit(fetch_json_with_retry, SOLAR_REGIONS_URL, 3, 30),
+                'summary': executor.submit(fetch_solar_region_summary_text)
+            }
 
-        # Fetch X-ray flux (1-day)
-        xray_1day_data = safe_get_json(GOES_XRAY_1DAY_URL)
-        
-        # Fetch Proton flux
-        proton_data = safe_get_json(GOES_PROTON_URL)
-        
-        # Fetch Sunspot Regions with retry and longer timeout
-        regions_data = fetch_json_with_retry(SOLAR_REGIONS_URL, retries=3, timeout=30)
+            results = {}
+            for key, future in futures.items():
+                try:
+                    results[key] = future.result()
+                except Exception as e:
+                    print(f"Error fetching {key} for solar data: {e}")
+                    results[key] = None
+
+        xray_data = results['xray']
+        xray_1day_data = results['xray_1day']
+        proton_data = results['proton']
+        regions_data = results['regions']
         sunspots = parse_solar_regions(regions_data)
         returning = parse_returning_regions(regions_data)
+
         # If JSON didn't include explicit returning list, try parsing SWPC Solar Region Summary text
         if not returning:
             try:
-                summary_text = fetch_solar_region_summary_text()
+                summary_text = results.get('summary')
                 if summary_text:
                     parsed = parse_returning_regions_from_summary_text(summary_text)
                     if parsed:
@@ -617,32 +604,72 @@ def fetch_noaa_scales():
 def fetch_ovation_data():
     """Fetch the latest OVATION auroral probability data from SWPC"""
     try:
-        response = requests.get(OVATION_URL, timeout=10)
-        data = response.json()
-        
-        if data and 'coordinates' in data:
-            # Extract metadata
-            obs_time = data.get('Observation Time', '')
-            forecast_time = data.get('Forecast Time', '')
-            
-            # Parse coordinates: [Longitude, Latitude, Aurora]
-            coords = np.array(data['coordinates'])
-            
-            # Separate into lon, lat, aurora values
-            lons = coords[:, 0]
-            lats = coords[:, 1]
-            aurora_vals = coords[:, 2]
-            
-            # Filter for Northern Hemisphere only (positive latitudes)
-            north_mask = lats > 0
-            lons_north = lons[north_mask]
-            lats_north = lats[north_mask]
-            aurora_north = aurora_vals[north_mask]
-            
-            return lons_north, lats_north, aurora_north, forecast_time
+        snapshot_payload = fetch_ovation_latest_snapshot()
+        lons_north, lats_north, aurora_north, frame_label, _ = extract_ovation_north_frame(snapshot_payload)
+        return lons_north, lats_north, aurora_north, frame_label
     except Exception as e:
         print(f"Error fetching OVATION data: {e}")
         return None, None, None, None
+
+
+def parse_ovation_snapshot_key(timestamp_key):
+    """Parse OVATION snapshot keys like YYYY-MM-DD_HHMM."""
+    return datetime.strptime(timestamp_key, '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+
+
+def parse_ovation_timestamp(timestamp_value):
+    """Parse SWPC OVATION timestamps into UTC datetimes."""
+    if isinstance(timestamp_value, datetime):
+        return timestamp_value.astimezone(timezone.utc) if timestamp_value.tzinfo else timestamp_value.replace(tzinfo=timezone.utc)
+
+    normalized = str(timestamp_value or '').strip()
+    if not normalized:
+        raise ValueError('Missing OVATION timestamp')
+
+    normalized = normalized.replace(' ', 'T')
+    if normalized.endswith('Z'):
+        normalized = normalized[:-1] + '+00:00'
+
+    parsed = datetime.fromisoformat(normalized)
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def format_ovation_snapshot_key(snapshot_time):
+    """Format UTC datetimes into OVATION snapshot keys."""
+    return snapshot_time.astimezone(timezone.utc).strftime('%Y-%m-%d_%H%M')
+
+
+def extract_ovation_north_frame(snapshot_payload):
+    """Extract northern OVATION grid arrays and metadata from a raw payload."""
+    if not snapshot_payload or 'coordinates' not in snapshot_payload:
+        raise ValueError('OVATION payload is missing coordinates')
+
+    forecast_time = parse_ovation_timestamp(
+        snapshot_payload.get('Forecast Time')
+        or snapshot_payload.get('Observation Time')
+        or snapshot_payload.get('generated_at')
+    )
+
+    coords = np.array(snapshot_payload['coordinates'])
+    lons = coords[:, 0]
+    lats = coords[:, 1]
+    aurora_vals = coords[:, 2]
+
+    north_mask = lats > 0
+    lons_north = lons[north_mask]
+    lats_north = lats[north_mask]
+    aurora_north = aurora_vals[north_mask]
+
+    snapshot_key = format_ovation_snapshot_key(forecast_time)
+    frame_label = forecast_time.strftime('%Y-%m-%d %H:%M UTC')
+    return lons_north, lats_north, aurora_north, frame_label, snapshot_key
+
+
+def fetch_ovation_latest_snapshot():
+    """Fetch the latest OVATION payload from SWPC."""
+    response = requests.get(OVATION_URL, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
 def fetch_hemispheric_power():
     """Fetch hemispheric power data from SWPC"""
@@ -2079,8 +2106,14 @@ def historical_goes_xray():
 @app.route('/api/solar-data')
 def get_solar_data():
     """Get solar activity data"""
+    cache_key = 'solar_data'
+    cached = get_cached(cache_key, max_age_seconds=45)
+    if cached:
+        return jsonify(cached)
+
     data = fetch_solar_data()
     if data:
+        set_cached(cache_key, data)
         return jsonify(data)
     return jsonify({'error': 'Failed to fetch data'}), 500
 
@@ -2151,6 +2184,11 @@ def get_xray_data():
 def get_proton_data():
     """Get proton flux data with specified time range"""
     time_range = request.args.get('range', '24h')
+
+    cache_key = f'proton_data_{time_range}'
+    cached = get_cached(cache_key, max_age_seconds=60)
+    if cached:
+        return jsonify(cached)
     
     print(f"Fetching proton data for range: {time_range}")
     
@@ -2188,6 +2226,7 @@ def get_proton_data():
             ]
             
             print(f"Returning {len(filtered_data)} proton data points for range {time_range}")
+            set_cached(cache_key, filtered_data)
             return jsonify(filtered_data)
         return jsonify([])
     except Exception as e:
@@ -2212,14 +2251,35 @@ def get_aurora_image():
 @app.route('/api/aurora-data')
 def get_aurora_data():
     """API endpoint to get all aurora-related data"""
-    solar_wind = fetch_solar_wind_data()
-    kp_data = fetch_kp_index()
-    noaa_scales = fetch_noaa_scales()
-    
-    # Fetch historical data for charts
-    sw_history = fetch_solar_wind_history()
-    hemi_power = fetch_hemispheric_power()
-    goes_mag = fetch_goes_magnetometer()
+    cache_key = 'aurora_data'
+    cached_response = get_cached(cache_key, max_age_seconds=20)
+    if cached_response:
+        return jsonify(cached_response)
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            'solar_wind': executor.submit(fetch_solar_wind_data),
+            'kp_data': executor.submit(fetch_kp_index),
+            'noaa_scales': executor.submit(fetch_noaa_scales),
+            'sw_history': executor.submit(fetch_solar_wind_history),
+            'hemi_power': executor.submit(fetch_hemispheric_power),
+            'goes_mag': executor.submit(fetch_goes_magnetometer),
+        }
+
+        results = {}
+        for key, future in futures.items():
+            try:
+                results[key] = future.result()
+            except Exception as e:
+                print(f"Error fetching {key} for /api/aurora-data: {e}")
+                results[key] = None
+
+    solar_wind = results['solar_wind']
+    kp_data = results['kp_data']
+    noaa_scales = results['noaa_scales']
+    sw_history = results['sw_history']
+    hemi_power = results['hemi_power']
+    goes_mag = results['goes_mag']
     
     kp_value = kp_data.get('kp') if kp_data else None
     g_scale = noaa_scales.get('g_scale') if noaa_scales else None
@@ -2254,7 +2314,8 @@ def get_aurora_data():
         ),
         'timestamp': datetime.now(timezone.utc).isoformat()
     }
-    
+
+    set_cached(cache_key, response)
     return jsonify(response)
 
 def generate_solar_wind_chart(times, values, label, color, current_value=None, unit='', title=''):
@@ -2938,16 +2999,20 @@ def generate_solar_overview():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def generate_map_image():
-    """Generate just the auroral oval map image"""
+def generate_map_image(ovation_snapshot=None):
+    """Generate the auroral oval map image using OVATION raw data."""
     import time
     start_time = time.time()
     print("[MAP] Starting generation...")
+
+    if ovation_snapshot is None:
+        ovation_snapshot = fetch_ovation_latest_snapshot()
+
+    ovation_lons, ovation_lats, ovation_aurora, ovation_time, _ = extract_ovation_north_frame(ovation_snapshot)
     
-    ovation_lons, ovation_lats, ovation_aurora, ovation_time = fetch_ovation_data()
-    
-    # Create figure with transparent background
+    # Create figure with transparent background and reserve a slim top band for header text.
     fig = plt.figure(figsize=(10, 10), facecolor='none')
+    fig.subplots_adjust(left=0.01, right=0.99, bottom=0.02, top=0.94)
     # Adjusted projection to focus more on North America
     ax_map = fig.add_subplot(1, 1, 1, projection=ccrs.Orthographic(-95, 55))
     ax_map.set_extent([-135, -55, 25, 85], crs=ccrs.PlateCarree())
@@ -3125,16 +3190,77 @@ def generate_map_image():
         # Add black outline to text instead of box
         text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.5, foreground='#020617')])
     
-    # Title
-    title_map = ax_map.set_title(f'REAL-TIME AURORAL OVAL\n{ovation_time if ovation_time else ""}',
-                    fontsize=14, color='#10b981', fontweight='bold', pad=10)
-    title_map.set_path_effects([matplotlib.patheffects.withStroke(linewidth=3, foreground='#0f172a', alpha=0.8)])
-    
+    # In-image header text, matching the requested top-left/top-right treatment.
+    header_title = 'LIVE AURORAL OVAL'
+    header_timestamp = ovation_time or datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+
+    header_left = fig.text(
+        0.015,
+        0.985,
+        header_title,
+        ha='left',
+        va='top',
+        fontsize=17,
+        color='#f8fafc',
+        fontweight='bold'
+    )
+    header_left.set_path_effects([
+        matplotlib.patheffects.withStroke(linewidth=3, foreground='#0f172a', alpha=0.9)
+    ])
+
+    header_right = fig.text(
+        0.985,
+        0.985,
+        header_timestamp,
+        ha='right',
+        va='top',
+        fontsize=15,
+        color='#f8fafc',
+        fontweight='bold'
+    )
+    header_right.set_path_effects([
+        matplotlib.patheffects.withStroke(linewidth=3, foreground='#0f172a', alpha=0.9)
+    ])
+
     # Save to BytesIO
     buf = BytesIO()
     plt.savefig(buf, format='png', dpi=150, facecolor='none', edgecolor='none', bbox_inches='tight')
     buf.seek(0)
     plt.close(fig)
+
+    # Composite the WTUS logo after rendering so it always sits above the map layers.
+    try:
+        base_img = Image.open(buf).convert('RGBA')
+        logo_path = os.path.join(os.path.dirname(__file__), 'wtusredlogotransparentx.png')
+        logo_img = Image.open(logo_path).convert('RGBA')
+
+        base_width, base_height = base_img.size
+        target_logo_width = max(82, int(base_width * 0.115))
+        aspect_ratio = logo_img.height / logo_img.width if logo_img.width else 1
+        target_logo_height = max(24, int(target_logo_width * aspect_ratio))
+        logo_img = logo_img.resize((target_logo_width, target_logo_height), Image.Resampling.LANCZOS)
+
+        # Add a soft shadow plate so the red logo stays readable over bright aurora regions.
+        shadow_pad = max(8, int(base_width * 0.006))
+        shadow = Image.new('RGBA', (target_logo_width + shadow_pad * 2, target_logo_height + shadow_pad * 2), (0, 0, 0, 0))
+        shadow_alpha = Image.new('L', shadow.size, 0)
+        shadow_alpha.paste(140, (shadow_pad, shadow_pad, shadow_pad + target_logo_width, shadow_pad + target_logo_height))
+        shadow.putalpha(shadow_alpha.filter(ImageFilter.GaussianBlur(radius=max(4, shadow_pad // 2))))
+
+        margin_x = max(42, int(base_width * 0.07))
+        margin_y = max(62, int(base_height * 0.115))
+        logo_pos = (margin_x, base_height - target_logo_height - margin_y)
+
+        composited = Image.new('RGBA', base_img.size, (0, 0, 0, 0))
+        composited.alpha_composite(base_img, (0, 0))
+        composited.alpha_composite(logo_img, logo_pos)
+
+        output_buf = BytesIO()
+        composited.save(output_buf, format='PNG')
+        output_buf.seek(0)
+        buf = output_buf
+    except Exception as e:
+        print(f"Could not composite WTUS logo on aurora map: {e}")
     
     elapsed = time.time() - start_time
     print(f"[MAP] Generation completed in {elapsed:.2f}s")
@@ -3210,6 +3336,7 @@ def get_aurora_map_image():
             return send_file(buf, mimetype='image/png')
         
         return f"Error generating map image: {e}", 500
+
 
 @app.route('/api/geomagnetic-alerts')
 def get_geomagnetic_alerts():
@@ -3533,6 +3660,221 @@ def get_f107():
         print(f"Error fetching F10.7: {e}")
         return jsonify({'flux': 0}), 500
 
+
+SOLAR_CYCLE_MINIMA = {
+    '24': datetime(2008, 12, 1),
+    '25': datetime(2019, 12, 1)
+}
+
+
+def _parse_solar_cycle_date(value):
+    if not value:
+        return None
+    for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
+        try:
+            return datetime.strptime(value, fmt)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _to_float(value):
+    try:
+        if value in (None, ''):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_nonnegative_float(value):
+    parsed = _to_float(value)
+    if parsed is None or parsed < 0:
+        return None
+    return parsed
+
+
+def _month_diff(start_dt, end_dt):
+    return (end_dt.year - start_dt.year) * 12 + (end_dt.month - start_dt.month)
+
+
+def _format_month(value):
+    if not value:
+        return ''
+    return value.strftime('%Y-%m')
+
+
+def _coerce_cycle_entries(raw_entries, predicted=False):
+    entries = []
+    for entry in raw_entries or []:
+        parsed_date = _parse_solar_cycle_date(entry.get('time-tag'))
+        if not parsed_date:
+            continue
+        if predicted:
+            entries.append({
+                'date': parsed_date,
+                'time': _format_month(parsed_date),
+                'smoothed_ssn': _to_nonnegative_float(entry.get('predicted_ssn')),
+                'f107': _to_nonnegative_float(entry.get('predicted_f10.7'))
+            })
+        else:
+            observed_ssn = _to_nonnegative_float(entry.get('observed_swpc_ssn'))
+            if observed_ssn is None:
+                observed_ssn = _to_nonnegative_float(entry.get('ssn'))
+
+            smoothed_ssn = _to_nonnegative_float(entry.get('smoothed_swpc_ssn'))
+            if smoothed_ssn is None:
+                smoothed_ssn = _to_nonnegative_float(entry.get('smoothed_ssn'))
+
+            entries.append({
+                'date': parsed_date,
+                'time': _format_month(parsed_date),
+                'ssn': observed_ssn,
+                'smoothed_ssn': smoothed_ssn,
+                'f107': _to_nonnegative_float(entry.get('f10.7'))
+            })
+    entries.sort(key=lambda item: item['date'])
+    return entries
+
+
+def _latest_entry_with(entries, *keys):
+    for entry in reversed(entries):
+        if all(entry.get(key) is not None for key in keys):
+            return entry
+    return None
+
+
+def _entry_months_from_start(entries, cycle_start):
+    series = []
+    for entry in entries:
+        month = _month_diff(cycle_start, entry['date'])
+        if month >= 0:
+            series.append({
+                'month': month,
+                'time': entry['time'],
+                'ssn': entry.get('ssn'),
+                'smoothed_ssn': entry.get('smoothed_ssn'),
+                'f107': entry.get('f107')
+            })
+    return series
+
+
+def _lookup_cycle_point(series, month):
+    for point in series:
+        if point['month'] == month:
+            return point
+    return None
+
+
+def _format_number(value, digits=1):
+    if value is None:
+        return None
+    return round(value, digits)
+
+
+def _describe_cycle_phase(current_month, observed_peak_month, six_month_change, twelve_month_change):
+    if observed_peak_month is None:
+        if six_month_change is not None and six_month_change > 0:
+            return 'Rising'
+        if six_month_change is not None and six_month_change < 0:
+            return 'Cooling'
+        return 'Active Cycle'
+
+    months_since_peak = current_month - observed_peak_month
+    if months_since_peak >= 6 and ((six_month_change is not None and six_month_change < 0) or (twelve_month_change is not None and twelve_month_change < 0)):
+        return 'Declining'
+    if months_since_peak >= 0:
+        return 'Near Peak / Easing'
+    if six_month_change is not None and six_month_change > 0:
+        return 'Rising'
+    return 'Active Cycle'
+
+
+def _describe_cycle_phase_detail(phase, latest, observed_peak, six_month_change):
+    latest_month = latest['time'] if latest else 'the latest month'
+    if phase == 'Declining' and observed_peak:
+        change_text = ''
+        if six_month_change is not None:
+            change_text = f" Smoothed activity is {abs(_format_number(six_month_change)):.1f} lower than six months earlier."
+        return f"Cycle 25 is easing from the observed smoothed high reached in {observed_peak['time']}.{change_text}"
+    if phase == 'Near Peak / Easing' and observed_peak:
+        return f"Cycle 25 remains elevated after the observed smoothed high in {observed_peak['time']}."
+    if phase == 'Rising':
+        return f"Cycle 25 is still climbing in the latest observed data through {latest_month}."
+    if phase == 'Cooling':
+        return f"Cycle 25 has softened in the latest observed data through {latest_month}."
+    return f"Cycle 25 remains active in the latest observed data through {latest_month}."
+
+
+def _build_solar_cycle_summary(observed_entries, predicted_entries):
+    latest = _latest_entry_with(observed_entries, 'ssn', 'smoothed_ssn', 'f107')
+    if not latest:
+        return {
+            'current': {},
+            'cycle25': {},
+            'comparison': {},
+            'milestones': []
+        }
+
+    current_cycle_start = SOLAR_CYCLE_MINIMA['25']
+    cycle25_observed = _entry_months_from_start(observed_entries, current_cycle_start)
+    cycle25_predicted = _entry_months_from_start(predicted_entries, current_cycle_start)
+
+    current_month = _month_diff(current_cycle_start, latest['date'])
+    prediction_now = _lookup_cycle_point(cycle25_predicted, current_month)
+
+    six_month_reference = next((entry for entry in reversed(observed_entries) if _month_diff(entry['date'], latest['date']) >= 6 and entry.get('smoothed_ssn') is not None), None)
+    twelve_month_reference = next((entry for entry in reversed(observed_entries) if _month_diff(entry['date'], latest['date']) >= 12 and entry.get('smoothed_ssn') is not None), None)
+
+    predicted_peak = max(
+        (entry for entry in cycle25_predicted if entry.get('smoothed_ssn') is not None),
+        key=lambda item: item['smoothed_ssn'],
+        default=None
+    )
+    observed_peak = max(
+        (entry for entry in cycle25_observed if entry.get('smoothed_ssn') is not None),
+        key=lambda item: item['smoothed_ssn'],
+        default=None
+    )
+
+    six_month_change = None
+    if six_month_reference:
+        six_month_change = latest['smoothed_ssn'] - six_month_reference['smoothed_ssn']
+
+    twelve_month_change = None
+    if twelve_month_reference:
+        twelve_month_change = latest['smoothed_ssn'] - twelve_month_reference['smoothed_ssn']
+
+    months_to_peak = predicted_peak['month'] - current_month if predicted_peak else None
+    observed_peak_month = observed_peak['month'] if observed_peak else None
+    phase = _describe_cycle_phase(current_month, observed_peak_month, six_month_change, twelve_month_change)
+    phase_detail = _describe_cycle_phase_detail(phase, latest, observed_peak, six_month_change)
+
+    return {
+        'current': {
+            'time': latest['time'],
+            'ssn': _format_number(latest['ssn']),
+            'smoothed_ssn': _format_number(latest['smoothed_ssn']),
+            'f107': _format_number(latest['f107']),
+            'six_month_change': _format_number(six_month_change),
+            'twelve_month_change': _format_number(twelve_month_change),
+            'predicted_ssn_now': _format_number(prediction_now.get('smoothed_ssn') if prediction_now else None)
+        },
+        'cycle25': {
+            'start': _format_month(current_cycle_start),
+            'months_elapsed': current_month,
+            'phase': phase,
+            'phase_detail': phase_detail,
+            'predicted_peak_time': predicted_peak['time'] if predicted_peak else None,
+            'predicted_peak_ssn': _format_number(predicted_peak.get('smoothed_ssn') if predicted_peak else None),
+            'months_to_predicted_peak': months_to_peak,
+            'observed_peak_time': observed_peak['time'] if observed_peak else None,
+            'observed_peak_ssn': _format_number(observed_peak.get('smoothed_ssn') if observed_peak else None)
+        },
+        'comparison': {},
+        'milestones': []
+    }
+
 @app.route('/api/solar-cycle-data')
 def get_solar_cycle_data():
     """Get solar cycle progression data (sunspot numbers over time)"""
@@ -3547,6 +3889,9 @@ def get_solar_cycle_data():
         # Fetch predicted data
         pred_response = requests.get(PREDICTED_URL, timeout=10)
         pred_data = pred_response.json()
+
+        observed_entries = _coerce_cycle_entries(obs_data, predicted=False)
+        predicted_entries = _coerce_cycle_entries(pred_data, predicted=True)
         
         # Process observed data (all available data for full cycle view)
         observed = {
@@ -3556,12 +3901,12 @@ def get_solar_cycle_data():
             'f107': []
         }
         
-        if obs_data and len(obs_data) > 0:
-            for entry in obs_data:
-                observed['times'].append(entry.get('time-tag', ''))
-                observed['sunspot_numbers'].append(entry.get('ssn', None))
-                observed['smoothed_ssn'].append(entry.get('smoothed_ssn', None))
-                observed['f107'].append(entry.get('f10.7', None))
+        if observed_entries:
+            for entry in observed_entries:
+                observed['times'].append(entry['time'])
+                observed['sunspot_numbers'].append(entry.get('ssn'))
+                observed['smoothed_ssn'].append(entry.get('smoothed_ssn'))
+                observed['f107'].append(entry.get('f107'))
         
         # Process predicted data
         predicted = {
@@ -3570,21 +3915,31 @@ def get_solar_cycle_data():
             'f107': []
         }
         
-        if pred_data and len(pred_data) > 0:
-            for entry in pred_data:
-                predicted['times'].append(entry.get('time-tag', ''))
-                predicted['smoothed_ssn'].append(entry.get('predicted_ssn', None))
-                predicted['f107'].append(entry.get('predicted_f10.7', None))
+        if predicted_entries:
+            for entry in predicted_entries:
+                predicted['times'].append(entry['time'])
+                predicted['smoothed_ssn'].append(entry.get('smoothed_ssn'))
+                predicted['f107'].append(entry.get('f107'))
+
+        summary = _build_solar_cycle_summary(observed_entries, predicted_entries)
+        normalized_comparison = {
+            'cycle24': _entry_months_from_start(observed_entries, SOLAR_CYCLE_MINIMA['24']),
+            'cycle25': _entry_months_from_start(observed_entries, SOLAR_CYCLE_MINIMA['25'])
+        }
         
         return jsonify({
             'observed': observed,
-            'predicted': predicted
+            'predicted': predicted,
+            'summary': summary,
+            'normalized_comparison': normalized_comparison
         })
     except Exception as e:
         print(f"Error fetching solar cycle data: {e}")
         return jsonify({
             'observed': {'times': [], 'sunspot_numbers': [], 'smoothed_ssn': [], 'f107': []},
-            'predicted': {'times': [], 'smoothed_ssn': [], 'f107': []}
+            'predicted': {'times': [], 'smoothed_ssn': [], 'f107': []},
+            'summary': {'current': {}, 'cycle25': {}, 'comparison': {}, 'milestones': []},
+            'normalized_comparison': {'cycle24': [], 'cycle25': []}
         }), 500
 
 @app.route('/api/cme-events')
@@ -3597,7 +3952,20 @@ def get_cme_events():
         CME_URL = f"https://api.nasa.gov/DONKI/CME?startDate={start_date}&endDate={end_date}&api_key=bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm"
         
         response = requests.get(CME_URL, timeout=15)
+        if response.status_code != 200:
+            print(f"Error fetching CME events: NASA DONKI returned {response.status_code}")
+            return jsonify({
+                'events': [],
+                'error': 'NASA DONKI is unavailable or the API quota has been exceeded.'
+            }), 502
+
         data = response.json()
+        if not isinstance(data, list):
+            print(f"Error fetching CME events: unexpected payload {type(data).__name__}")
+            return jsonify({
+                'events': [],
+                'error': 'NASA DONKI returned an unexpected response.'
+            }), 502
         
         events = []
         for cme in data[:15]:  # Check more CMEs for better filtering
