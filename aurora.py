@@ -3,8 +3,11 @@ import requests
 import re
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
+from collections import OrderedDict
 import json
 import time
+import threading
+import sys
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
@@ -70,6 +73,7 @@ GOES_XRAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.j
 GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
 GOES_PROTON_URL = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
 SOLAR_REGIONS_URL = "https://services.swpc.noaa.gov/json/solar_regions.json"
+FLARE_EVENT_FEED_URL = "https://services.swpc.noaa.gov/json/solar_events_last_30_days.json"
 SOLAR_REGION_SUMMARY_URLS = [
     "https://services.swpc.noaa.gov/text/solar-region-summary.txt",
     "https://services.swpc.noaa.gov/text/solar-regions.txt",
@@ -79,35 +83,126 @@ HEMI_POWER_URL = "https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.
 GOES_MAG_PRIMARY_URL = "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json"
 GOES_MAG_SECONDARY_URL = "https://services.swpc.noaa.gov/json/goes/secondary/magnetometers-6-hour.json"
 NASA_API_KEY = os.getenv('NASA_API_KEY', 'bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm')
+FLARE_ALERT_MAX_AGE_HOURS = 24
 
-# Simple in-memory cache for expensive operations
-_cache = {}
+# Bounded in-memory cache for expensive operations. Keep values directly in
+# _cache so the stale aurora-map fallback can still read old bytes.
+def _env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+_CACHE_MAX_ENTRIES = max(8, _env_int('AURORA_CACHE_MAX_ENTRIES', 80))
+_CACHE_MAX_BYTES = max(4, _env_int('AURORA_CACHE_MAX_MB', 24)) * 1024 * 1024
+_CACHE_ENTRY_MAX_BYTES = max(1, _env_int('AURORA_CACHE_ENTRY_MAX_MB', 8)) * 1024 * 1024
+_STALE_FALLBACK_KEYS = {'aurora_map'}
+_cache = OrderedDict()
 _cache_timestamps = {}
+_cache_expirations = {}
+_cache_sizes = {}
+_cache_lock = threading.RLock()
 
 # Backwards-compatible cache helper used by newer endpoints
 class _SimpleCache:
     def get(self, key, default=None):
-        v = get_cached(key)
+        v = get_cached(key, max_age_seconds=None)
         return v if v is not None else default
     def set(self, key, value, timeout=None):
-        # ignore timeout for this simple wrapper; store value
-        set_cached(key, value)
+        set_cached(key, value, timeout=timeout)
 
 # expose `cache` for code that expects a Flask-like cache object
 cache = _SimpleCache()
 
 # Thread lock for expensive operations to prevent concurrent generation
-import threading
 _map_generation_lock = threading.Lock()
 _map_generating = False  # Flag to indicate generation in progress
 
+def _estimate_cache_value_size(value):
+    """Best-effort deep size estimate without allocating serialized copies."""
+    seen = set()
+    objects_seen = 0
+
+    def walk(obj):
+        nonlocal objects_seen
+        if objects_seen > 5000:
+            return 0
+        obj_id = id(obj)
+        if obj_id in seen:
+            return 0
+        seen.add(obj_id)
+        objects_seen += 1
+
+        size = sys.getsizeof(obj, 0)
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                size += walk(k) + walk(v)
+                if size > _CACHE_ENTRY_MAX_BYTES:
+                    break
+        elif isinstance(obj, (list, tuple, set, frozenset, OrderedDict)):
+            for item in obj:
+                size += walk(item)
+                if size > _CACHE_ENTRY_MAX_BYTES:
+                    break
+        return size
+
+    return walk(value)
+
+
+def _delete_cached_unlocked(key):
+    _cache.pop(key, None)
+    _cache_timestamps.pop(key, None)
+    _cache_expirations.pop(key, None)
+    _cache_sizes.pop(key, None)
+
+
+def _purge_expired_unlocked(now=None):
+    now = now or time.time()
+    for key, expires_at in list(_cache_expirations.items()):
+        if expires_at is not None and expires_at <= now and key not in _STALE_FALLBACK_KEYS:
+            _delete_cached_unlocked(key)
+
+
+def _enforce_cache_limits_unlocked():
+    total_size = sum(_cache_sizes.values())
+    while _cache and (len(_cache) > _CACHE_MAX_ENTRIES or total_size > _CACHE_MAX_BYTES):
+        key, _ = _cache.popitem(last=False)
+        total_size -= _cache_sizes.pop(key, 0)
+        _cache_timestamps.pop(key, None)
+        _cache_expirations.pop(key, None)
+
+
 def get_cached(key, max_age_seconds=30):
     """Get cached value if not expired"""
-    if key in _cache and key in _cache_timestamps:
-        age = time.time() - _cache_timestamps[key]
-        if age < max_age_seconds:
-            return _cache[key]
-    return None
+    now = time.time()
+    with _cache_lock:
+        if key not in _cache:
+            return None
+
+        expires_at = _cache_expirations.get(key)
+        if expires_at is not None and expires_at <= now:
+            if key not in _STALE_FALLBACK_KEYS:
+                _delete_cached_unlocked(key)
+            return None
+
+        timestamp = _cache_timestamps.get(key)
+        if max_age_seconds is not None and (timestamp is None or now - timestamp >= max_age_seconds):
+            if key not in _STALE_FALLBACK_KEYS:
+                _delete_cached_unlocked(key)
+            return None
+
+        _cache.move_to_end(key)
+        return _cache[key]
+
+
+def get_stale_cached(key):
+    """Return a cached value without age checks for explicit fallback paths."""
+    with _cache_lock:
+        value = _cache.get(key)
+        if value is not None:
+            _cache.move_to_end(key)
+        return value
 
 
 def _validate_date_range(start_str, end_str, max_days=11):
@@ -124,10 +219,35 @@ def _validate_date_range(start_str, end_str, max_days=11):
         return False, f'Date range too large (max {max_days} days)'
     return True, ''
 
-def set_cached(key, value):
+def set_cached(key, value, timeout=None):
     """Set cached value with current timestamp"""
-    _cache[key] = value
-    _cache_timestamps[key] = time.time()
+    now = time.time()
+    value_size = _estimate_cache_value_size(value)
+    if value_size > _CACHE_ENTRY_MAX_BYTES:
+        with _cache_lock:
+            _delete_cached_unlocked(key)
+        print(f"[CACHE] Skipped oversized cache entry {key}: {value_size / (1024 * 1024):.1f} MB")
+        return
+
+    with _cache_lock:
+        _purge_expired_unlocked(now)
+        _cache[key] = value
+        _cache.move_to_end(key)
+        _cache_timestamps[key] = now
+        _cache_expirations[key] = now + timeout if timeout else None
+        _cache_sizes[key] = value_size
+        _enforce_cache_limits_unlocked()
+
+
+def _figure_to_png_buffer(fig, **savefig_kwargs):
+    """Serialize and close a matplotlib figure promptly."""
+    buf = BytesIO()
+    try:
+        fig.savefig(buf, format='png', **savefig_kwargs)
+        buf.seek(0)
+        return buf
+    finally:
+        plt.close(fig)
 
 
 
@@ -163,40 +283,92 @@ def interpolate_gaps(values, max_gap_minutes=10, time_interval_minutes=1):
     return [None if np.isnan(value) else float(value) for value in result]
 
 
+def _swpc_table_to_rows(table_rows):
+    """Convert SWPC JSON table payloads into header-keyed dictionaries."""
+    if not isinstance(table_rows, list) or len(table_rows) < 2:
+        return []
+
+    header = [str(column).strip() for column in table_rows[0]]
+    parsed_rows = []
+    for row in table_rows[1:]:
+        if not isinstance(row, list):
+            continue
+        parsed_rows.append({
+            header[index]: row[index] if index < len(row) else None
+            for index in range(len(header))
+        })
+    return parsed_rows
+
+
+def _swpc_numeric(value):
+    if value in (None, ''):
+        return None
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    return None if numeric <= -999 else numeric
+
+
+def _fallback_solar_wind_history(sw_current=None):
+    if not sw_current:
+        return None
+
+    current_time = parse_swpc_datetime(sw_current.get('time')) or datetime.now(timezone.utc)
+    return {
+        'times': [current_time],
+        'speeds': [sw_current.get('speed')],
+        'densities': [sw_current.get('density')],
+        'bzs': [sw_current.get('bz')],
+        'bts': [sw_current.get('bt')],
+    }
+
+
 def fetch_solar_wind_data():
     """Fetch current solar wind plasma and magnetic field data"""
     try:
         # Fetch plasma data (speed, density)
         plasma_response = requests.get(PLASMA_URL, timeout=10)
-        plasma_data = plasma_response.json()
+        plasma_response.raise_for_status()
+        plasma_rows = _swpc_table_to_rows(plasma_response.json())
         
         # Fetch magnetic field data (Bt, Bz)
         mag_response = requests.get(MAG_URL, timeout=10)
-        mag_data = mag_response.json()
+        mag_response.raise_for_status()
+        mag_rows = _swpc_table_to_rows(mag_response.json())
         
-        # Get latest values (last entry in the array)
-        if len(plasma_data) > 1 and len(mag_data) > 1:
-            latest_plasma = plasma_data[-1]
-            latest_mag = mag_data[-1]
-            
-            # Handle both array formats and potential null values
-            speed = latest_plasma[2] if len(latest_plasma) > 2 and latest_plasma[2] not in [None, '', -999, -9999] else None
-            density = latest_plasma[1] if len(latest_plasma) > 1 and latest_plasma[1] not in [None, '', -999, -9999] else None
-            temperature = latest_plasma[3] if len(latest_plasma) > 3 and latest_plasma[3] not in [None, '', -999, -9999] else None
-            bt = latest_mag[6] if len(latest_mag) > 6 and latest_mag[6] not in [None, '', -999, -9999] else None
-            bz = latest_mag[3] if len(latest_mag) > 3 and latest_mag[3] not in [None, '', -999, -9999] else None
-            bx = latest_mag[1] if len(latest_mag) > 1 and latest_mag[1] not in [None, '', -999, -9999] else None
-            by = latest_mag[2] if len(latest_mag) > 2 and latest_mag[2] not in [None, '', -999, -9999] else None
-            
+        latest_plasma = None
+        latest_plasma_time = None
+        for row in reversed(plasma_rows):
+            row_time = parse_swpc_datetime(row.get('time_tag'))
+            if row_time:
+                latest_plasma = row
+                latest_plasma_time = row_time
+                break
+
+        latest_mag = None
+        for row in reversed(mag_rows):
+            row_time = parse_swpc_datetime(row.get('time_tag'))
+            if not row_time:
+                continue
+            if latest_plasma_time and row_time == latest_plasma_time:
+                latest_mag = row
+                break
+            if latest_mag is None:
+                latest_mag = row
+
+        if latest_plasma and latest_mag:
             return {
-                'time': latest_plasma[0],
-                'speed': float(speed) if speed is not None else None,
-                'density': float(density) if density is not None else None,
-                'temperature': float(temperature) if temperature is not None else None,
-                'bt': float(bt) if bt is not None else None,
-                'bz': float(bz) if bz is not None else None,
-                'bx': float(bx) if bx is not None else None,
-                'by': float(by) if by is not None else None
+                'time': latest_plasma.get('time_tag') or latest_mag.get('time_tag'),
+                'speed': _swpc_numeric(latest_plasma.get('speed')),
+                'density': _swpc_numeric(latest_plasma.get('density')),
+                'temperature': _swpc_numeric(latest_plasma.get('temperature')),
+                'bt': _swpc_numeric(latest_mag.get('bt')),
+                'bz': _swpc_numeric(latest_mag.get('bz_gsm')),
+                'bx': _swpc_numeric(latest_mag.get('bx_gsm')),
+                'by': _swpc_numeric(latest_mag.get('by_gsm')),
             }
     except Exception as e:
         print(f"Error fetching solar wind data: {e}")
@@ -216,64 +388,75 @@ def fetch_solar_wind_history():
             return None
         
         try:
-            plasma_data = plasma_response.json()
-            mag_data = mag_response.json()
+            plasma_rows = _swpc_table_to_rows(plasma_response.json())
+            mag_rows = _swpc_table_to_rows(mag_response.json())
         except json.JSONDecodeError as e:
             print(f"JSON decode error from SWPC (data provider issue): {e}")
-            # Try to use current data to create minimal history
             sw_current = fetch_solar_wind_data()
-            if sw_current:
-                current_time = datetime.now(timezone.utc)
-                return {
-                    'times': [current_time],
-                    'speeds': [sw_current.get('speed')],
-                    'densities': [sw_current.get('density')],
-                    'bzs': [sw_current.get('bz')],
-                    'bts': [sw_current.get('bt')]
-                }
-            return None
+            return _fallback_solar_wind_history(sw_current)
         
-        # Parse data (skip header row)
+        plasma_by_time = {}
+        for row in plasma_rows:
+            dt = parse_swpc_datetime(row.get('time_tag'))
+            if not dt:
+                continue
+            plasma_by_time[dt] = {
+                'speed': _swpc_numeric(row.get('speed')),
+                'density': _swpc_numeric(row.get('density')),
+            }
+
+        mag_by_time = {}
+        for row in mag_rows:
+            dt = parse_swpc_datetime(row.get('time_tag'))
+            if not dt:
+                continue
+            mag_by_time[dt] = {
+                'bz': _swpc_numeric(row.get('bz_gsm')),
+                'bt': _swpc_numeric(row.get('bt')),
+            }
+
+        common_times = sorted(set(plasma_by_time) & set(mag_by_time))
+        if len(common_times) == 0:
+            print("Warning: No overlapping plasma/magnetic solar wind timestamps")
+            return _fallback_solar_wind_history(fetch_solar_wind_data())
+
         times = []
         speeds = []
         densities = []
         bzs = []
         bts = []
         
-        for i in range(1, min(len(plasma_data), len(mag_data))):
+        for dt in common_times:
             try:
-                p_row = plasma_data[i]
-                m_row = mag_data[i]
-                
-                time_str = p_row[0]
-                # Parse time and make it timezone-aware (UTC)
-                dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S.%f")
-                times.append(dt.replace(tzinfo=timezone.utc))
-                
-                # Filter out invalid values (-999, -9999, None, empty strings)
-                speed = p_row[2] if len(p_row) > 2 and p_row[2] not in [None, '', -999, -9999] else None
-                density = p_row[1] if len(p_row) > 1 and p_row[1] not in [None, '', -999, -9999] else None
-                bz = m_row[3] if len(m_row) > 3 and m_row[3] not in [None, '', -999, -9999] else None
-                bt = m_row[6] if len(m_row) > 6 and m_row[6] not in [None, '', -999, -9999] else None
-                
-                speeds.append(float(speed) if speed is not None else None)
-                densities.append(float(density) if density is not None else None)
-                bzs.append(float(bz) if bz is not None else None)
-                bts.append(float(bt) if bt is not None else None)
+                times.append(dt)
+                speeds.append(plasma_by_time[dt]['speed'])
+                densities.append(plasma_by_time[dt]['density'])
+                bzs.append(mag_by_time[dt]['bz'])
+                bts.append(mag_by_time[dt]['bt'])
             except Exception as row_error:
-                print(f"Error parsing row {i}: {row_error}")
+                print(f"Error parsing row {dt.isoformat()}: {row_error}")
                 continue
         
         if len(times) == 0:
             print("Warning: No valid historical data parsed")
-            return None
+            return _fallback_solar_wind_history(fetch_solar_wind_data())
+
+        time_interval_minutes = 1
+        if len(times) >= 2:
+            time_deltas = [
+                (times[index + 1] - times[index]).total_seconds() / 60.0
+                for index in range(len(times) - 1)
+                if times[index + 1] > times[index]
+            ]
+            if time_deltas:
+                time_interval_minutes = max(1, int(round(float(np.median(time_deltas)))))
         
         # Interpolate gaps in the data to smooth over temporary dropouts
         # Use 10-minute max gap to avoid interpolating over extended outages
-        speeds = interpolate_gaps(speeds, max_gap_minutes=10, time_interval_minutes=1)
-        densities = interpolate_gaps(densities, max_gap_minutes=10, time_interval_minutes=1)
-        bzs = interpolate_gaps(bzs, max_gap_minutes=10, time_interval_minutes=1)
-        bts = interpolate_gaps(bts, max_gap_minutes=10, time_interval_minutes=1)
+        speeds = interpolate_gaps(speeds, max_gap_minutes=10, time_interval_minutes=time_interval_minutes)
+        densities = interpolate_gaps(densities, max_gap_minutes=10, time_interval_minutes=time_interval_minutes)
+        bzs = interpolate_gaps(bzs, max_gap_minutes=10, time_interval_minutes=time_interval_minutes)
+        bts = interpolate_gaps(bts, max_gap_minutes=10, time_interval_minutes=time_interval_minutes)
         
         return {
             'times': times,
@@ -601,6 +784,795 @@ def fetch_noaa_scales():
         print(f"Error fetching NOAA scales: {e}")
         return None
 
+
+def _safe_int(value, default=0):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError, AttributeError):
+        return default
+
+
+def parse_swpc_datetime(value):
+    """Parse SWPC/DONKI timestamps into timezone-aware UTC datetimes."""
+    if not value or value == 'N/A':
+        return None
+
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+
+    normalized = normalized.replace(' ', 'T')
+    if normalized.endswith('Z'):
+        normalized = normalized[:-1] + '+00:00'
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+
+    for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(normalized, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+
+    return None
+
+
+def format_utc_display(dt_value):
+    if not dt_value:
+        return 'Unknown'
+    return dt_value.astimezone(timezone.utc).strftime('%b %d, %Y %H:%M UTC')
+
+
+def normalize_flare_class(raw_value):
+    normalized = re.sub(r'\s+', '', str(raw_value or '').upper())
+    match = re.match(r'^([ABCMX])(\d+(?:\.\d+)?)', normalized)
+    if not match:
+        return None
+    return f"{match.group(1)}{match.group(2)}"
+
+
+def flare_class_to_flux(flare_class):
+    normalized = normalize_flare_class(flare_class)
+    if not normalized:
+        return None
+
+    scale = {
+        'A': 1e-8,
+        'B': 1e-7,
+        'C': 1e-6,
+        'M': 1e-5,
+        'X': 1e-4,
+    }
+
+    try:
+        return float(normalized[1:]) * scale[normalized[0]]
+    except (KeyError, ValueError):
+        return None
+
+
+def flux_to_flare_class(flux):
+    if flux is None:
+        return 'Unknown'
+
+    try:
+        flux_value = float(flux)
+    except (TypeError, ValueError):
+        return 'Unknown'
+
+    if flux_value < 1e-7:
+        return f"A{flux_value * 1e8:.2f}"
+    if flux_value < 1e-6:
+        return f"B{flux_value * 1e7:.2f}"
+    if flux_value < 1e-5:
+        return f"C{flux_value * 1e6:.2f}"
+    if flux_value < 1e-4:
+        return f"M{flux_value * 1e5:.2f}"
+    return f"X{flux_value * 1e4:.2f}"
+
+
+def flare_flux_to_r_scale(flux):
+    if flux is None:
+        return 0
+    if flux >= 2e-3:
+        return 5
+    if flux >= 1e-3:
+        return 4
+    if flux >= 1e-4:
+        return 3
+    if flux >= 5e-5:
+        return 2
+    if flux >= 1e-5:
+        return 1
+    return 0
+
+
+def proton_flux_to_s_scale(flux):
+    if flux is None:
+        return 0
+    if flux >= 100000:
+        return 5
+    if flux >= 10000:
+        return 4
+    if flux >= 1000:
+        return 3
+    if flux >= 100:
+        return 2
+    if flux >= 10:
+        return 1
+    return 0
+
+
+def get_flare_palette(flare_class):
+    class_letter = (normalize_flare_class(flare_class) or 'C1.0')[0]
+    if class_letter == 'X':
+        return {
+            'base': '#b91c1c',
+            'accent': '#ef4444',
+            'soft': 'rgba(239, 68, 68, 0.18)',
+            'text': '#fff5f5',
+        }
+    if class_letter == 'M':
+        return {
+            'base': '#c2410c',
+            'accent': '#f97316',
+            'soft': 'rgba(249, 115, 22, 0.18)',
+            'text': '#fff7ed',
+        }
+    return {
+        'base': '#ca8a04',
+        'accent': '#facc15',
+        'soft': 'rgba(250, 204, 21, 0.18)',
+        'text': '#fefce8',
+    }
+
+
+def get_flare_impact_copy(flare_class):
+    class_letter = (normalize_flare_class(flare_class) or 'C1.0')[0]
+    if class_letter == 'X':
+        return [
+            'A solar flare is an eruption of solar particles. X-level flares are uncommon to rare.',
+            'A flare of this magnitude can result in a radiation storm and notable radio blackouts.',
+            'It is unknown if this flare produced a CME, but coronagraph imagery can help determine if any direct impacts to Earth are possible.',
+        ]
+    if class_letter == 'M':
+        return [
+            'A solar flare is an eruption of solar particles. M-level flares are relatively common.',
+            'A flare of this magnitude can result in a radiation storm and radio blackouts.',
+            'It is unknown if this flare produced a CME, but coronagraph imagery can help determine if any direct impacts to Earth are possible.',
+        ]
+    return [
+        'A solar flare is an eruption of solar particles. C-level flares are very common.',
+        'Little to no impacts are expected regarding radiation or radio blackouts.',
+        'A CME is unlikely from a flare of this magnitude, but if one is launched it will likely be slow with minor to no effects here on Earth.',
+    ]
+
+
+def parse_solar_region_location(location):
+    if not location:
+        return None
+
+    match = re.search(r'([NS])(\d{1,2})([EW])(\d{1,2})', str(location).upper())
+    if not match:
+        return None
+
+    latitude = int(match.group(2)) * (1 if match.group(1) == 'N' else -1)
+    longitude = int(match.group(4)) * (1 if match.group(3) == 'W' else -1)
+    return latitude, longitude
+
+
+def solar_region_to_disk_xy(location):
+    coords = parse_solar_region_location(location)
+    if not coords:
+        return None
+
+    latitude, longitude = coords
+    lat_rad = np.deg2rad(latitude)
+    lon_rad = np.deg2rad(longitude)
+    x = np.sin(lon_rad) * np.cos(lat_rad)
+    y = -np.sin(lat_rad)
+    return x, y
+
+
+def build_flare_event_id(event_dt, flare_class, region_number=None):
+    timestamp = event_dt.astimezone(timezone.utc).strftime('%Y%m%d%H%M') if event_dt else 'unknown'
+    region_part = re.sub(r'[^0-9A-Za-z]+', '-', str(region_number or 'na'))
+    class_part = re.sub(r'[^0-9A-Za-z]+', '-', normalize_flare_class(flare_class) or 'flare')
+    return f"{timestamp}-{class_part}-{region_part}"
+
+
+def fetch_remote_image(urls, timeout=10):
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            return Image.open(BytesIO(response.content)).convert('RGB')
+        except Exception as exc:
+            print(f"[FLARE_ALERT] Failed to load image {url}: {exc}")
+    return None
+
+
+def detect_recent_xray_flares(xray_rows, min_flux=1e-6, window=15):
+    flare_candidates = []
+    if not xray_rows:
+        return flare_candidates
+
+    long_channel = []
+    for row in xray_rows:
+        if row.get('energy') != '0.1-0.8nm':
+            continue
+        try:
+            flux_value = float(row.get('flux'))
+            time_value = parse_swpc_datetime(row.get('time_tag'))
+            if not time_value or flux_value <= 0:
+                continue
+            long_channel.append({'time': time_value, 'flux': flux_value})
+        except (TypeError, ValueError):
+            continue
+
+    for index in range(len(long_channel)):
+        candidate = long_channel[index]
+        if candidate['flux'] < min_flux:
+            continue
+
+        start_index = max(0, index - window)
+        end_index = min(len(long_channel) - 1, index + window)
+        if any(long_channel[compare_index]['flux'] > candidate['flux'] for compare_index in range(start_index, end_index + 1) if compare_index != index):
+            continue
+
+        onset_index = index
+        end_event_index = index
+        threshold = max(min_flux, candidate['flux'] * 0.35)
+
+        while onset_index > 0 and long_channel[onset_index - 1]['flux'] >= threshold:
+            onset_index -= 1
+        while end_event_index < len(long_channel) - 1 and long_channel[end_event_index + 1]['flux'] >= threshold:
+            end_event_index += 1
+
+        flare_candidates.append({
+            'time': candidate['time'],
+            'peak_time': candidate['time'],
+            'start_time': long_channel[onset_index]['time'],
+            'end_time': long_channel[end_event_index]['time'],
+            'flux': candidate['flux'],
+            'event_class': flux_to_flare_class(candidate['flux']),
+        })
+
+    flare_candidates.sort(key=lambda item: item['peak_time'], reverse=True)
+    return flare_candidates
+
+
+def fetch_recent_donki_flares(days_back=5):
+    cache_key = f'donki_flares_{days_back}'
+    cached = get_cached(cache_key, max_age_seconds=600)
+    if cached is not None:
+        return cached
+
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days_back)
+    try:
+        response = requests.get(
+            'https://api.nasa.gov/DONKI/FLR',
+            params={
+                'startDate': start_date.strftime('%Y-%m-%d'),
+                'endDate': end_date.strftime('%Y-%m-%d'),
+                'api_key': NASA_API_KEY,
+            },
+            timeout=12,
+        )
+        if response.status_code != 200:
+            print(f"[FLARE_ALERT] DONKI returned status {response.status_code}")
+            set_cached(cache_key, [])
+            return []
+
+        donki_rows = response.json()
+    except Exception as exc:
+        print(f"[FLARE_ALERT] Failed to fetch DONKI flare events: {exc}")
+        set_cached(cache_key, [])
+        return []
+
+    flare_rows = []
+    for row in donki_rows:
+        flare_class = normalize_flare_class(row.get('classType'))
+        if not flare_class or flare_class[0] not in {'C', 'M', 'X'}:
+            continue
+        peak_dt = parse_swpc_datetime(row.get('peakTime'))
+        if not peak_dt:
+            continue
+        flare_rows.append({
+            'event_class': flare_class,
+            'time': parse_swpc_datetime(row.get('beginTime')),
+            'peak_time': peak_dt,
+            'end_time': parse_swpc_datetime(row.get('endTime')),
+            'region_number': str(row.get('activeRegionNum') or '').strip() or None,
+            'source_location': row.get('sourceLocation'),
+        })
+
+    flare_rows.sort(key=lambda item: item['peak_time'], reverse=True)
+    set_cached(cache_key, flare_rows)
+    return flare_rows
+
+
+def infer_source_region_metadata(regions, flare_class, preferred_region_number=None):
+    if not regions:
+        return None
+
+    if preferred_region_number:
+        for region in regions:
+            if str(region.get('number')) == str(preferred_region_number):
+                return region
+
+    class_letter = (normalize_flare_class(flare_class) or 'C1.0')[0]
+    target_key = {'X': 'x_flares', 'M': 'm_flares'}.get(class_letter, 'c_flares')
+    complexity_rank = {
+        'Alpha': 1,
+        'Beta': 2,
+        'Beta-Gamma': 3,
+        'Beta-Delta': 4,
+        'Gamma-Delta': 5,
+        'Beta-Gamma-Delta': 6,
+    }
+
+    def region_rank(region):
+        area_value = _safe_int(region.get('area'), 0)
+        return (
+            _safe_int(region.get(target_key), 0),
+            _safe_int(region.get('x_flares'), 0),
+            _safe_int(region.get('m_flares'), 0),
+            _safe_int(region.get('c_flares'), 0),
+            complexity_rank.get(region.get('mag_type'), 0),
+            area_value,
+        )
+
+    return sorted(regions, key=region_rank, reverse=True)[0]
+
+
+def fetch_latest_flare_alert(max_age_hours=FLARE_ALERT_MAX_AGE_HOURS):
+    cache_key = 'latest_flare_alert'
+    cached = get_cached(cache_key, max_age_seconds=180)
+    if cached:
+        return cached
+
+    solar_data = fetch_solar_data() or {}
+    flare_candidates = detect_recent_xray_flares(solar_data.get('xray_1day') or [])
+    latest = flare_candidates[0] if flare_candidates else None
+    if not latest:
+        payload = {'active': False, 'flare': None}
+        set_cached(cache_key, payload)
+        return payload
+
+    now = datetime.now(timezone.utc)
+    scales = fetch_noaa_scales() or {}
+    current_r_scale = _safe_int(scales.get('r_scale'), 0)
+    flare_class = latest['event_class']
+    donki_rows = fetch_recent_donki_flares()
+    matched_donki = None
+    for row in donki_rows:
+        if row['event_class'][0] != flare_class[0]:
+            continue
+        time_delta = abs((row['peak_time'] - latest['peak_time']).total_seconds()) / 60.0
+        if time_delta <= 120:
+            matched_donki = row
+            break
+
+    region_number = matched_donki.get('region_number') if matched_donki else None
+    region_meta = infer_source_region_metadata(solar_data.get('sunspots') or [], flare_class, region_number)
+    if not region_number and region_meta and region_meta.get('number'):
+        region_number = str(region_meta.get('number'))
+
+    source_region = f"AR {region_number}" if region_number else 'Source region unavailable'
+    location = None
+    if matched_donki and matched_donki.get('source_location'):
+        location = matched_donki['source_location']
+    elif region_meta and region_meta.get('location'):
+        location = region_meta.get('location')
+
+    event_dt = latest['peak_time']
+    peak_r_scale = max(current_r_scale, flare_flux_to_r_scale(latest['flux']))
+    age_hours = max(0.0, (now - event_dt).total_seconds() / 3600.0)
+    palette = get_flare_palette(flare_class)
+
+    latest = {
+        'id': build_flare_event_id(event_dt, flare_class, region_number),
+        'event_class': flare_class,
+        'class_letter': flare_class[0],
+        'magnitude': flare_class[1:],
+        'time': (matched_donki.get('time') if matched_donki and matched_donki.get('time') else latest['start_time']).isoformat() if (matched_donki and matched_donki.get('time')) or latest.get('start_time') else None,
+        'peak_time': (matched_donki.get('peak_time') if matched_donki and matched_donki.get('peak_time') else latest['peak_time']).isoformat(),
+        'end_time': (matched_donki.get('end_time') if matched_donki and matched_donki.get('end_time') else latest.get('end_time')).isoformat() if (matched_donki and matched_donki.get('end_time')) or latest.get('end_time') else None,
+        'event_time_display': format_utc_display(event_dt),
+        'peak_time_display': format_utc_display(event_dt),
+        'source_region': source_region,
+        'region_number': region_number,
+        'location': location,
+        'current_r_scale': current_r_scale,
+        'peak_r_scale': peak_r_scale,
+        'r_scale_label': f"R{peak_r_scale}",
+        'flux': latest['flux'],
+        'color': palette['accent'],
+        'base_color': palette['base'],
+        'age_minutes': int(round(age_hours * 60)),
+        'age_hours': round(age_hours, 2),
+        'summary_text': f"{flare_class} flare detected{f' from {source_region}' if region_number else ''}",
+        'what_to_know': get_flare_impact_copy(flare_class),
+    }
+
+    payload = {
+        'active': bool(latest and latest['age_hours'] <= max_age_hours),
+        'flare': latest,
+    }
+    set_cached(cache_key, payload)
+    return payload
+
+
+def draw_flare_alert_graphic(flare_info):
+    import matplotlib.dates as mdates
+    from matplotlib.transforms import blended_transform_factory
+    from matplotlib.ticker import LogLocator, NullFormatter
+    import textwrap
+
+    flare_class = flare_info.get('event_class') or 'C1.0'
+    palette = get_flare_palette(flare_class)
+    figure_bg = '#080b10'
+    panel_bg = '#05070a'
+    panel_edge = '#d9e2ec'
+    card_bg = '#0b1017'
+    card_edge = (1, 1, 1, 0.08)
+    bright_text = '#f8fafc'
+    muted_text = '#94a3b8'
+    soft_text = '#cbd5e1'
+    fig = plt.figure(figsize=(14.8, 8.4), facecolor=figure_bg)
+    gs = GridSpec(22, 24, figure=fig, left=0.028, right=0.985, top=0.905, bottom=0.055, wspace=0.34, hspace=0.54)
+
+    peak_time_display = flare_info.get('peak_time_display') or flare_info.get('event_time_display') or format_utc_display(datetime.now(timezone.utc))
+    source_region = flare_info.get('source_region') or 'Source region unavailable'
+    location_label = flare_info.get('location') or 'Location unavailable'
+    age_hours = flare_info.get('age_hours')
+    if isinstance(age_hours, (int, float)):
+        age_label = f"Detected {age_hours:.1f}h ago" if age_hours >= 1 else f"Detected {int(round(age_hours * 60))}m ago"
+    else:
+        age_label = 'Recent event'
+
+    fig.text(
+        0.035, 0.955, 'NEW FLARE EVENT', ha='left', va='center', fontsize=28,
+        color=palette['text'], fontweight='bold',
+        bbox=dict(boxstyle='round,pad=0.25,rounding_size=0.08', facecolor=palette['base'], edgecolor=palette['accent'], linewidth=1.5)
+    )
+    fig.text(0.56, 0.958, peak_time_display, ha='left', va='center', fontsize=19, color=bright_text, fontweight='bold')
+    fig.text(0.56, 0.927, f"{source_region} | {age_label}", ha='left', va='center', fontsize=10.5, color=muted_text, fontweight='bold')
+    fig.text(
+        0.965, 0.955, flare_class, ha='right', va='center', fontsize=28,
+        color=palette['text'], fontweight='bold',
+        bbox=dict(boxstyle='round,pad=0.25,rounding_size=0.08', facecolor=palette['base'], edgecolor=palette['accent'], linewidth=1.5)
+    )
+
+    ax_goes = fig.add_subplot(gs[1:11, 0:8])
+    ax_source = fig.add_subplot(gs[1:11, 9:17])
+    ax_info = fig.add_subplot(gs[1:19, 18:24])
+    ax_xray = fig.add_subplot(gs[11:18, 0:9])
+    ax_proton = fig.add_subplot(gs[11:18, 9:18])
+
+    content_axes = [ax_goes, ax_source, ax_info, ax_xray, ax_proton]
+    for axis in content_axes:
+        axis.set_facecolor(panel_bg)
+        for spine in axis.spines.values():
+            spine.set_color(panel_edge)
+            spine.set_linewidth(1.15)
+
+    def style_chart_axis(axis):
+        axis.set_facecolor(panel_bg)
+        axis.tick_params(axis='x', labelsize=10, colors=soft_text, pad=4)
+        axis.tick_params(axis='y', labelsize=10, colors=soft_text, pad=6)
+        axis.set_axisbelow(True)
+        for spine in axis.spines.values():
+            spine.set_color(panel_edge)
+            spine.set_linewidth(1.05)
+
+    def add_chart_header(axis, title, value_text=None, value_color=bright_text):
+        axis.text(0.015, 0.972, title, transform=axis.transAxes, ha='left', va='top',
+                  fontsize=16, color=palette['accent'], fontweight='bold')
+        if value_text:
+            axis.text(
+                0.985, 0.972, value_text, transform=axis.transAxes, ha='right', va='top',
+                fontsize=10, color=value_color, fontweight='bold', fontfamily='monospace',
+                bbox=dict(boxstyle='round,pad=0.22,rounding_size=0.08', facecolor=card_bg, edgecolor=card_edge, linewidth=0.9)
+            )
+
+    def add_xray_gridlines(axis):
+        major_lines = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3]
+        minor_lines = []
+        for base in major_lines:
+            for multiplier in range(2, 10):
+                minor_lines.append(base * multiplier)
+
+        for value in minor_lines:
+            axis.axhline(value, color=(1, 1, 1, 0.05), linewidth=0.7, zorder=0)
+        for value in major_lines:
+            axis.axhline(value, color=(1, 1, 1, 0.14), linewidth=0.9, zorder=0)
+
+    def add_info_bullet(axis, top_y, text_value):
+        wrapped = textwrap.fill(text_value, width=28)
+        line_count = wrapped.count('\n') + 1
+        bullet_center_y = top_y - 0.017
+        axis.add_patch(
+            mpatches.Circle((0.078, bullet_center_y), 0.009, transform=axis.transAxes,
+                            facecolor=palette['accent'], edgecolor='none', zorder=3)
+        )
+        axis.text(0.108, top_y, wrapped, ha='left', va='top', fontsize=9.8,
+                  color=bright_text, linespacing=1.28, transform=ax_info.transAxes)
+        return top_y - (0.031 * line_count) - 0.028
+
+    def add_info_card(axis, x, y, width, height, label, value, secondary=None, value_color=bright_text, value_size=16, mono=False):
+        card = mpatches.FancyBboxPatch(
+            (x, y - height), width, height,
+            boxstyle='round,pad=0.014,rounding_size=0.03',
+            transform=axis.transAxes,
+            facecolor=card_bg,
+            edgecolor=card_edge,
+            linewidth=0.9,
+        )
+        axis.add_patch(card)
+        axis.text(x + 0.025, y - 0.018, label, ha='left', va='top', fontsize=8.8,
+                  color=muted_text, fontweight='bold', transform=axis.transAxes)
+        axis.text(x + 0.025, y - 0.063, value, ha='left', va='top', fontsize=value_size,
+                  color=value_color, fontweight='bold', fontfamily='monospace' if mono else None, transform=axis.transAxes)
+        if secondary:
+            axis.text(x + 0.025, y - height + 0.03, secondary, ha='left', va='bottom', fontsize=10.2,
+                      color=soft_text, fontweight='bold', transform=axis.transAxes)
+
+    def annotate_source_region(axis, image_width, image_height, region_x, region_y, label):
+        label_dx = 18 if region_x < image_width * 0.28 else (-18 if region_x > image_width * 0.72 else 0)
+        label_dy = -18 if region_y < image_height * 0.28 else 18
+        label_ha = 'left' if label_dx > 0 else 'right' if label_dx < 0 else 'center'
+        label_va = 'top' if label_dy < 0 else 'bottom'
+
+        axis.annotate(
+            label,
+            xy=(region_x, region_y),
+            xytext=(label_dx, label_dy),
+            textcoords='offset points',
+            ha=label_ha,
+            va=label_va,
+            fontsize=11.2,
+            color=bright_text,
+            fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.18,rounding_size=0.05', facecolor=(8 / 255, 11 / 255, 16 / 255, 0.88), edgecolor='none'),
+            arrowprops=dict(arrowstyle='-', color=palette['accent'], linewidth=1.2, shrinkA=4, shrinkB=10),
+            annotation_clip=True,
+        )
+
+    def draw_image_placeholder(axis, headline, detail):
+        axis.set_xticks([])
+        axis.set_yticks([])
+        axis.add_patch(mpatches.Circle((0.5, 0.55), 0.295, transform=axis.transAxes,
+                                       facecolor='#121922', edgecolor=(1, 1, 1, 0.08), linewidth=1.2))
+        axis.add_patch(mpatches.Circle((0.5, 0.55), 0.255, transform=axis.transAxes,
+                                       facecolor=(250 / 255, 204 / 255, 21 / 255, 0.09), edgecolor=palette['accent'], linewidth=1.0))
+        axis.add_patch(mpatches.Circle((0.5, 0.55), 0.05, transform=axis.transAxes,
+                                       facecolor=(250 / 255, 204 / 255, 21 / 255, 0.26), edgecolor='none'))
+        axis.text(0.5, 0.17, headline, ha='center', va='center', fontsize=13.5, color=bright_text, fontweight='bold', transform=axis.transAxes)
+        axis.text(0.5, 0.11, detail, ha='center', va='center', fontsize=10.2, color=muted_text, transform=axis.transAxes)
+
+    goes_image = fetch_remote_image([
+        'https://services.swpc.noaa.gov/images/animations/suvi/primary/131/latest.png',
+        'https://services.swpc.noaa.gov/images/animations/suvi/secondary/131/latest.png',
+    ])
+    if goes_image:
+        ax_goes.imshow(goes_image)
+        ax_goes.text(0.02, 0.035, 'GOES-19 SUVI composite 131A', ha='left', va='center', fontsize=9.2,
+                     color=bright_text, transform=ax_goes.transAxes,
+                     bbox=dict(boxstyle='round,pad=0.18,rounding_size=0.06', facecolor=(5 / 255, 7 / 255, 10 / 255, 0.84), edgecolor='none'))
+    else:
+        draw_image_placeholder(ax_goes, 'GOES imagery unavailable', 'Waiting for the latest SWPC frame')
+    ax_goes.set_title('GOES Imagery', color=bright_text, fontsize=20, fontweight='bold', pad=8)
+    ax_goes.set_xticks([])
+    ax_goes.set_yticks([])
+
+    source_image = fetch_remote_image([
+        'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMII.jpg',
+        'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIBC.jpg',
+        'https://soho.nascom.nasa.gov/data/realtime/hmi_igr/1024/latest.jpg',
+    ])
+    if source_image:
+        ax_source.imshow(source_image)
+        disk_xy = solar_region_to_disk_xy(flare_info.get('location'))
+        if disk_xy:
+            height, width = source_image.height, source_image.width
+            radius = min(width, height) * 0.44
+            center_x = width / 2
+            center_y = height / 2
+            region_x = center_x + disk_xy[0] * radius
+            region_y = center_y + disk_xy[1] * radius
+            box_size = max(70, width * 0.09)
+            rect = mpatches.Rectangle(
+                (region_x - box_size / 2, region_y - box_size / 2),
+                box_size, box_size, fill=False, edgecolor=palette['accent'], linewidth=2.1
+            )
+            ax_source.add_patch(rect)
+            ax_source.scatter([region_x], [region_y], s=24, color=palette['accent'], edgecolors=bright_text, linewidths=0.7, zorder=4)
+            annotate_source_region(ax_source, width, height, region_x, region_y, source_region)
+        ax_source.text(0.02, 0.035, 'Latest continuum / intensity view', ha='left', va='center', fontsize=9.2,
+                       color=bright_text, transform=ax_source.transAxes,
+                       bbox=dict(boxstyle='round,pad=0.18,rounding_size=0.06', facecolor=(5 / 255, 7 / 255, 10 / 255, 0.84), edgecolor='none'))
+    else:
+        draw_image_placeholder(ax_source, source_region, location_label)
+        if flare_info.get('location'):
+            ax_source.add_patch(mpatches.Rectangle((0.43, 0.48), 0.14, 0.14, transform=ax_source.transAxes,
+                                                   fill=False, edgecolor=palette['accent'], linewidth=1.8))
+    ax_source.set_title('Source Region', color=bright_text, fontsize=20, fontweight='bold', pad=8)
+    ax_source.set_xticks([])
+    ax_source.set_yticks([])
+
+    r_scale_label = flare_info.get('r_scale_label') or 'R0'
+    ax_info.set_xlim(0, 1)
+    ax_info.set_ylim(0, 1)
+    ax_info.set_xticks([])
+    ax_info.set_yticks([])
+    ax_info.add_patch(mpatches.Rectangle((0, 0.905), 1, 0.095, transform=ax_info.transAxes,
+                                         facecolor=(250 / 255, 204 / 255, 21 / 255, 0.06), edgecolor='none'))
+    ax_info.text(0.05, 0.95, 'WHAT TO KNOW:', ha='left', va='top', fontsize=20, color=bright_text, fontweight='bold', transform=ax_info.transAxes)
+    source_region_display = textwrap.shorten(source_region, width=18, placeholder='...')
+    add_info_card(ax_info, 0.05, 0.865, 0.27, 0.105, 'FLARE', flare_class, value_color=palette['accent'], value_size=18)
+    add_info_card(ax_info, 0.35, 0.865, 0.43, 0.105, 'SOURCE', source_region_display, value_color=bright_text, value_size=14.2)
+    add_info_card(ax_info, 0.81, 0.865, 0.14, 0.105, 'R-SCALE', r_scale_label, value_color=bright_text, value_size=16.5, mono=True)
+    add_info_card(ax_info, 0.05, 0.72, 0.90, 0.105, 'PEAK TIME', peak_time_display, value_color=bright_text, value_size=13.1)
+    ax_info.text(0.05, 0.585, 'LOCATION', ha='left', va='top', fontsize=9.3, color=muted_text, fontweight='bold', transform=ax_info.transAxes)
+    ax_info.text(0.95, 0.585, age_label, ha='right', va='top', fontsize=9.2, color=muted_text, fontweight='bold', transform=ax_info.transAxes)
+    location_text = textwrap.fill(location_label, width=28)
+    location_line_count = location_text.count('\n') + 1
+    ax_info.text(0.05, 0.548, location_text, ha='left', va='top', fontsize=10.4,
+                 color=soft_text, fontweight='bold', transform=ax_info.transAxes)
+
+    bullet_y = 0.50 - (0.03 * max(0, location_line_count - 1))
+    for bullet in get_flare_impact_copy(flare_class):
+        bullet_y = add_info_bullet(ax_info, bullet_y, bullet)
+
+    ax_info.text(0.05, 0.02, textwrap.fill('R scale is estimated from the flare peak flux and the latest NOAA radio-blackout scale.', width=34), ha='left', va='bottom', fontsize=7.4, color=muted_text, transform=ax_info.transAxes)
+
+    xray_data = []
+    try:
+        response = requests.get(GOES_XRAY_URL, timeout=12)
+        response.raise_for_status()
+        xray_data = response.json()
+    except Exception as exc:
+        print(f"[FLARE_ALERT] Failed to fetch X-ray chart data: {exc}")
+
+    long_xray = []
+    for entry in xray_data:
+        if entry.get('energy') != '0.1-0.8nm':
+            continue
+        try:
+            flux_value = float(entry.get('flux'))
+            if flux_value <= 0:
+                continue
+            time_value = parse_swpc_datetime(entry.get('time_tag'))
+            if not time_value:
+                continue
+            long_xray.append((time_value, flux_value))
+        except (TypeError, ValueError):
+            continue
+
+    style_chart_axis(ax_xray)
+    if long_xray:
+        times = [item[0] for item in long_xray]
+        values = [item[1] for item in long_xray]
+        ax_xray.axhspan(1e-8, 1e-6, facecolor=(16 / 255, 185 / 255, 129 / 255, 0.12), zorder=0)
+        ax_xray.axhspan(1e-6, 1e-5, facecolor=(234 / 255, 179 / 255, 8 / 255, 0.12), zorder=0)
+        ax_xray.axhspan(1e-5, 1e-4, facecolor=(249 / 255, 115 / 255, 22 / 255, 0.12), zorder=0)
+        ax_xray.axhspan(1e-4, 1e-3, facecolor=(220 / 255, 38 / 255, 38 / 255, 0.14), zorder=0)
+        ax_xray.axhspan(1e-3, 1e-2, facecolor=(168 / 255, 85 / 255, 247 / 255, 0.14), zorder=0)
+        add_xray_gridlines(ax_xray)
+        ax_xray.grid(True, which='major', axis='x', color='#334155', alpha=0.28, linewidth=0.7)
+        ax_xray.plot(times, values, color='#34d399', linewidth=2.35, solid_capstyle='round', zorder=4)
+        ax_xray.fill_between(times, values, 1e-8, color=(52 / 255, 211 / 255, 153 / 255, 0.10))
+        peak_time = parse_swpc_datetime(flare_info.get('peak_time') or flare_info.get('time'))
+        peak_flux = flare_info.get('flux')
+        if peak_time and times[0] <= peak_time <= times[-1]:
+            ax_xray.axvline(peak_time, color=palette['accent'], linewidth=1.5, linestyle='--', alpha=0.92)
+            if isinstance(peak_flux, (int, float)) and peak_flux > 0:
+                ax_xray.scatter([peak_time], [peak_flux], s=34, color=palette['accent'], edgecolors=bright_text, linewidths=0.8, zorder=5)
+                label_offset_x = -34 if peak_time >= times[-1] - timedelta(minutes=45) else 8
+                label_align = 'right' if label_offset_x < 0 else 'left'
+                ax_xray.annotate('Peak', xy=(peak_time, peak_flux), xytext=(label_offset_x, 10), textcoords='offset points',
+                                 ha=label_align,
+                                 fontsize=9.4, color=palette['accent'], fontweight='bold')
+        ax_xray.set_yscale('log')
+        ax_xray.set_ylim(1e-8, 1e-2)
+        ax_xray.set_xlim(times[0], times[-1])
+        ax_xray.set_yticks([1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3])
+        ax_xray.set_yticklabels(['A', 'B', 'C', 'M', 'X', 'X10'])
+        ax_xray.yaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1))
+        ax_xray.yaxis.set_minor_formatter(NullFormatter())
+        ax_xray.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+        ax_xray.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        add_chart_header(ax_xray, 'GOES X-ray Flux', f"Current {flux_to_flare_class(values[-1])}")
+    else:
+        ax_xray.text(0.5, 0.5, 'X-ray chart unavailable', ha='center', va='center', color=muted_text, fontsize=13, transform=ax_xray.transAxes)
+        ax_xray.set_xticks([])
+        ax_xray.set_yticks([])
+        add_chart_header(ax_xray, 'GOES X-ray Flux')
+
+    proton_data = []
+    try:
+        response = requests.get(GOES_PROTON_URL, timeout=12)
+        response.raise_for_status()
+        proton_data = response.json()
+    except Exception as exc:
+        print(f"[FLARE_ALERT] Failed to fetch proton chart data: {exc}")
+
+    proton_series = {'>=10 MeV': [], '>=50 MeV': [], '>=100 MeV': []}
+    for entry in proton_data:
+        energy = entry.get('energy')
+        if energy not in proton_series:
+            continue
+        try:
+            time_value = parse_swpc_datetime(entry.get('time_tag'))
+            flux_value = float(entry.get('flux'))
+            if not time_value or flux_value <= 0:
+                continue
+            proton_series[energy].append((time_value, flux_value))
+        except (TypeError, ValueError):
+            continue
+
+    style_chart_axis(ax_proton)
+    ax_proton.yaxis.tick_right()
+    ax_proton.tick_params(axis='y', labelleft=False, left=False, labelright=False, right=False, pad=4)
+    has_proton_data = any(proton_series.values())
+    if has_proton_data:
+        proton_colors = {
+            '>=10 MeV': '#facc15',
+            '>=50 MeV': '#38bdf8',
+            '>=100 MeV': '#a78bfa',
+        }
+        ax_proton.axhspan(10, 100, facecolor=(250 / 255, 204 / 255, 21 / 255, 0.055), zorder=0)
+        ax_proton.axhspan(100, 1000, facecolor=(249 / 255, 115 / 255, 22 / 255, 0.05), zorder=0)
+        ax_proton.axhspan(1000, 1e5, facecolor=(239 / 255, 68 / 255, 68 / 255, 0.05), zorder=0)
+        for energy, points in proton_series.items():
+            if not points:
+                continue
+            ax_proton.plot([point[0] for point in points], [point[1] for point in points], color=proton_colors[energy], linewidth=1.95, label=energy)
+        peak_time = parse_swpc_datetime(flare_info.get('peak_time') or flare_info.get('time'))
+        sample_series = proton_series['>=10 MeV'] or proton_series['>=50 MeV'] or proton_series['>=100 MeV']
+        if peak_time and sample_series and sample_series[0][0] <= peak_time <= sample_series[-1][0]:
+            ax_proton.axvline(peak_time, color=palette['accent'], linewidth=1.5, linestyle='--', alpha=0.92)
+        ax_proton.axhline(10, color='#facc15', linewidth=1.0, linestyle='--', alpha=0.45)
+        ax_proton.axhline(100, color='#f97316', linewidth=1.0, linestyle='--', alpha=0.45)
+        ax_proton.axhline(1000, color='#ef4444', linewidth=1.0, linestyle='--', alpha=0.45)
+        ax_proton.set_yscale('log')
+        ax_proton.set_ylim(1e-2, 1e5)
+        sample_series_times = [point[0] for point in sample_series]
+        ax_proton.set_xlim(sample_series_times[0], sample_series_times[-1])
+        ax_proton.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+        ax_proton.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d\n%H:%M'))
+        ax_proton.grid(True, which='major', axis='x', color='#334155', alpha=0.28, linewidth=0.7)
+        ax_proton.grid(True, which='major', axis='y', color='#334155', alpha=0.22, linewidth=0.7)
+        ax_proton.legend(loc='upper left', bbox_to_anchor=(0.015, 0.84), fontsize=9, frameon=False, labelcolor=bright_text)
+        label_transform = blended_transform_factory(ax_proton.transAxes, ax_proton.transData)
+        ax_proton.text(0.985, 10, 'S1', transform=label_transform, ha='right', va='bottom', fontsize=8.8, color='#facc15', fontweight='bold')
+        ax_proton.text(0.985, 100, 'S2', transform=label_transform, ha='right', va='bottom', fontsize=8.8, color='#f97316', fontweight='bold')
+        ax_proton.text(0.985, 1000, 'S3+', transform=label_transform, ha='right', va='bottom', fontsize=8.8, color='#ef4444', fontweight='bold')
+        latest_p10 = proton_series['>=10 MeV'][-1][1] if proton_series['>=10 MeV'] else None
+        add_chart_header(ax_proton, 'GOES Proton Flux', f"Current S{proton_flux_to_s_scale(latest_p10)}" if latest_p10 is not None else 'Current S0')
+    else:
+        ax_proton.text(0.5, 0.5, 'Proton chart unavailable', ha='center', va='center', color=muted_text, fontsize=13, transform=ax_proton.transAxes)
+        ax_proton.set_xticks([])
+        ax_proton.set_yticks([])
+        add_chart_header(ax_proton, 'GOES Proton Flux')
+
+    fig.text(0.03, 0.03, 'NOAA SWPC live data | GOES and SDO imagery', ha='left', va='bottom', fontsize=9.5, color=muted_text, fontweight='bold')
+    fig.text(0.97, 0.03, 'spacewx.weathertrackus.com', ha='right', va='bottom', fontsize=11, color='#e2e8f0', fontweight='bold')
+
+    return _figure_to_png_buffer(
+        fig,
+        dpi=160,
+        facecolor=figure_bg,
+        edgecolor='none',
+        bbox_inches='tight',
+        pad_inches=0.22
+    )
+
 def fetch_ovation_data():
     """Fetch the latest OVATION auroral probability data from SWPC"""
     try:
@@ -650,7 +1622,7 @@ def extract_ovation_north_frame(snapshot_payload):
         or snapshot_payload.get('generated_at')
     )
 
-    coords = np.array(snapshot_payload['coordinates'])
+    coords = np.asarray(snapshot_payload['coordinates'], dtype=np.float32)
     lons = coords[:, 0]
     lats = coords[:, 1]
     aurora_vals = coords[:, 2]
@@ -1562,13 +2534,13 @@ def generate_aurora_image():
     fig.text(0.98, 0.01, footer_right, ha='right', va='bottom', fontsize=9,
              color=footer_color, fontweight='bold')
     
-    # Save to BytesIO
-    buf = BytesIO()
-    plt.savefig(buf, format='png', dpi=150, facecolor='#0f172a', edgecolor='none', bbox_inches='tight')
-    buf.seek(0)
-    plt.close(fig)
-    
-    return buf
+    return _figure_to_png_buffer(
+        fig,
+        dpi=150,
+        facecolor='#0f172a',
+        edgecolor='none',
+        bbox_inches='tight'
+    )
 
 @app.route('/')
 def index():
@@ -2117,6 +3089,63 @@ def get_solar_data():
         return jsonify(data)
     return jsonify({'error': 'Failed to fetch data'}), 500
 
+
+@app.route('/api/flare-alert')
+def get_flare_alert():
+    """Return the latest flare alert summary for popup notifications."""
+    payload = fetch_latest_flare_alert()
+    flare = payload.get('flare')
+    if flare:
+        graphic_params = {
+            'event_class': flare.get('event_class') or '',
+            'start_time': flare.get('time') or '',
+            'peak_time': flare.get('peak_time') or '',
+            'end_time': flare.get('end_time') or '',
+            'region': flare.get('region_number') or '',
+            'location': flare.get('location') or '',
+            'source_region': flare.get('source_region') or '',
+            'r_scale': flare.get('r_scale_label') or '',
+        }
+        flare['graphic_url'] = '/api/flare-alert-graphic?' + '&'.join(
+            f"{key}={requests.utils.quote(str(value))}" for key, value in graphic_params.items() if value
+        )
+
+    response = jsonify(payload)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@app.route('/api/flare-alert-graphic')
+def get_flare_alert_graphic():
+    """Render a shareable flare alert graphic using live imagery and charts."""
+    flare_payload = fetch_latest_flare_alert()
+    flare = dict(flare_payload.get('flare') or {})
+
+    event_class = normalize_flare_class(request.args.get('event_class'))
+    if event_class:
+        flare.update({
+            'event_class': event_class,
+            'source_region': request.args.get('source_region') or flare.get('source_region'),
+            'region_number': request.args.get('region') or flare.get('region_number'),
+            'location': request.args.get('location') or flare.get('location'),
+            'time': request.args.get('start_time') or flare.get('time'),
+            'peak_time': request.args.get('peak_time') or flare.get('peak_time'),
+            'end_time': request.args.get('end_time') or flare.get('end_time'),
+        })
+
+    if not flare or not flare.get('event_class'):
+        return jsonify({'error': 'No recent flare alert available'}), 404
+
+    peak_dt = parse_swpc_datetime(flare.get('peak_time')) or parse_swpc_datetime(flare.get('time')) or datetime.now(timezone.utc)
+    flare['peak_time_display'] = format_utc_display(peak_dt)
+    flare['event_time_display'] = format_utc_display(parse_swpc_datetime(flare.get('time')) or peak_dt)
+    flare['r_scale_label'] = request.args.get('r_scale') or flare.get('r_scale_label') or f"R{flare_flux_to_r_scale(flare_class_to_flux(flare.get('event_class')))}"
+
+    image_buffer = draw_flare_alert_graphic(flare)
+    response = send_file(image_buffer, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
 @app.route('/api/xray-data')
 def get_xray_data():
     """Get X-ray flux data with specified time range"""
@@ -2246,8 +3275,11 @@ def get_aurora_image():
         else:
             img = generate_full_dashboard_image()
             img_buffer = BytesIO()
-            img.save(img_buffer, format='PNG')
-            img_buffer.seek(0)
+            try:
+                img.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+            finally:
+                img.close()
 
         force_download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
         return send_file(img_buffer, mimetype='image/png', as_attachment=force_download, 
@@ -2382,16 +3414,30 @@ def generate_solar_wind_chart(times, values, label, color, current_value=None, u
     
     plt.tight_layout()
     
-    # Save to buffer with higher DPI
-    buf = BytesIO()
-    plt.savefig(buf, format='png', dpi=120, facecolor='#0f172a', edgecolor='none', bbox_inches='tight')
-    buf.seek(0)
-    plt.close(fig)
-    
-    return Image.open(buf)
+    buf = _figure_to_png_buffer(
+        fig,
+        dpi=120,
+        facecolor='#0f172a',
+        edgecolor='none',
+        bbox_inches='tight'
+    )
+    try:
+        chart_img = Image.open(buf).convert('RGBA')
+        chart_img.load()
+        return chart_img
+    finally:
+        buf.close()
 
 
-def generate_full_dashboard_image(frame_time=None, time_window_end=None):
+def generate_full_dashboard_image(
+    frame_time=None,
+    time_window_end=None,
+    solar_wind_full=None,
+    kp_data=None,
+    scales=None,
+    ovation_snapshot=None,
+    map_image=None
+):
     """
     Generate a complete dashboard image with map and all charts (server-side).
     This mimics what the frontend does with canvas composition.
@@ -2404,12 +3450,14 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
         PIL Image object with the complete dashboard
     """
     from PIL import Image, ImageDraw, ImageFont
-    import io
     
     # Fetch all current data
-    solar_wind_full = fetch_solar_wind_history()
-    kp_data = fetch_kp_index()
-    scales = fetch_noaa_scales()
+    if solar_wind_full is None:
+        solar_wind_full = fetch_solar_wind_history()
+    if kp_data is None:
+        kp_data = fetch_kp_index()
+    if scales is None:
+        scales = fetch_noaa_scales()
     
     # Create sliding window effect for animation
     if time_window_end and solar_wind_full:
@@ -2441,15 +3489,30 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
     canvas = Image.new('RGB', (canvas_width, canvas_height), bg_color)
     draw = ImageDraw.Draw(canvas)
     
-    # Generate aurora map (left side)
-    map_buffer = generate_map_image()
-    map_img = Image.open(map_buffer)
-    
     # Resize map to fit left half
     map_width = 1150
     map_height = canvas_height
-    map_img = map_img.resize((map_width, map_height), Image.Resampling.LANCZOS)
-    canvas.paste(map_img, (0, 0))
+
+    if map_image is None:
+        map_buffer = generate_map_image(ovation_snapshot=ovation_snapshot)
+        try:
+            with Image.open(map_buffer) as map_src:
+                source_map = map_src.convert('RGBA')
+        finally:
+            map_buffer.close()
+        close_source_map = True
+    else:
+        source_map = map_image
+        close_source_map = False
+
+    try:
+        resized_map = source_map.resize((map_width, map_height), Image.Resampling.LANCZOS)
+        canvas.paste(resized_map, (0, 0), resized_map if resized_map.mode == 'RGBA' else None)
+    finally:
+        if 'resized_map' in locals():
+            resized_map.close()
+        if close_source_map:
+            source_map.close()
     
     # Right side: Generate solar wind charts
     right_x = 1180
@@ -2467,7 +3530,10 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
             ' km/s',
             'SOLAR WIND SPEED'
         )
-        canvas.paste(speed_chart, (right_x, chart_y_start), speed_chart if speed_chart.mode == 'RGBA' else None)
+        try:
+            canvas.paste(speed_chart, (right_x, chart_y_start), speed_chart if speed_chart.mode == 'RGBA' else None)
+        finally:
+            speed_chart.close()
         
         density_chart = generate_solar_wind_chart(
             times, solar_wind['densities'],
@@ -2476,7 +3542,10 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
             ' p/cm³',
             'PROTON DENSITY'
         )
-        canvas.paste(density_chart, (right_x, chart_y_start + chart_spacing), density_chart if density_chart.mode == 'RGBA' else None)
+        try:
+            canvas.paste(density_chart, (right_x, chart_y_start + chart_spacing), density_chart if density_chart.mode == 'RGBA' else None)
+        finally:
+            density_chart.close()
         
         bt_chart = generate_solar_wind_chart(
             times, solar_wind['bts'],
@@ -2485,7 +3554,10 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
             ' nT',
             'IMF Bt'
         )
-        canvas.paste(bt_chart, (right_x, chart_y_start + chart_spacing * 2), bt_chart if bt_chart.mode == 'RGBA' else None)
+        try:
+            canvas.paste(bt_chart, (right_x, chart_y_start + chart_spacing * 2), bt_chart if bt_chart.mode == 'RGBA' else None)
+        finally:
+            bt_chart.close()
         
         bz_chart = generate_solar_wind_chart(
             times, solar_wind['bzs'],
@@ -2494,7 +3566,10 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
             ' nT',
             'IMF Bz'
         )
-        canvas.paste(bz_chart, (right_x, chart_y_start + chart_spacing * 3), bz_chart if bz_chart.mode == 'RGBA' else None)
+        try:
+            canvas.paste(bz_chart, (right_x, chart_y_start + chart_spacing * 3), bz_chart if bz_chart.mode == 'RGBA' else None)
+        finally:
+            bz_chart.close()
     
     # Add Kp index panel (top right)
     try:
@@ -2538,6 +3613,16 @@ def generate_full_dashboard_image(frame_time=None, time_window_end=None):
     return canvas
 
 
+def _prepare_gif_frame(image):
+    """Convert a full RGB/RGBA frame to GIF palette mode before storing it."""
+    palette_mode = getattr(getattr(Image, 'Palette', None), 'ADAPTIVE', None)
+    if palette_mode is None:
+        palette_mode = Image.ADAPTIVE
+    frame = image.convert('P', palette=palette_mode, colors=256)
+    frame.load()
+    return frame
+
+
 def generate_historical_gif(hours_back=2, frame_interval_minutes=5, output_filename=None, frame_duration=500):
     """
     Generate an animated GIF from HISTORICAL aurora data.
@@ -2579,8 +3664,26 @@ def generate_historical_gif(hours_back=2, frame_interval_minutes=5, output_filen
     
     output_path = os.path.join(output_dir, output_filename)
     
-    # Generate frames from historical data
+    # Generate frames from historical data. Source data and the map are reused
+    # across frames so only the time-windowed charts need to change.
     frames = []
+    solar_wind_full = fetch_solar_wind_history() or {}
+    kp_data = fetch_kp_index() or {}
+    scales = fetch_noaa_scales() or {}
+    ovation_snapshot = None
+    shared_map_image = None
+
+    try:
+        ovation_snapshot = fetch_ovation_latest_snapshot()
+        map_buffer = generate_map_image(ovation_snapshot=ovation_snapshot)
+        try:
+            with Image.open(map_buffer) as map_src:
+                shared_map_image = map_src.convert('RGBA')
+                shared_map_image.load()
+        finally:
+            map_buffer.close()
+    except Exception as e:
+        print(f"   Shared map pre-render failed, falling back per frame: {e}")
     
     for i in range(num_frames):
         frame_time = start_time + timedelta(minutes=i * frame_interval_minutes)
@@ -2589,8 +3692,19 @@ def generate_historical_gif(hours_back=2, frame_interval_minutes=5, output_filen
         
         try:
             # Generate the FULL dashboard image with sliding time window for animation
-            img = generate_full_dashboard_image(frame_time, time_window_end=frame_time)
-            frames.append(img)
+            img = generate_full_dashboard_image(
+                frame_time,
+                time_window_end=frame_time,
+                solar_wind_full=solar_wind_full,
+                kp_data=kp_data,
+                scales=scales,
+                ovation_snapshot=ovation_snapshot,
+                map_image=shared_map_image
+            )
+            try:
+                frames.append(_prepare_gif_frame(img))
+            finally:
+                img.close()
             
             print(f" ✓")
             
@@ -2601,27 +3715,37 @@ def generate_historical_gif(hours_back=2, frame_interval_minutes=5, output_filen
             continue
     
     if len(frames) == 0:
+        if shared_map_image is not None:
+            shared_map_image.close()
         raise Exception("Failed to generate any frames")
     
     # Save as animated GIF
     print(f"\n💾 Saving GIF to {output_path}...")
-    frames[0].save(
-        output_path,
-        save_all=True,
-        append_images=frames[1:],
-        duration=frame_duration,
-        loop=0,
-        optimize=False
-    )
+    frame_count = len(frames)
+    try:
+        frames[0].save(
+            output_path,
+            save_all=True,
+            append_images=frames[1:],
+            duration=frame_duration,
+            loop=0,
+            optimize=False
+        )
+    finally:
+        for frame in frames:
+            frame.close()
+        frames.clear()
+        if shared_map_image is not None:
+            shared_map_image.close()
     
     # Calculate stats
     file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-    total_animation_duration = (len(frames) * frame_duration) / 1000
+    total_animation_duration = (frame_count * frame_duration) / 1000
     
     print(f"\n✅ Animation complete!")
     print(f"   File: {output_path}")
     print(f"   Size: {file_size_mb:.2f} MB")
-    print(f"   Frames: {len(frames)}")
+    print(f"   Frames: {frame_count}")
     print(f"   Playback duration: {total_animation_duration:.1f} seconds")
     print(f"   Time period: {hours_back} hours")
     
@@ -2684,9 +3808,13 @@ def generate_animated_gif(hours_duration=2, frame_interval_minutes=1, output_fil
             # Capture current dashboard state
             img_buffer = generate_aurora_image()
             
-            # Convert to PIL Image
+            # Convert to a palette frame before storing to keep long captures lighter.
             img_buffer.seek(0)
-            frame = Image.open(img_buffer).copy()  # Copy to ensure it's in memory
+            try:
+                with Image.open(img_buffer) as frame_src:
+                    frame = _prepare_gif_frame(frame_src)
+            finally:
+                img_buffer.close()
             
             frames.append(frame)
             print(" ✓")
@@ -2713,22 +3841,28 @@ def generate_animated_gif(hours_duration=2, frame_interval_minutes=1, output_fil
     # Save as animated GIF
     print(f"")
     print(f"💾 Saving animated GIF to: {output_path}")
-    frames[0].save(
-        output_path,
-        save_all=True,
-        append_images=frames[1:],
-        duration=frame_duration,
-        loop=0,
-        optimize=True
-    )
+    frame_count = len(frames)
+    try:
+        frames[0].save(
+            output_path,
+            save_all=True,
+            append_images=frames[1:],
+            duration=frame_duration,
+            loop=0,
+            optimize=True
+        )
+    finally:
+        for frame in frames:
+            frame.close()
+        frames.clear()
     
     file_size = os.path.getsize(output_path) / (1024 * 1024)  # MB
-    total_animation_duration = len(frames) * frame_duration / 1000
+    total_animation_duration = frame_count * frame_duration / 1000
     
     print(f"✅ Animation complete!")
     print(f"   File: {output_path}")
     print(f"   Size: {file_size:.2f} MB")
-    print(f"   Frames: {len(frames)}")
+    print(f"   Frames: {frame_count}")
     print(f"   Playback duration: {total_animation_duration:.1f} seconds")
     print(f"   Time period captured: {hours_duration} hours")
     
@@ -2990,11 +4124,14 @@ def generate_solar_overview():
             ax4.set_title('GOES-19 CCOR-1 Coronagraph', color='#e2e8f0', 
                          fontsize=16, fontweight='bold', pad=12, loc='center')
         
-        # Save to BytesIO
-        buf = BytesIO()
-        plt.savefig(buf, format='png', dpi=150, facecolor='#0f172a', edgecolor='none', bbox_inches='tight', pad_inches=0.3)
-        buf.seek(0)
-        plt.close(fig)
+        buf = _figure_to_png_buffer(
+            fig,
+            dpi=150,
+            facecolor='#0f172a',
+            edgecolor='none',
+            bbox_inches='tight',
+            pad_inches=0.3
+        )
         
         print("[SOLAR_OVERVIEW] Solar overview PNG generated successfully")
         return send_file(buf, mimetype='image/png', as_attachment=True,
@@ -3100,9 +4237,9 @@ def generate_map_image(ovation_snapshot=None):
                 filtered_aurora[wrap_mask_right]
             ])
             
-            # Create high-resolution grid for smoother interpolation
-            lon_grid = np.linspace(-180, 180, 1080)  # Higher resolution for smoother oval
-            lat_grid = np.linspace(35, 85, 300)  # Higher resolution for smoother oval
+            # Create a smooth-enough grid without keeping several huge arrays resident.
+            lon_grid = np.linspace(-180, 180, 720)
+            lat_grid = np.linspace(35, 85, 240)
             lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
             
             # Interpolate using cubic method for smoother results
@@ -3232,45 +4369,55 @@ def generate_map_image(ovation_snapshot=None):
         matplotlib.patheffects.withStroke(linewidth=3, foreground='#0f172a', alpha=0.9)
     ])
 
-    # Save to BytesIO
-    buf = BytesIO()
-    plt.savefig(buf, format='png', dpi=150, facecolor='none', edgecolor='none', bbox_inches='tight')
-    buf.seek(0)
-    plt.close(fig)
+    buf = _figure_to_png_buffer(
+        fig,
+        dpi=150,
+        facecolor='none',
+        edgecolor='none',
+        bbox_inches='tight'
+    )
 
     # Composite the WTUS logo after rendering so it always sits above the map layers.
+    base_img = None
+    logo_img = None
+    logo_resized = None
+    composited = None
     try:
-        base_img = Image.open(buf).convert('RGBA')
+        with Image.open(buf) as base_src:
+            base_img = base_src.convert('RGBA')
         logo_path = os.path.join(os.path.dirname(__file__), 'wtusredlogotransparentx.png')
-        logo_img = Image.open(logo_path).convert('RGBA')
+        with Image.open(logo_path) as logo_src:
+            logo_img = logo_src.convert('RGBA')
 
         base_width, base_height = base_img.size
         target_logo_width = max(82, int(base_width * 0.115))
         aspect_ratio = logo_img.height / logo_img.width if logo_img.width else 1
         target_logo_height = max(24, int(target_logo_width * aspect_ratio))
-        logo_img = logo_img.resize((target_logo_width, target_logo_height), Image.Resampling.LANCZOS)
-
-        # Add a soft shadow plate so the red logo stays readable over bright aurora regions.
-        shadow_pad = max(8, int(base_width * 0.006))
-        shadow = Image.new('RGBA', (target_logo_width + shadow_pad * 2, target_logo_height + shadow_pad * 2), (0, 0, 0, 0))
-        shadow_alpha = Image.new('L', shadow.size, 0)
-        shadow_alpha.paste(140, (shadow_pad, shadow_pad, shadow_pad + target_logo_width, shadow_pad + target_logo_height))
-        shadow.putalpha(shadow_alpha.filter(ImageFilter.GaussianBlur(radius=max(4, shadow_pad // 2))))
+        logo_resized = logo_img.resize((target_logo_width, target_logo_height), Image.Resampling.LANCZOS)
 
         margin_x = max(42, int(base_width * 0.07))
         margin_y = max(62, int(base_height * 0.115))
         logo_pos = (margin_x, base_height - target_logo_height - margin_y)
 
-        composited = Image.new('RGBA', base_img.size, (0, 0, 0, 0))
-        composited.alpha_composite(base_img, (0, 0))
-        composited.alpha_composite(logo_img, logo_pos)
+        composited = base_img.copy()
+        composited.alpha_composite(logo_resized, logo_pos)
 
         output_buf = BytesIO()
         composited.save(output_buf, format='PNG')
         output_buf.seek(0)
+        buf.close()
         buf = output_buf
     except Exception as e:
         print(f"Could not composite WTUS logo on aurora map: {e}")
+    finally:
+        if logo_img is not None:
+            logo_img.close()
+        if logo_resized is not None:
+            logo_resized.close()
+        if composited is not None:
+            composited.close()
+        if base_img is not None:
+            base_img.close()
     
     elapsed = time.time() - start_time
     print(f"[MAP] Generation completed in {elapsed:.2f}s")
@@ -3298,7 +4445,7 @@ def get_aurora_map_image():
         
         if not lock_acquired:
             # Timeout waiting for lock - return stale cache if available or error
-            stale_cached = _cache.get('aurora_map')
+            stale_cached = get_stale_cached('aurora_map')
             if stale_cached:
                 print("Map generation busy, returning stale cache")
                 buf = BytesIO(stale_cached)
@@ -3338,7 +4485,7 @@ def get_aurora_map_image():
         traceback.print_exc()
         
         # Try to return stale cache on error
-        stale_cached = _cache.get('aurora_map')
+        stale_cached = get_stale_cached('aurora_map')
         if stale_cached:
             print("Returning stale cache due to generation error")
             buf = BytesIO(stale_cached)
@@ -4566,59 +5713,103 @@ def get_dst_index():
     try:
         # Get time range parameter (default to 24h)
         time_range = request.args.get('range', '24h')
+
+        cache_key = f'dst_index_{time_range}'
+        cached = get_cached(cache_key, max_age_seconds=300)
+        if cached is not None:
+            return jsonify(cached)
         
         # NOAA provides estimated Dst values
         DST_URL = "https://services.swpc.noaa.gov/products/kyoto-dst.json"
         response = requests.get(DST_URL, timeout=10)
+        response.raise_for_status()
         
-        if response.status_code == 200:
-            data = response.json()
-            # Skip header row and convert to structured format
-            dst_values = []
-            for row in data[1:]:  # Skip header
-                if len(row) >= 2:
-                    try:
-                        dst_values.append({
-                            'time': row[0],  # ISO timestamp
-                            'dst': float(row[1])  # Dst value in nT
-                        })
-                    except (ValueError, IndexError):
-                        continue
-            
-            # Filter by time range
-            from datetime import datetime, timedelta
-            now = datetime.utcnow()
-            
-            # Parse time range
-            range_hours = {
-                '6h': 6,
-                '12h': 12,
-                '24h': 24,
-                '3d': 72,
-                '7d': 168
-            }.get(time_range, 24)  # Default to 24h
-            
-            cutoff_time = now - timedelta(hours=range_hours)
-            
-            # Filter data points within the time range
-            filtered_values = []
-            for point in dst_values:
+        data = response.json()
+        dst_values = []
+
+        if isinstance(data, list):
+            # SWPC currently returns objects:
+            # [{'time_tag': '2026-05-14T19:00:00', 'dst': 13}, ...]
+            # Older products may use a header row followed by arrays, so keep both.
+            header = None
+            rows = data
+            if rows and isinstance(rows[0], list):
+                header = [str(value).strip().lower() for value in rows[0]]
+                rows = rows[1:]
+
+            for row in rows:
                 try:
-                    point_time = datetime.fromisoformat(point['time'].replace('Z', '+00:00'))
-                    if point_time >= cutoff_time:
-                        filtered_values.append(point)
-                except (ValueError, AttributeError):
+                    if isinstance(row, dict):
+                        raw_time = next(
+                            (row.get(key) for key in ('time_tag', 'time', 'timestamp') if row.get(key) is not None),
+                            None
+                        )
+                        raw_dst = next(
+                            (row.get(key) for key in ('dst', 'DST', 'Dst') if row.get(key) is not None),
+                            None
+                        )
+                    elif isinstance(row, list):
+                        if header:
+                            row_map = {
+                                header[index]: row[index] if index < len(row) else None
+                                for index in range(len(header))
+                            }
+                            raw_time = row_map.get('time_tag') or row_map.get('time') or row_map.get('timestamp')
+                            raw_dst = row_map.get('dst')
+                        else:
+                            raw_time = row[0] if len(row) > 0 else None
+                            raw_dst = row[1] if len(row) > 1 else None
+                    else:
+                        continue
+
+                    point_time = parse_swpc_datetime(raw_time)
+                    dst = float(raw_dst)
+                    if point_time is None or abs(dst) >= 9999:
+                        continue
+
+                    dst_values.append({
+                        'time': point_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        'dst': dst
+                    })
+                except (TypeError, ValueError, IndexError):
                     continue
-            
-            return jsonify({
-                'dst_values': filtered_values,
-                'count': len(filtered_values),
-                'source': 'NOAA SWPC / Kyoto WDC',
-                'unit': 'nT',
-                'range': time_range
-            })
-        else:
-            return jsonify({'error': 'Failed to fetch Dst data', 'dst_values': []}), 500
+
+        range_hours = {
+            '6h': 6,
+            '12h': 12,
+            '24h': 24,
+            '3d': 72,
+            '7d': 168
+        }.get(time_range, 24)
+
+        parsed_points = [
+            (parse_swpc_datetime(point['time']), point)
+            for point in dst_values
+        ]
+        parsed_points = [
+            (point_time, point)
+            for point_time, point in parsed_points
+            if point_time is not None
+        ]
+        reference_time = max(
+            (point_time for point_time, _ in parsed_points),
+            default=datetime.now(timezone.utc)
+        )
+        cutoff_time = reference_time - timedelta(hours=range_hours)
+        filtered_values = []
+        for point_time, point in parsed_points:
+            if point_time >= cutoff_time:
+                filtered_values.append(point)
+
+        payload = {
+            'dst_values': filtered_values,
+            'count': len(filtered_values),
+            'source': 'NOAA SWPC / Kyoto WDC',
+            'unit': 'nT',
+            'range': time_range
+        }
+        set_cached(cache_key, payload, timeout=300)
+        return jsonify(payload)
             
     except Exception as e:
         print(f"Error fetching Dst index: {e}")

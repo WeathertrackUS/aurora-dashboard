@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/flare-alert.css">
     <style>
         /* Local Metropolis fallback - requires font files in static/fonts/metropolis/ */
         @font-face {
@@ -40,6 +41,7 @@
     <!-- ECharts for charting -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+    <script src="/static/flare-alert.js" defer></script>
     <style>
         :root {
             --bg-dark: #0a0a0a;
@@ -2089,7 +2091,7 @@
         }
     </style>
 </head>
-<body>
+<body data-flare-alert-enabled="false">
     <div class="bg-noise"></div>
     <nav class="navbar">
         <a href="/" class="brand">
@@ -2392,13 +2394,11 @@
             }
             
             // Show loading overlay immediately for initial map load
-            const loadingOverlay = document.getElementById('loading-overlay');
             if (loadingOverlay) {
                 loadingOverlay.classList.add('active');
             }
             
             // Preload the initial map image with retry logic
-            const mapImage = document.getElementById('map-image');
             if (mapImage) {
                 // Hide the img initially to prevent flash of broken image
                 mapImage.style.opacity = '0';
@@ -2523,6 +2523,7 @@
         }
         
         let currentDstRange = '24h';
+        let latestDstData = [];
 
         function parseDstTimestamp(value) {
             if (value instanceof Date) {
@@ -2596,13 +2597,20 @@
         async function fetchDstData() {
             try {
                 const response = await fetch(`/api/dst-index?range=${currentDstRange}`);
+                if (!response.ok) {
+                    throw new Error(`Dst request failed: ${response.status}`);
+                }
                 const data = await response.json();
                 if (data.dst_values && data.dst_values.length > 0) {
                     latestDstData = data.dst_values;
                     plotDstChart(data.dst_values);
+                } else {
+                    latestDstData = [];
+                    plotDstChart([]);
                 }
             } catch (error) {
                 console.error('Error fetching Dst data:', error);
+                plotDstChart([]);
             }
         }
         
@@ -2610,28 +2618,62 @@
         window.echartsInstances = window.echartsInstances || {};
         
         function plotDstChart(dstData) {
-            const times = dstData.map(d => d.time);
-            const values = dstData.map(d => d.dst);
+            const chartData = (Array.isArray(dstData) ? dstData : [])
+                .map(d => ({
+                    time: d.time,
+                    value: Number(d.dst)
+                }))
+                .filter(d => d.time && Number.isFinite(d.value));
+            const times = chartData.map(d => d.time);
+            const values = chartData.map(d => d.value);
+            const container = document.getElementById('chart-dst');
+            const dstEl = document.getElementById('chart-val-dst');
+
+            if (!container) return;
+
+            if (!values.length) {
+                if (dstEl) {
+                    dstEl.textContent = '--';
+                    dstEl.style.color = 'var(--text-secondary)';
+                }
+                if (window.echartsInstances['chart-dst']) {
+                    window.echartsInstances['chart-dst'].dispose();
+                }
+                const chart = echarts.init(container);
+                window.echartsInstances['chart-dst'] = chart;
+                chart.setOption({
+                    backgroundColor: 'transparent',
+                    graphic: {
+                        type: 'text',
+                        left: 'center',
+                        top: 'middle',
+                        style: {
+                            text: 'No Dst data',
+                            fill: '#8b8b8b',
+                            fontSize: 12
+                        }
+                    }
+                });
+                return;
+            }
             
             // Update current value display
             if (values.length > 0) {
                 const currentDst = values[values.length - 1];
-                const dstEl = document.getElementById('chart-val-dst');
-                dstEl.textContent = currentDst.toFixed(0) + ' nT';
+                if (dstEl) dstEl.textContent = currentDst.toFixed(0) + ' nT';
                 
                 // Color code based on severity
                 if (currentDst <= -100) {
-                    dstEl.style.color = '#dc2626';
+                    if (dstEl) dstEl.style.color = '#dc2626';
                 } else if (currentDst <= -50) {
-                    dstEl.style.color = '#f97316';
+                    if (dstEl) dstEl.style.color = '#f97316';
                 } else if (currentDst <= -20) {
-                    dstEl.style.color = '#fbbf24';
+                    if (dstEl) dstEl.style.color = '#fbbf24';
                 } else {
-                    dstEl.style.color = '#22c55e';
+                    if (dstEl) dstEl.style.color = '#22c55e';
                 }
             }
             
-            const container = document.getElementById('chart-dst');
             if (window.echartsInstances['chart-dst']) {
                 window.echartsInstances['chart-dst'].dispose();
             }
@@ -2668,13 +2710,15 @@
                 yAxis: {
                     type: 'value',
                     scale: true,
+                    min: yMin,
+                    max: yMax,
                     axisLine: { lineStyle: { color: '#444' } },
                     axisLabel: { color: '#8b8b8b', fontSize: 8 },
                     splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
                 },
                 series: [{
                     type: 'line',
-                    data: values,
+                    data: chartData,
                     smooth: true,
                     symbol: 'none',
                     lineStyle: {
@@ -2714,8 +2758,9 @@
                     textStyle: { color: '#fff', fontSize: 11 },
                     formatter: function(params) {
                         const point = params[0];
-                        const formattedTime = formatDstTimestamp(point.data && point.data.time ? point.data.time : point.axisValue);
-                        return point.value.toFixed(0) + ' nT<br>' + formattedTime;
+                        const value = typeof point.value === 'number' ? point.value : point.data?.value;
+                        const formattedTime = formatDstTimestamp(point.data?.time || point.axisValue);
+                        return Number(value).toFixed(0) + ' nT<br>' + formattedTime;
                     }
                 }
             };
@@ -3007,6 +3052,48 @@
                 console.warn('Chart data not ready yet');
                 return;
             }
+
+            function normalizeSolarWindHistory(history) {
+                if (!history || !Array.isArray(history.times) || history.times.length === 0) {
+                    return null;
+                }
+
+                const normalized = {
+                    times: [],
+                    speeds: [],
+                    densities: [],
+                    bts: [],
+                    bzs: []
+                };
+                const seriesKeys = ['speeds', 'densities', 'bts', 'bzs'];
+
+                history.times.forEach((rawTime, index) => {
+                    const parsedTime = new Date(rawTime);
+                    if (Number.isNaN(parsedTime.getTime())) {
+                        return;
+                    }
+
+                    normalized.times.push(parsedTime.toISOString());
+                    seriesKeys.forEach((key) => {
+                        const rawValue = Array.isArray(history[key]) ? history[key][index] : null;
+                        if (rawValue === null || rawValue === undefined || rawValue === '') {
+                            normalized[key].push(null);
+                            return;
+                        }
+
+                        const numericValue = Number(rawValue);
+                        normalized[key].push(Number.isFinite(numericValue) ? numericValue : null);
+                    });
+                });
+
+                return normalized.times.length > 0 ? normalized : null;
+            }
+
+            const hist = normalizeSolarWindHistory(data.solar_wind_history);
+            if (!hist) {
+                console.warn('Solar wind history could not be normalized');
+                return;
+            }
             
             // Mobile-optimized margins and font sizes
             const mobileFontSize = isMobile ? 8 : 10;
@@ -3035,7 +3122,7 @@
             // Based on 10-min average solar wind speed to calculate L1->Earth travel time
             let earthNowTimeIso = null;
             try {
-                const sw = data.solar_wind_history;
+                const sw = hist;
                 if (sw && sw.times && sw.speeds && sw.times.length && sw.speeds.length) {
                     // Calculate 10-minute average speed (last 10 data points, assuming 1-min intervals)
                     const count = Math.min(10, sw.speeds.length);
@@ -3112,144 +3199,136 @@
             };
 
             // 1. Solar Wind Speed with Gradient Fill
-            if (data.solar_wind_history && data.solar_wind_history.times && data.solar_wind_history.speeds) {
-                const hist = data.solar_wind_history;
+            if (hist.times && hist.speeds) {
                 
                 // Validate data exists and has minimum length
                 if (!hist.speeds || hist.speeds.length === 0 || !hist.times || hist.times.length === 0) {
                     console.warn('No speed data available');
-                    return;
-                }
-                
-                if (hist.speeds.length !== hist.times.length) {
-                    console.warn('Speed and time data length mismatch');
-                    return;
-                }
-                
-                // Remove single-point spikes from speed data
-                const cleanedSpeeds = hist.speeds.map((val, idx, arr) => {
-                    if (val === null || val === undefined) return null;
-                    if (idx === 0 || idx === arr.length - 1) return val;
-                    const prev = arr[idx - 1];
-                    const next = arr[idx + 1];
-                    if (prev !== null && next !== null) {
-                        const avgNeighbor = (prev + next) / 2;
-                        const deviation = Math.abs(val - avgNeighbor);
-                        if (deviation > 150) return avgNeighbor;
-                    }
-                    return val;
-                });
-                hist.speeds = cleanedSpeeds;
-                
-                const speeds = hist.speeds.filter(s => s !== null && !isNaN(s));
-                if (speeds.length === 0) {
-                    console.warn('No valid speed data after filtering');
-                    return;
-                }
-                const maxSpeed = Math.max(...speeds, 400);
-                const minSpeed = Math.min(...speeds, 200);
-                const yMin = Math.max(250, Math.floor((Math.min(minSpeed, 420) - 40) / 25) * 25);
-                const yMax = Math.max(825, Math.ceil((maxSpeed + 80) / 25) * 25);
-                
-                // Use an explicit speed scale so the color bands stay consistent across refreshes.
-                // 500 km/s should sit in the yellow band rather than looking quiet/green.
-                function normalizeValue(val) {
-                    return Math.max(0, Math.min(1, (val - yMin) / (yMax - yMin)));
-                }
-                
-                const chart = getChartInstance('chart-speed');
-                if (chart) {
-                    // Format data for time-based rendering
-                    const timeSeriesData = hist.times.map((time, idx) => [time, hist.speeds[idx]]);
-                    
-                    if (earthNowTimeIso) {
-                        console.log('[EARTH_LINE_DEBUG] Speed chart - Last time:', hist.times[hist.times.length - 1], 
-                                    'Earth NOW:', earthNowTimeIso, 'Earth NOW ms:', new Date(earthNowTimeIso).getTime());
-                    }
-                    
-                    chart.setOption({
-                        backgroundColor: 'transparent',
-                        grid: commonGrid,
-                        xAxis: {
-                            type: 'time',
-                            axisLine: { show: false },
-                            axisTick: { show: false },
-                            axisLabel: { 
-                                color: '#94a3b8', 
-                                fontSize: mobileFontSize,
-                                formatter: chartTimeFormatter
-                            },
-                            splitLine: { show: false }
-                        },
-                        yAxis: {
-                            ...commonYAxis,
-                            min: yMin,
-                            max: yMax
-                        },
-                        tooltip: {
-                            trigger: 'axis',
-                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                            borderColor: 'rgba(255,255,255,0.1)',
-                            textStyle: { color: '#f8fafc' },
-                            formatter: (params) => `${Math.round(params[0].value[1])} km/s`
-                        },
-                        series: [{
-                            type: 'line',
-                            data: timeSeriesData,
-                            smooth: 0.2,
-                            symbol: 'none',
-                            lineStyle: { color: '#f8fafc', width: 2.5 },
-                            areaStyle: {
-                                color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
-                                    { offset: 0, color: 'rgba(34, 197, 94, 0.30)' },
-                                    { offset: normalizeValue(325), color: 'rgba(34, 197, 94, 0.28)' },
-                                    { offset: normalizeValue(400), color: 'rgba(163, 230, 53, 0.30)' },
-                                    { offset: normalizeValue(475), color: 'rgba(234, 179, 8, 0.32)' },
-                                    { offset: normalizeValue(550), color: 'rgba(245, 158, 11, 0.33)' },
-                                    { offset: normalizeValue(650), color: 'rgba(249, 115, 22, 0.35)' },
-                                    { offset: normalizeValue(775), color: 'rgba(239, 68, 68, 0.38)' },
-                                    { offset: normalizeValue(900), color: 'rgba(220, 38, 38, 0.42)' },
-                                    { offset: 1, color: 'rgba(190, 24, 93, 0.40)' }
-                                ])
-                            },
-                            markLine: earthNowTimeIso ? {
-                                silent: false,
-                                symbol: 'none',
-                                label: {
-                                    show: true,
-                                    formatter: 'Earth',
-                                    color: '#60a5fa',
-                                    fontSize: isMobile ? 9 : 11,
-                                    position: 'end'
-                                },
-                                lineStyle: {
-                                    color: '#60a5fa',
-                                    width: 2,
-                                    type: 'dashed'
-                                },
-                                data: [{ xAxis: new Date(earthNowTimeIso).getTime() }]
-                            } : undefined
-                        }]
+                } else {
+                    // Remove single-point spikes from speed data
+                    const cleanedSpeeds = hist.speeds.map((val, idx, arr) => {
+                        if (val === null || val === undefined) return null;
+                        if (idx === 0 || idx === arr.length - 1) return val;
+                        const prev = arr[idx - 1];
+                        const next = arr[idx + 1];
+                        if (prev !== null && next !== null) {
+                            const avgNeighbor = (prev + next) / 2;
+                            const deviation = Math.abs(val - avgNeighbor);
+                            if (deviation > 150) return avgNeighbor;
+                        }
+                        return val;
                     });
-                }
-                
-                const lastVal = hist.speeds[hist.speeds.length - 1];
-                const valElem = document.getElementById('chart-val-speed');
-                if (lastVal) {
-                    valElem.textContent = Math.round(lastVal) + ' km/s';
-                    if (lastVal >= 1000) valElem.style.color = '#ffffff';
-                    else if (lastVal >= 850) valElem.style.color = '#ec4899';
-                    else if (lastVal >= 775) valElem.style.color = '#ef4444';
-                    else if (lastVal >= 650) valElem.style.color = '#fb923c';
-                    else if (lastVal >= 475) valElem.style.color = '#facc15';
-                    else if (lastVal >= 400) valElem.style.color = '#d9f99d';
-                    else valElem.style.color = '#4ade80';
+                    hist.speeds = cleanedSpeeds;
+                    
+                    const speeds = hist.speeds.filter(s => s !== null && !isNaN(s));
+                    if (speeds.length === 0) {
+                        console.warn('No valid speed data after filtering');
+                    } else {
+                        const maxSpeed = Math.max(...speeds, 400);
+                        const minSpeed = Math.min(...speeds, 200);
+                        const yMin = Math.max(250, Math.floor((Math.min(minSpeed, 420) - 40) / 25) * 25);
+                        const yMax = Math.max(825, Math.ceil((maxSpeed + 80) / 25) * 25);
+                        
+                        // Use an explicit speed scale so the color bands stay consistent across refreshes.
+                        // 500 km/s should sit in the yellow band rather than looking quiet/green.
+                        function normalizeValue(val) {
+                            return Math.max(0, Math.min(1, (val - yMin) / (yMax - yMin)));
+                        }
+                        
+                        const chart = getChartInstance('chart-speed');
+                        if (chart) {
+                            // Format data for time-based rendering
+                            const timeSeriesData = hist.times.map((time, idx) => [time, hist.speeds[idx]]);
+                            
+                            if (earthNowTimeIso) {
+                                console.log('[EARTH_LINE_DEBUG] Speed chart - Last time:', hist.times[hist.times.length - 1], 
+                                            'Earth NOW:', earthNowTimeIso, 'Earth NOW ms:', new Date(earthNowTimeIso).getTime());
+                            }
+                            
+                            chart.setOption({
+                                backgroundColor: 'transparent',
+                                grid: commonGrid,
+                                xAxis: {
+                                    type: 'time',
+                                    axisLine: { show: false },
+                                    axisTick: { show: false },
+                                    axisLabel: { 
+                                        color: '#94a3b8', 
+                                        fontSize: mobileFontSize,
+                                        formatter: chartTimeFormatter
+                                    },
+                                    splitLine: { show: false }
+                                },
+                                yAxis: {
+                                    ...commonYAxis,
+                                    min: yMin,
+                                    max: yMax
+                                },
+                                tooltip: {
+                                    trigger: 'axis',
+                                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                    borderColor: 'rgba(255,255,255,0.1)',
+                                    textStyle: { color: '#f8fafc' },
+                                    formatter: (params) => `${Math.round(params[0].value[1])} km/s`
+                                },
+                                series: [{
+                                    type: 'line',
+                                    data: timeSeriesData,
+                                    smooth: 0.2,
+                                    symbol: 'none',
+                                    lineStyle: { color: '#f8fafc', width: 2.5 },
+                                    areaStyle: {
+                                        color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [
+                                            { offset: 0, color: 'rgba(34, 197, 94, 0.30)' },
+                                            { offset: normalizeValue(325), color: 'rgba(34, 197, 94, 0.28)' },
+                                            { offset: normalizeValue(400), color: 'rgba(163, 230, 53, 0.30)' },
+                                            { offset: normalizeValue(475), color: 'rgba(234, 179, 8, 0.32)' },
+                                            { offset: normalizeValue(550), color: 'rgba(245, 158, 11, 0.33)' },
+                                            { offset: normalizeValue(650), color: 'rgba(249, 115, 22, 0.35)' },
+                                            { offset: normalizeValue(775), color: 'rgba(239, 68, 68, 0.38)' },
+                                            { offset: normalizeValue(900), color: 'rgba(220, 38, 38, 0.42)' },
+                                            { offset: 1, color: 'rgba(190, 24, 93, 0.40)' }
+                                        ])
+                                    },
+                                    markLine: earthNowTimeIso ? {
+                                        silent: false,
+                                        symbol: 'none',
+                                        label: {
+                                            show: true,
+                                            formatter: 'Earth',
+                                            color: '#60a5fa',
+                                            fontSize: isMobile ? 9 : 11,
+                                            position: 'end'
+                                        },
+                                        lineStyle: {
+                                            color: '#60a5fa',
+                                            width: 2,
+                                            type: 'dashed'
+                                        },
+                                        data: [{ xAxis: new Date(earthNowTimeIso).getTime() }]
+                                    } : undefined
+                                }]
+                            });
+                        }
+                        
+                        const lastVal = hist.speeds[hist.speeds.length - 1];
+                        const valElem = document.getElementById('chart-val-speed');
+                        if (lastVal !== null && lastVal !== undefined) {
+                            valElem.textContent = Math.round(lastVal) + ' km/s';
+                            if (lastVal >= 1000) valElem.style.color = '#ffffff';
+                            else if (lastVal >= 850) valElem.style.color = '#ec4899';
+                            else if (lastVal >= 775) valElem.style.color = '#ef4444';
+                            else if (lastVal >= 650) valElem.style.color = '#fb923c';
+                            else if (lastVal >= 475) valElem.style.color = '#facc15';
+                            else if (lastVal >= 400) valElem.style.color = '#d9f99d';
+                            else valElem.style.color = '#4ade80';
+                        }
+                    }
                 }
             }
 
             // 2. Density with Gradient
-            if (data.solar_wind_history && data.solar_wind_history.densities) {
-                const hist = data.solar_wind_history;
+            if (hist.densities) {
                 const densities = hist.densities.filter(d => d !== null && !isNaN(d));
                 if (densities.length === 0) {
                     console.warn('No valid density data');
@@ -3334,13 +3413,12 @@
                     }
                     
                     const lastVal = hist.densities[hist.densities.length - 1];
-                    document.getElementById('chart-val-density').textContent = lastVal ? lastVal.toFixed(1) : '--';
+                    document.getElementById('chart-val-density').textContent = lastVal !== null && lastVal !== undefined ? lastVal.toFixed(1) : '--';
                 }
             }
 
             // 3. Bt with Gradient
-            if (data.solar_wind_history && data.solar_wind_history.bts) {
-                const hist = data.solar_wind_history;
+            if (hist.bts) {
                 const bts = hist.bts.filter(b => b !== null && !isNaN(b));
                 if (bts.length === 0) {
                     console.warn('No valid Bt data');
@@ -3422,13 +3500,12 @@
                     }
                     
                     const lastVal = hist.bts[hist.bts.length - 1];
-                    document.getElementById('chart-val-bt').textContent = lastVal ? lastVal.toFixed(1) + ' nT' : '--';
+                    document.getElementById('chart-val-bt').textContent = lastVal !== null && lastVal !== undefined ? lastVal.toFixed(1) + ' nT' : '--';
                 }
             }
 
             // 4. Bz - Bipolar fill (green for positive, red for negative)
-            if (data.solar_wind_history && data.solar_wind_history.bzs) {
-                const hist = data.solar_wind_history;
+            if (hist.bzs) {
                 const bzs = hist.bzs.filter(b => b !== null && !isNaN(b));
                 if (bzs.length === 0) {
                     console.warn('No valid Bz data');
@@ -3817,6 +3894,26 @@
                 gElem.style.color = 'var(--text-secondary)';
                 gElem.style.opacity = '0.5';
                 gElem.style.textShadow = 'none';
+            }
+
+            const solarWind = data.solar_wind || {};
+            const speedEl = document.getElementById('chart-val-speed');
+            const densityEl = document.getElementById('chart-val-density');
+            const btEl = document.getElementById('chart-val-bt');
+            const bzEl = document.getElementById('chart-val-bz');
+
+            if (solarWind.speed !== null && solarWind.speed !== undefined && speedEl && speedEl.textContent === '--') {
+                speedEl.textContent = Math.round(Number(solarWind.speed)) + ' km/s';
+            }
+            if (solarWind.density !== null && solarWind.density !== undefined && densityEl && densityEl.textContent === '--') {
+                densityEl.textContent = Number(solarWind.density).toFixed(1);
+            }
+            if (solarWind.bt !== null && solarWind.bt !== undefined && btEl && btEl.textContent === '--') {
+                btEl.textContent = Number(solarWind.bt).toFixed(1) + ' nT';
+            }
+            if (solarWind.bz !== null && solarWind.bz !== undefined && bzEl && bzEl.textContent === '--') {
+                bzEl.textContent = Number(solarWind.bz).toFixed(1) + ' nT';
+                bzEl.style.color = Number(solarWind.bz) < 0 ? '#ff4444' : '#4ade80';
             }
 
 

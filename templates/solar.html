@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/flare-alert.css">
     <style>
         /* Local Metropolis fallback - requires font files in static/fonts/metropolis/ */
         @font-face {
@@ -39,6 +40,7 @@
     </style>
     <!-- ECharts for charting -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="/static/flare-alert.js" defer></script>
     <style>
         :root {
             --bg-dark: #0a0d11;
@@ -2159,7 +2161,7 @@
         }
     </style>
 </head>
-<body>
+<body data-flare-alert-enabled="false">
     <div class="bg-noise"></div>
     <nav class="navbar">
         <a href="/" class="brand">
@@ -2196,7 +2198,10 @@
                 }
                 // Run immediately and every second
                 tick();
-                setInterval(tick, 1000);
+                if (!window.__solarUtcTimerStarted) {
+                    window.__solarUtcTimerStarted = true;
+                    window.__solarUtcTimerId = setInterval(tick, 1000);
+                }
             } catch (e) {
                 console.warn('UTC ticker failed:', e);
             }
@@ -4000,9 +4005,6 @@
             }
         }
 
-        // Auto-refresh solar data every 5 minutes
-        setInterval(fetchSolarData, 5 * 60 * 1000);
-
         async function loadHMIImages(regionNumber, location) {
             const intensitygramDiv = document.getElementById('hmi-intensitygram');
             const magnetogramDiv = document.getElementById('hmi-magnetogram');
@@ -4519,11 +4521,7 @@
         fetchF107Data();
         fetchCMEData();
         
-        // Refresh every 5 minutes
-        setInterval(fetchSolarData, 300000);
-        setInterval(fetchKpHistoryExtended, 300000);
-        setInterval(fetchSolarCycleData, 300000);
-        setInterval(fetchF107Data, 300000);
+        // Five-minute refreshes are driven by updateRefreshCountdown().
 
         // Handle window resize for charts - delegated to resizeAllCharts which uses ECharts API
 
@@ -4621,16 +4619,8 @@
                 timeElement.textContent = now.toISOString().slice(11, 16) + ' UTC';
             }
         }
-        // Start updates when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                updateUtcTime();
-                setInterval(updateUtcTime, 1000);
-            });
-        } else {
-            updateUtcTime();
-            setInterval(updateUtcTime, 1000);
-        }
+        // The navbar ticker above owns the repeating UTC interval.
+        updateUtcTime();
 
         // Tab Management
         function switchTab(tabName) {
@@ -5759,14 +5749,7 @@
             setInterval(checkSystemAlert, 5 * 60 * 1000);
         });
         
-        // Resize charts on window resize - uses ECharts resize API via resizeAllCharts()
-        let solarResizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(solarResizeTimeout);
-            solarResizeTimeout = setTimeout(() => {
-                resizeAllCharts();
-            }, 150);
-        });
+        // Resize charts on window resize via the shared debounced handler above.
 
         // Image load handler for smooth transitions
         function initImageLoadHandlers() {
@@ -5776,6 +5759,11 @@
                     img.classList.add('loaded');
                     img.parentElement.classList.add('loaded');
                 }
+
+                if (img.dataset.loadHandlersReady === '1') {
+                    return;
+                }
+                img.dataset.loadHandlersReady = '1';
                 
                 // Handle load event
                 img.addEventListener('load', function() {
