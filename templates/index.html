@@ -41,6 +41,8 @@
     <!-- ECharts for charting -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/flare-alert.js" defer></script>
     <style>
         :root {
@@ -159,10 +161,401 @@
         .aurora-map-frame {
             flex: 1;
             min-height: 0;
+            position: relative;
+            display: block;
+            overflow: hidden;
+            border-radius: 3px;
+            background: #071014;
+        }
+
+        .aurora-interactive-map {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: #071014;
+            z-index: 1;
+        }
+
+        .aurora-interactive-map .leaflet-control-zoom a {
+            background: rgba(10, 15, 20, 0.92);
+            border-bottom-color: rgba(180, 215, 228, 0.12);
+            color: var(--text-primary);
+        }
+
+        .aurora-interactive-map .leaflet-control-attribution {
+            background: rgba(5, 10, 14, 0.72);
+            color: rgba(237, 243, 247, 0.68);
+            font-size: 0.62rem;
+        }
+
+        .aurora-map-toolbar {
+            position: absolute;
+            top: 0.55rem;
+            left: 0.55rem;
+            right: 0.55rem;
+            z-index: 450;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.65rem;
+            pointer-events: none;
+        }
+
+        .aurora-map-title {
+            min-width: 0;
+            padding: 0.42rem 0.55rem;
+            border: 1px solid rgba(180, 215, 228, 0.14);
+            border-radius: 4px;
+            background: rgba(7, 13, 18, 0.78);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+            pointer-events: auto;
+        }
+
+        .aurora-map-title strong {
+            display: block;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .aurora-map-title span {
+            display: block;
+            margin-top: 0.12rem;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            line-height: 1.25;
+        }
+
+        .aurora-map-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.35rem;
+            pointer-events: auto;
+        }
+
+        .map-tool-btn {
+            border: 1px solid rgba(180, 215, 228, 0.14);
+            border-radius: 4px;
+            padding: 0.38rem 0.52rem;
+            background: rgba(7, 13, 18, 0.82);
+            color: var(--text-primary);
+            font: 700 0.68rem var(--font-sans);
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+        }
+
+        .map-tool-btn:hover {
+            border-color: rgba(139, 211, 207, 0.42);
+            color: var(--accent-primary);
+        }
+
+        .aurora-map-legend {
+            position: absolute;
+            left: 0.6rem;
+            bottom: 0.58rem;
+            z-index: 440;
+            width: min(220px, calc(100% - 1.2rem));
+            padding: 0.45rem 0.55rem;
+            border: 1px solid rgba(180, 215, 228, 0.13);
+            border-radius: 4px;
+            background: rgba(7, 13, 18, 0.76);
+            color: var(--text-secondary);
+            font-size: 0.64rem;
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+        }
+
+        .aurora-map-gradient {
+            height: 7px;
+            margin-bottom: 0.32rem;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #10b981, #84cc16, #facc15, #fb923c, #ef4444);
+        }
+
+        .aurora-map-legend-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .aurora-map-fallback {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .aurora-map-fallback.active {
+            opacity: 1;
+        }
+
+        .aurora-probability-popup .leaflet-popup-content-wrapper {
+            border: 1px solid rgba(143, 211, 207, 0.16);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(6, 12, 17, 0.985) 0%, rgba(9, 17, 24, 0.965) 100%);
+            box-shadow: 0 26px 58px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+            color: var(--text-primary);
+            padding: 0;
+            overflow: hidden;
+            backdrop-filter: blur(16px);
+        }
+
+        .aurora-probability-popup .leaflet-popup-content {
+            margin: 0;
+            min-width: 294px;
+        }
+
+        .aurora-probability-popup .leaflet-popup-tip {
+            background: rgba(9, 17, 24, 0.98);
+        }
+
+        .aurora-probability-popup .leaflet-popup-close-button {
+            top: 0.55rem;
+            right: 0.55rem;
+            width: 1.45rem;
+            height: 1.45rem;
+            border-radius: 999px;
+            color: rgba(237, 243, 247, 0.72);
+            font-size: 1rem;
+            line-height: 1.45rem;
+            transition: background 0.18s ease, color 0.18s ease;
+        }
+
+        .aurora-probability-popup .leaflet-popup-close-button:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+        }
+
+        .aurora-popup-card {
+            position: relative;
+            padding: 0.92rem 0.95rem 0.88rem;
+            font-family: 'Metropolis', var(--font-sans);
+            background:
+                linear-gradient(180deg, rgba(8, 13, 18, 0.985) 0%, rgba(9, 15, 21, 0.98) 100%);
+        }
+
+        .aurora-popup-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, color-mix(in srgb, var(--aurora-glow, #8bd3cf) 35%, transparent), var(--aurora-glow, #8bd3cf));
+            pointer-events: none;
+        }
+
+        .aurora-popup-hero {
+            position: relative;
+            margin: 0 0 0.82rem;
+            padding: 0 0 0.72rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .aurora-popup-hero::after {
+            content: none;
+        }
+
+        .aurora-popup-header {
+            position: relative;
+            z-index: 1;
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+        }
+
+        .aurora-popup-overline {
+            display: block;
+            font-size: 0.58rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: rgba(146, 168, 182, 0.84);
+        }
+
+        .aurora-popup-badge {
+            display: inline-flex;
+            align-items: center;
             justify-content: center;
+            min-width: 3.1rem;
+            padding: 0.26rem 0.56rem;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            color: #041015;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            filter: saturate(0.92);
+        }
+
+        .aurora-popup-title {
+            position: relative;
+            z-index: 1;
+            margin: 0.72rem 0 0.26rem;
+            font-family: 'Metropolis', var(--font-sans);
+            font-size: 1.12rem;
+            font-weight: 800;
+            line-height: 1.02;
+            color: var(--text-primary);
+            text-wrap: balance;
+            letter-spacing: -0.025em;
+        }
+
+        .aurora-popup-summary {
+            position: relative;
+            z-index: 1;
+            margin: 0 0 0.62rem;
+            max-width: 34ch;
+            font-size: 0.76rem;
+            line-height: 1.42;
+            color: rgba(237, 243, 247, 0.72);
+        }
+
+        .aurora-popup-meter {
+            position: relative;
+            z-index: 1;
+            position: relative;
+            height: 6px;
+            margin-bottom: 0;
             overflow: hidden;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        .aurora-popup-meter > span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, color-mix(in srgb, var(--aurora-glow, #8bd3cf) 70%, #7dd3fc), var(--aurora-glow, #8bd3cf));
+            box-shadow: 0 0 22px color-mix(in srgb, var(--aurora-glow, #8bd3cf) 42%, transparent);
+        }
+
+        .aurora-popup-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.42rem;
+            margin-bottom: 0.54rem;
+        }
+
+        .aurora-popup-metric {
+            padding: 0.6rem 0.66rem 0.56rem;
+            border: 1px solid rgba(180, 215, 228, 0.08);
+            border-radius: 11px;
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .aurora-popup-label {
+            display: block;
+            margin-bottom: 0.22rem;
+            font-size: 0.56rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(140, 164, 180, 0.88);
+        }
+
+        .aurora-popup-value {
+            display: block;
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .aurora-popup-value--mono {
+            font-family: 'Metropolis', var(--font-sans);
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+        }
+
+        .aurora-popup-inline-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.36rem 0.62rem;
+            margin-bottom: 0.62rem;
+            font-size: 0.66rem;
+            color: rgba(237, 243, 247, 0.8);
+            padding-top: 0.04rem;
+            padding-bottom: 0.02rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .aurora-popup-inline-meta span {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.32rem;
+        }
+
+        .aurora-popup-inline-meta span::after {
+            content: '';
+            width: 3px;
+            height: 3px;
+            margin-left: 0.1rem;
+            border-radius: 999px;
+            background: rgba(140, 164, 180, 0.4);
+        }
+
+        .aurora-popup-inline-meta span:last-child::after {
+            content: none;
+        }
+
+        .aurora-popup-inline-meta strong {
+            font-size: 0.57rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(140, 164, 180, 0.84);
+        }
+
+        .aurora-popup-time {
+            display: block;
+            margin-bottom: 0.18rem;
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: rgba(192, 205, 216, 0.88);
+            letter-spacing: 0.02em;
+        }
+
+        .aurora-popup-note {
+            display: block;
+        }
+
+        .aurora-popup-disclaimer {
+            margin-top: 0.5rem;
+            padding: 0.58rem 0.66rem 0.62rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.025);
+            font-size: 0.62rem;
+            line-height: 1.46;
+            color: rgba(178, 192, 205, 0.9);
+        }
+
+        .aurora-popup-disclaimer strong {
+            display: inline-block;
+            margin-right: 0.26rem;
+            font-size: 0.56rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(206, 220, 230, 0.92);
+        }
+
+        .aurora-popup-footnote {
+            margin-top: 0;
+            padding-top: 0.56rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.62rem;
+            line-height: 1.42;
+            color: rgba(140, 164, 180, 0.88);
         }
         
         .map-image {
@@ -653,6 +1046,21 @@
 
             .chart-value {
                 font-size: 0.9rem;
+            }
+
+            .aurora-map-toolbar {
+                align-items: stretch;
+                flex-direction: column;
+                right: auto;
+                max-width: calc(100% - 1.1rem);
+            }
+
+            .aurora-map-actions {
+                justify-content: flex-start;
+            }
+
+            .map-tool-btn {
+                padding: 0.34rem 0.46rem;
             }
         }
 
@@ -2090,6 +2498,7 @@
             min-height: 70px !important;
         }
     </style>
+    <link rel="stylesheet" href="/static/wtus-ui.css">
 </head>
 <body data-flare-alert-enabled="false">
     <div class="bg-noise"></div>
@@ -2152,7 +2561,27 @@
                 </div>
                 <div class="aurora-map-shell">
                     <div class="aurora-map-frame">
-                        <img src="/aurora-map.png" alt="Aurora Map" class="map-image" id="map-image">
+                        <div id="aurora-interactive-map" class="aurora-interactive-map" aria-label="Interactive auroral oval map"></div>
+                        <div class="aurora-map-toolbar">
+                            <div class="aurora-map-title">
+                                <strong>Live Auroral Oval</strong>
+                                <span id="aurora-map-updated">Loading SWPC OVATION data...</span>
+                            </div>
+                            <div class="aurora-map-actions">
+                                <button type="button" class="map-tool-btn" onclick="resetAuroraMapView()">Reset</button>
+                                <button type="button" class="map-tool-btn" onclick="downloadAuroraMapView()">Save View</button>
+                                <button type="button" class="map-tool-btn" onclick="copyAuroraMapView()">Copy View</button>
+                            </div>
+                        </div>
+                        <div class="aurora-map-legend">
+                            <div class="aurora-map-gradient"></div>
+                            <div class="aurora-map-legend-row">
+                                <span>5%</span>
+                                <span>50%</span>
+                                <span>90%+</span>
+                            </div>
+                        </div>
+                        <img src="/aurora-map.png" alt="Static auroral oval map fallback" class="map-image aurora-map-fallback" id="map-image">
                     </div>
                 </div>
             </div>
@@ -2356,6 +2785,17 @@
         let isMobile = window.innerWidth <= 768;
         let isResizing = false;
         let resizeDebounceTimer = null;
+        let auroraMap = null;
+        let auroraOvalLayer = null;
+        let auroraOvalPoints = [];
+        let auroraOvalRaster = null;
+        let auroraOvalTimestamp = null;
+        let auroraMapUsingFallback = false;
+
+        const AURORA_RASTER_SIZE = {
+            width: 1440,
+            height: 720
+        };
 
         // Elements
         const mapImage = document.getElementById('map-image');
@@ -2376,6 +2816,8 @@
                 isResizing = false;
                 checkMobile();
                 resizeAllCharts();
+                if (auroraMap) auroraMap.invalidateSize();
+                if (auroraOvalLayer) auroraOvalLayer.redraw();
             }, 250);
         }
         
@@ -2398,8 +2840,10 @@
                 loadingOverlay.classList.add('active');
             }
             
-            // Preload the initial map image with retry logic
-            if (mapImage) {
+            initInteractiveAuroraMap();
+
+            // Static map fallback is loaded only if the interactive map cannot initialize.
+            if (false && mapImage) {
                 // Hide the img initially to prevent flash of broken image
                 mapImage.style.opacity = '0';
                 
@@ -2768,6 +3212,690 @@
             chart.setOption(option);
         }
 
+        function initInteractiveAuroraMap() {
+            const mapEl = document.getElementById('aurora-interactive-map');
+            const statusEl = document.getElementById('aurora-map-updated');
+
+            if (!mapEl || !window.L) {
+                if (statusEl) statusEl.textContent = 'Interactive map unavailable; using static fallback.';
+                showStaticAuroraMapFallback();
+                return;
+            }
+
+            auroraMap = L.map(mapEl, {
+                center: [55, -96],
+                zoom: 3,
+                minZoom: 2,
+                maxZoom: 8,
+                worldCopyJump: true,
+                zoomControl: true,
+                attributionControl: true
+            });
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 8,
+                subdomains: 'abcd',
+                crossOrigin: true,
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(auroraMap);
+
+            auroraOvalLayer = createAuroraOvalCanvasLayer();
+            auroraOvalLayer.addTo(auroraMap);
+
+            auroraMap.on('click', showAuroraMapPointPopup);
+            auroraMap.on('moveend zoomend', () => {
+                if (auroraOvalLayer) auroraOvalLayer.redraw();
+            });
+
+            setTimeout(() => auroraMap.invalidateSize(), 100);
+        }
+
+        function normalizeAuroraLongitude(lon) {
+            let normalized = Number(lon);
+            if (!Number.isFinite(normalized)) return null;
+            while (normalized < -180) normalized += 360;
+            while (normalized >= 180) normalized -= 360;
+            return normalized;
+        }
+
+        function mercatorYForLatitude(lat) {
+            const limitedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+            const radians = limitedLat * Math.PI / 180;
+            const sinValue = Math.sin(radians);
+            return 0.5 - Math.log((1 + sinValue) / (1 - sinValue)) / (4 * Math.PI);
+        }
+
+        function latitudeForMercatorY(y) {
+            const radians = 2 * Math.atan(Math.exp((0.5 - y) * 2 * Math.PI)) - (Math.PI / 2);
+            return radians * 180 / Math.PI;
+        }
+
+        function mixChannel(start, end, weight) {
+            return Math.round(start + ((end - start) * weight));
+        }
+
+        function auroraColorComponents(value, alpha = 1) {
+            const stops = [
+                { value: 5, color: [16, 185, 129] },
+                { value: 15, color: [132, 204, 22] },
+                { value: 40, color: [250, 204, 21] },
+                { value: 65, color: [251, 146, 60] },
+                { value: 90, color: [239, 68, 68] },
+                { value: 100, color: [239, 68, 68] }
+            ];
+
+            if (value <= stops[0].value) {
+                const [red, green, blue] = stops[0].color;
+                return [red, green, blue, alpha];
+            }
+
+            for (let index = 1; index < stops.length; index += 1) {
+                const previous = stops[index - 1];
+                const current = stops[index];
+                if (value <= current.value) {
+                    const weight = (value - previous.value) / (current.value - previous.value || 1);
+                    return [
+                        mixChannel(previous.color[0], current.color[0], weight),
+                        mixChannel(previous.color[1], current.color[1], weight),
+                        mixChannel(previous.color[2], current.color[2], weight),
+                        alpha
+                    ];
+                }
+            }
+
+            const [red, green, blue] = stops[stops.length - 1].color;
+            return [red, green, blue, alpha];
+        }
+
+        function rebuildAuroraOvalRaster() {
+            if (!Array.isArray(auroraOvalPoints) || !auroraOvalPoints.length) {
+                auroraOvalRaster = null;
+                return;
+            }
+
+            const validPoints = auroraOvalPoints.filter((point) => (
+                Number.isFinite(point?.lat) &&
+                Number.isFinite(point?.lon) &&
+                Number.isFinite(point?.value) &&
+                point.value > 0
+            ));
+
+            if (!validPoints.length) {
+                auroraOvalRaster = null;
+                return;
+            }
+
+            const latitudes = [...new Set(validPoints.map((point) => Math.round(point.lat)))].sort((left, right) => left - right);
+            if (!latitudes.length) {
+                auroraOvalRaster = null;
+                return;
+            }
+
+            const south = latitudes[0];
+            const north = latitudes[latitudes.length - 1];
+            const lonCount = 360;
+            const latCount = (north - south) + 1;
+            const sourceGrid = Array.from({ length: latCount }, () => new Float32Array(lonCount));
+
+            for (const point of validPoints) {
+                const lon = normalizeAuroraLongitude(point.lon);
+                const latIndex = Math.round(point.lat) - south;
+                if (lon === null || latIndex < 0 || latIndex >= latCount) continue;
+                const lonIndex = ((Math.round(lon) + 180) % lonCount + lonCount) % lonCount;
+                sourceGrid[latIndex][lonIndex] = Math.max(sourceGrid[latIndex][lonIndex], point.value);
+            }
+
+            const rasterCanvas = document.createElement('canvas');
+            rasterCanvas.width = AURORA_RASTER_SIZE.width;
+            rasterCanvas.height = AURORA_RASTER_SIZE.height;
+            const rasterContext = rasterCanvas.getContext('2d');
+            const imageData = rasterContext.createImageData(rasterCanvas.width, rasterCanvas.height);
+            const southMercatorY = mercatorYForLatitude(south);
+            const northMercatorY = mercatorYForLatitude(north);
+
+            for (let pixelY = 0; pixelY < rasterCanvas.height; pixelY += 1) {
+                const yRatio = rasterCanvas.height === 1 ? 0 : pixelY / (rasterCanvas.height - 1);
+                const projectedY = northMercatorY + ((southMercatorY - northMercatorY) * yRatio);
+                const sampleLat = latitudeForMercatorY(projectedY);
+                const latPosition = Math.max(0, Math.min(latCount - 1.0001, sampleLat - south));
+                const latFloor = Math.floor(latPosition);
+                const latCeil = Math.min(latCount - 1, latFloor + 1);
+                const latMix = latPosition - latFloor;
+
+                for (let pixelX = 0; pixelX < rasterCanvas.width; pixelX += 1) {
+                    const xRatio = rasterCanvas.width === 1 ? 0 : pixelX / (rasterCanvas.width - 1);
+                    const lonPosition = xRatio * lonCount;
+                    const lonFloorWrapped = ((Math.floor(lonPosition) % lonCount) + lonCount) % lonCount;
+                    const lonCeilWrapped = (lonFloorWrapped + 1) % lonCount;
+                    const lonMix = lonPosition - Math.floor(lonPosition);
+
+                    const topLeft = sourceGrid[latFloor][lonFloorWrapped];
+                    const topRight = sourceGrid[latFloor][lonCeilWrapped];
+                    const bottomLeft = sourceGrid[latCeil][lonFloorWrapped];
+                    const bottomRight = sourceGrid[latCeil][lonCeilWrapped];
+                    const topBlend = topLeft + ((topRight - topLeft) * lonMix);
+                    const bottomBlend = bottomLeft + ((bottomRight - bottomLeft) * lonMix);
+                    const value = topBlend + ((bottomBlend - topBlend) * latMix);
+                    const normalizedValue = Math.max(0, Math.min(1, (value - 5) / 95));
+                    if (normalizedValue <= 0) continue;
+
+                        const alpha = Math.min(1, 0.18 + Math.pow(normalizedValue, 1) * 1);
+                    const [red, green, blue, resolvedAlpha] = auroraColorComponents(value, alpha);
+                    const offset = (pixelY * rasterCanvas.width + pixelX) * 4;
+                    imageData.data[offset] = red;
+                    imageData.data[offset + 1] = green;
+                    imageData.data[offset + 2] = blue;
+                    imageData.data[offset + 3] = Math.round(resolvedAlpha * 255);
+                }
+            }
+
+            rasterContext.putImageData(imageData, 0, 0);
+            auroraOvalRaster = {
+                canvas: rasterCanvas,
+                south,
+                north,
+                west: -180,
+                east: 180
+            };
+        }
+
+        function createAuroraOvalCanvasLayer() {
+            const AuroraOvalLayer = L.Layer.extend({
+                onAdd(map) {
+                    this._map = map;
+                    this._canvas = L.DomUtil.create('canvas', 'aurora-oval-canvas');
+                    this._canvas.style.position = 'absolute';
+                    this._canvas.style.pointerEvents = 'none';
+                    this._canvas.style.mixBlendMode = 'screen';
+                    map.getPanes().overlayPane.appendChild(this._canvas);
+                    map.on('move zoom resize', this._reset, this);
+                    this._reset();
+                },
+                onRemove(map) {
+                    map.off('move zoom resize', this._reset, this);
+                    L.DomUtil.remove(this._canvas);
+                },
+                redraw() {
+                    this._reset();
+                },
+                _reset() {
+                    if (!this._map || !this._canvas) return;
+                    const size = this._map.getSize();
+                    const topLeft = this._map.containerPointToLayerPoint([0, 0]);
+                    this._topLeft = topLeft;
+                    const pixelRatio = window.devicePixelRatio || 1;
+                    L.DomUtil.setPosition(this._canvas, topLeft);
+                    this._canvas.width = Math.round(size.x * pixelRatio);
+                    this._canvas.height = Math.round(size.y * pixelRatio);
+                    this._canvas.style.width = `${size.x}px`;
+                    this._canvas.style.height = `${size.y}px`;
+
+                    const ctx = this._canvas.getContext('2d');
+                    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+                    this._draw();
+                },
+                _draw() {
+                    const ctx = this._canvas.getContext('2d');
+                    const size = this._map.getSize();
+                    ctx.clearRect(0, 0, size.x, size.y);
+                    if (!auroraOvalRaster?.canvas) return;
+
+                    const zoom = this._map.getZoom();
+                    const worldWidth = this._map.options.crs.scale(zoom);
+                    const northWest = this._map.latLngToContainerPoint([auroraOvalRaster.north, auroraOvalRaster.west]);
+                    const southEast = this._map.latLngToContainerPoint([auroraOvalRaster.south, auroraOvalRaster.east]);
+                    const drawLeft = northWest.x;
+                    const drawTop = northWest.y;
+                    let drawWidth = southEast.x - northWest.x;
+                    const drawHeight = southEast.y - northWest.y;
+                    if (drawWidth <= 0) {
+                        drawWidth += worldWidth;
+                    }
+
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.globalAlpha = 1;
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.filter = 'blur(0.45px)';
+
+                    for (const worldOffset of [-worldWidth, 0, worldWidth]) {
+                        const shiftedLeft = drawLeft + worldOffset;
+                        if (shiftedLeft > size.x + 32 || shiftedLeft + drawWidth < -32) continue;
+                        ctx.drawImage(auroraOvalRaster.canvas, shiftedLeft, drawTop, drawWidth, drawHeight);
+                    }
+
+                    ctx.filter = 'none';
+                    ctx.globalAlpha = 1;
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+            });
+            return new AuroraOvalLayer();
+        }
+
+        function auroraProbabilityColor(value, alpha = 1) {
+            if (value >= 90) return `rgba(239, 68, 68, ${alpha})`;
+            if (value >= 65) return `rgba(251, 146, 60, ${alpha})`;
+            if (value >= 40) return `rgba(250, 204, 21, ${alpha})`;
+            if (value >= 15) return `rgba(132, 204, 22, ${alpha})`;
+            return `rgba(16, 185, 129, ${alpha})`;
+        }
+
+        function formatAuroraMapTimestamp(value) {
+            if (!value) return 'SWPC OVATION timestamp unavailable';
+            const parsed = new Date(value);
+            if (!Number.isNaN(parsed.getTime())) {
+                return `SWPC OVATION ${parsed.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+            }
+            return `SWPC OVATION ${value}`;
+        }
+
+        function showStaticAuroraMapFallback() {
+            auroraMapUsingFallback = true;
+            const mapEl = document.getElementById('aurora-interactive-map');
+            if (mapEl) mapEl.style.display = 'none';
+            if (mapImage) {
+                mapImage.classList.add('active');
+                mapImage.style.opacity = '1';
+                mapImage.src = `/aurora-map.png?t=${Date.now()}`;
+            }
+        }
+
+        async function refreshInteractiveAuroraMap() {
+            if (!auroraMap || !auroraOvalLayer) {
+                showStaticAuroraMapFallback();
+                return refreshAuroraMapLegacy();
+            }
+
+            const response = await fetch(`/api/auroral-oval-data?t=${Date.now()}`);
+            if (!response.ok) {
+                throw new Error(`OVATION data request failed: ${response.status}`);
+            }
+
+            const payload = await response.json();
+            auroraOvalPoints = Array.isArray(payload.points) ? payload.points : [];
+            rebuildAuroraOvalRaster();
+            auroraOvalTimestamp = payload.time_tag || payload.generated_at || null;
+            const statusEl = document.getElementById('aurora-map-updated');
+            if (statusEl) {
+                statusEl.textContent = `${formatAuroraMapTimestamp(auroraOvalTimestamp)} · ${auroraOvalPoints.length.toLocaleString()} plotted cells`;
+            }
+            auroraOvalLayer.redraw();
+            auroraMap.invalidateSize();
+            loadingOverlay.classList.remove('active');
+            nextRefreshTime = Date.now() + 60000;
+        }
+
+        function findNearestAuroraPoint(lat, lon) {
+            let nearest = null;
+            let nearestDistance = Infinity;
+            for (const point of auroraOvalPoints) {
+                const latDelta = point.lat - lat;
+                const lonDelta = wrappedLongitudeDelta(point.lon, lon);
+                const distance = latDelta * latDelta + lonDelta * lonDelta;
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearest = point;
+                }
+            }
+            return nearest;
+        }
+
+        function wrappedLongitudeDelta(left, right) {
+            const rawDelta = Math.abs(Number(left) - Number(right)) % 360;
+            return rawDelta > 180 ? 360 - rawDelta : rawDelta;
+        }
+
+        function formatSignedCoordinate(value, positiveLabel, negativeLabel) {
+            const absolute = Math.abs(Number(value)).toFixed(1);
+            return `${absolute}°${Number(value) >= 0 ? positiveLabel : negativeLabel}`;
+        }
+
+        function estimateAuroraDistanceKm(fromLat, fromLon, toLat, toLon) {
+            const earthRadiusKm = 6371;
+            const lat1 = fromLat * Math.PI / 180;
+            const lat2 = toLat * Math.PI / 180;
+            const deltaLat = (toLat - fromLat) * Math.PI / 180;
+            const deltaLon = wrappedLongitudeDelta(fromLon, toLon) * Math.PI / 180;
+            const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+            return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function auroraProbabilityLabel(value) {
+            if (value >= 80) return 'Intense';
+            if (value >= 55) return 'Active';
+            if (value >= 30) return 'Moderate';
+            if (value >= 12) return 'Faint';
+            return 'Minimal';
+        }
+
+        function auroraProbabilityHex(value) {
+            if (value >= 90) return '#ef4444';
+            if (value >= 65) return '#fb923c';
+            if (value >= 40) return '#facc15';
+            if (value >= 15) return '#84cc16';
+            return '#10b981';
+        }
+
+        function auroraProbabilityNarrative(value) {
+            if (value >= 80) return 'This click lands under one of the stronger modeled sections of the oval.';
+            if (value >= 55) return 'The modeled oval is fairly active here, with a stronger-than-average local signal.';
+            if (value >= 30) return 'This point sits inside a workable part of the oval, though intensity is still uneven.';
+            if (value >= 12) return 'You are near a softer fringe of the modeled oval rather than its brighter core.';
+            return 'This click is on the quiet outer edge of the modeled oval.';
+        }
+
+        function formatAuroraPopupTimestamp(value) {
+            if (!value) return 'Latest SWPC run';
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return `SWPC OVATION ${value}`;
+            return `SWPC OVATION ${parsed.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+        }
+
+        function showAuroraMapPointPopup(event) {
+            if (!auroraMap || !auroraOvalPoints.length) return;
+            const nearest = findNearestAuroraPoint(event.latlng.lat, event.latlng.lng);
+            const probabilityValue = nearest ? Number(nearest.value).toFixed(0) : null;
+            const probability = probabilityValue ? `${probabilityValue}%` : 'N/A';
+            const probabilityPercent = nearest ? Math.max(0, Math.min(100, Math.round(nearest.value))) : 0;
+            const popupColor = nearest ? auroraProbabilityHex(nearest.value) : '#8fa2b1';
+            const popupTone = nearest ? auroraProbabilityLabel(nearest.value) : 'Unavailable';
+            const popupNarrative = nearest ? auroraProbabilityNarrative(nearest.value) : 'The current SWPC payload did not include a usable auroral cell near this click.';
+            const popupTimestamp = formatAuroraPopupTimestamp(auroraOvalTimestamp);
+            const popupMarkup = nearest
+                ? `
+                    <div class="aurora-popup-card" style="--aurora-glow:${popupColor};">
+                        <div class="aurora-popup-hero">
+                            <div class="aurora-popup-header">
+                                <span class="aurora-popup-overline">OVATION cell forecast</span>
+                                <span class="aurora-popup-badge" style="background:${popupColor};">${probability}</span>
+                            </div>
+                            <p class="aurora-popup-title">${popupTone} auroral potential</p>
+                            <p class="aurora-popup-summary">${popupNarrative}</p>
+                            <div class="aurora-popup-meter"><span style="width:${probabilityPercent}%;"></span></div>
+                        </div>
+                        <div class="aurora-popup-grid">
+                            <div class="aurora-popup-metric">
+                                <span class="aurora-popup-label">Cell center</span>
+                                <span class="aurora-popup-value aurora-popup-value--mono">${formatSignedCoordinate(nearest.lat, 'N', 'S')} · ${formatSignedCoordinate(nearest.lon, 'E', 'W')}</span>
+                            </div>
+                            <div class="aurora-popup-metric">
+                                <span class="aurora-popup-label">Forecast window</span>
+                                <span class="aurora-popup-value">30 minute model</span>
+                            </div>
+                        </div>
+                        <div class="aurora-popup-inline-meta">
+                            <span><strong>Band</strong><span>${popupTone}</span></span>
+                            <span><strong>Source</strong><span>SWPC OVATION</span></span>
+                        </div>
+                        <p class="aurora-popup-footnote"><span class="aurora-popup-time">${popupTimestamp}</span><span class="aurora-popup-note">Nearest 1° grid cell; not an exact point forecast.</span></p>
+                        <p class="aurora-popup-disclaimer"><strong>Caution</strong>Please use this with caution. Geomagnetic conditions, and auroral visibility will vary. Monitor real-time solar wind &amp; magnetometer data.</p>
+                    </div>
+                `
+                : `
+                    <div class="aurora-popup-card" style="--aurora-glow:${popupColor};">
+                        <div class="aurora-popup-hero">
+                            <div class="aurora-popup-header">
+                                <span class="aurora-popup-overline">OVATION cell forecast</span>
+                                <span class="aurora-popup-badge" style="background:${popupColor};">N/A</span>
+                            </div>
+                            <p class="aurora-popup-title">No nearby forecast cell</p>
+                            <p class="aurora-popup-summary">The current SWPC payload did not include a usable auroral cell near this click.</p>
+                        </div>
+                        <p class="aurora-popup-footnote"><span class="aurora-popup-time">${popupTimestamp}</span></p>
+                        <p class="aurora-popup-disclaimer"><strong>Caution</strong>Please use this with caution. Geomagnetic conditions, and auroral visibility will vary. Monitor real-time solar wind &amp; magnetometer data.</p>
+                    </div>
+                `;
+            L.popup({
+                className: 'aurora-probability-popup',
+                maxWidth: 372,
+                autoPanPaddingTopLeft: [28, 86],
+                autoPanPaddingBottomRight: [28, 28],
+                offset: [0, 12]
+            })
+                .setLatLng(event.latlng)
+                .setContent(popupMarkup)
+                .openOn(auroraMap);
+        }
+
+        function resetAuroraMapView() {
+            if (auroraMap) {
+                auroraMap.setView([55, -96], 3);
+            }
+        }
+
+        function getAuroraMapExportParams() {
+            const target = document.getElementById('aurora-interactive-map') || document.querySelector('.aurora-map-frame');
+            const rect = target.getBoundingClientRect();
+            const width = Math.round(Math.min(2400, Math.max(900, rect.width * 2)));
+            const height = Math.round(Math.min(1800, Math.max(700, rect.height * 2)));
+            const params = new URLSearchParams({ width, height });
+
+            if (auroraMap && !auroraMapUsingFallback) {
+                const bounds = auroraMap.getBounds();
+                params.set('west', bounds.getWest().toFixed(4));
+                params.set('south', bounds.getSouth().toFixed(4));
+                params.set('east', bounds.getEast().toFixed(4));
+                params.set('north', bounds.getNorth().toFixed(4));
+            }
+
+            return params;
+        }
+
+        function appendRoundedRectPath(ctx, x, y, width, height, radius) {
+            const resolvedRadius = Math.min(radius, width / 2, height / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + resolvedRadius, y);
+            ctx.arcTo(x + width, y, x + width, y + height, resolvedRadius);
+            ctx.arcTo(x + width, y + height, x, y + height, resolvedRadius);
+            ctx.arcTo(x, y + height, x, y, resolvedRadius);
+            ctx.arcTo(x, y, x + width, y, resolvedRadius);
+            ctx.closePath();
+        }
+
+        function loadImageForExport(src) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.crossOrigin = 'anonymous';
+                image.decoding = 'async';
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error(`Image load failed: ${src}`));
+                image.src = src;
+            });
+        }
+
+        function drawAuroraExportTitle(ctx, frameWidth) {
+            const statusText = document.getElementById('aurora-map-updated')?.textContent?.trim() || 'SWPC OVATION status unavailable';
+            const cardX = 14;
+            const cardY = 14;
+            const cardWidth = Math.min(frameWidth - 28, 360);
+            const cardHeight = 54;
+
+            appendRoundedRectPath(ctx, cardX, cardY, cardWidth, cardHeight, 10);
+            ctx.fillStyle = 'rgba(7, 13, 18, 0.84)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(180, 215, 228, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = '#edf3f7';
+            ctx.font = '700 14px Metropolis, "Segoe UI", sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillText('LIVE AURORAL OVAL', cardX + 12, cardY + 10, cardWidth - 24);
+
+            ctx.fillStyle = 'rgba(203, 213, 225, 0.9)';
+            ctx.font = '600 11px Metropolis, "Segoe UI", sans-serif';
+            ctx.fillText(statusText, cardX + 12, cardY + 29, cardWidth - 24);
+        }
+
+        function drawAuroraExportLegend(ctx, frameWidth, frameHeight) {
+            const panelWidth = Math.min(226, frameWidth - 24);
+            const panelHeight = 74;
+            const panelX = 14;
+            const panelY = frameHeight - panelHeight - 14;
+
+            appendRoundedRectPath(ctx, panelX, panelY, panelWidth, panelHeight, 12);
+            ctx.fillStyle = 'rgba(7, 13, 18, 0.82)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(180, 215, 228, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = '#edf3f7';
+            ctx.font = '700 11px Metropolis, "Segoe UI", sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillText('Aurora probability', panelX + 12, panelY + 11);
+
+            const gradientX = panelX + 12;
+            const gradientY = panelY + 35;
+            const gradientWidth = panelWidth - 24;
+            const gradient = ctx.createLinearGradient(gradientX, gradientY, gradientX + gradientWidth, gradientY);
+            gradient.addColorStop(0, '#10b981');
+            gradient.addColorStop(0.25, '#84cc16');
+            gradient.addColorStop(0.5, '#facc15');
+            gradient.addColorStop(0.75, '#fb923c');
+            gradient.addColorStop(1, '#ef4444');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(gradientX, gradientY, gradientWidth, 9);
+            ctx.strokeStyle = 'rgba(180, 215, 228, 0.12)';
+            ctx.strokeRect(gradientX, gradientY, gradientWidth, 9);
+
+            ctx.fillStyle = 'rgba(203, 213, 225, 0.92)';
+            ctx.font = '700 10px Metropolis, "Segoe UI", sans-serif';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText('5%', gradientX, panelY + 63);
+            ctx.textAlign = 'center';
+            ctx.fillText('50%', gradientX + (gradientWidth / 2), panelY + 63);
+            ctx.textAlign = 'right';
+            ctx.fillText('90%+', gradientX + gradientWidth, panelY + 63);
+            ctx.textAlign = 'left';
+        }
+
+        async function renderInteractiveAuroraMapBlob() {
+            const frame = document.querySelector('.aurora-map-frame');
+            const mapEl = document.getElementById('aurora-interactive-map');
+            if (!frame || !mapEl) {
+                throw new Error('Interactive map frame unavailable');
+            }
+
+            const frameRect = frame.getBoundingClientRect();
+            if (frameRect.width < 40 || frameRect.height < 40) {
+                throw new Error('Interactive map bounds unavailable');
+            }
+
+            const exportScale = 2;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(frameRect.width * exportScale);
+            canvas.height = Math.round(frameRect.height * exportScale);
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(exportScale, 0, 0, exportScale, 0, 0);
+            ctx.fillStyle = '#071014';
+            ctx.fillRect(0, 0, frameRect.width, frameRect.height);
+
+            const tileElements = Array.from(mapEl.querySelectorAll('.leaflet-tile-pane img.leaflet-tile'));
+            const tileRecords = (await Promise.all(tileElements.map(async (tile) => {
+                const src = tile.currentSrc || tile.src;
+                if (!src) return null;
+                const tileRect = tile.getBoundingClientRect();
+                if (tileRect.width < 2 || tileRect.height < 2) return null;
+                try {
+                    const image = await loadImageForExport(src);
+                    return {
+                        image,
+                        x: tileRect.left - frameRect.left,
+                        y: tileRect.top - frameRect.top,
+                        width: tileRect.width,
+                        height: tileRect.height,
+                        opacity: Number.parseFloat(getComputedStyle(tile).opacity || '1') || 1
+                    };
+                } catch {
+                    return null;
+                }
+            }))).filter(Boolean);
+
+            if (!tileRecords.length) {
+                throw new Error('No map tiles available for export');
+            }
+
+            for (const tile of tileRecords) {
+                ctx.globalAlpha = tile.opacity;
+                ctx.drawImage(tile.image, tile.x, tile.y, tile.width, tile.height);
+            }
+
+            ctx.globalAlpha = 1;
+
+            const overlayCanvas = frame.querySelector('.aurora-oval-canvas');
+            if (overlayCanvas) {
+                const overlayRect = overlayCanvas.getBoundingClientRect();
+                ctx.drawImage(
+                    overlayCanvas,
+                    overlayRect.left - frameRect.left,
+                    overlayRect.top - frameRect.top,
+                    overlayRect.width,
+                    overlayRect.height
+                );
+            }
+
+            drawAuroraExportTitle(ctx, frameRect.width);
+            drawAuroraExportLegend(ctx, frameRect.width, frameRect.height);
+
+            return new Promise((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(blob);
+                        return;
+                    }
+                    reject(new Error('Map export blob generation failed'));
+                }, 'image/png');
+            });
+        }
+
+        async function fetchAuroraMapViewBlob() {
+            if (auroraMap && !auroraMapUsingFallback) {
+                try {
+                    return await renderInteractiveAuroraMapBlob();
+                } catch (error) {
+                    console.warn('Interactive map export failed, falling back to server render.', error);
+                }
+            }
+
+            const response = await fetch(`/aurora-map-view.png?${getAuroraMapExportParams().toString()}`);
+            if (!response.ok) {
+                throw new Error(`Map export failed: ${response.status}`);
+            }
+            return response.blob();
+        }
+
+        function buildAuroraMapExportFilename() {
+            return `auroral_oval_view_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
+        }
+
+        async function downloadAuroraMapView() {
+            try {
+                const blob = await fetchAuroraMapViewBlob();
+                triggerBlobDownload(blob, buildAuroraMapExportFilename());
+                showToast('Auroral oval view downloaded', 'success');
+            } catch (error) {
+                console.error('Aurora map download failed', error);
+                showToast('Failed to download map view', 'error');
+            }
+        }
+
+        async function copyAuroraMapView() {
+            try {
+                const blob = await fetchAuroraMapViewBlob();
+                if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+                    triggerBlobDownload(blob, buildAuroraMapExportFilename());
+                    showToast('Clipboard unsupported; map view downloaded', 'success');
+                    return;
+                }
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                showToast('Auroral oval view copied', 'success');
+            } catch (error) {
+                console.error('Aurora map copy failed', error);
+                showToast('Failed to copy map view', 'error');
+            }
+        }
+
         async function refreshDashboard() {
             if (loadingOverlay) {
                 loadingOverlay.classList.add('active');
@@ -2812,6 +3940,16 @@
         }
         
         async function refreshAuroraMap(maxRetries = 3) {
+            if (auroraMap && auroraOvalLayer) {
+                try {
+                    await refreshInteractiveAuroraMap();
+                    return;
+                } catch (error) {
+                    console.error('Interactive aurora map refresh failed', error);
+                    showToast('Interactive map failed; using static fallback', 'error');
+                    showStaticAuroraMapFallback();
+                }
+            }
             return refreshAuroraMapLegacy(maxRetries);
         }
         
@@ -4038,7 +5176,7 @@
             const rootStyles = getComputedStyle(document.documentElement);
             const backgroundColor = rootStyles.getPropertyValue('--bg-dark').trim() || '#0a0a0a';
 
-            if (!options.preferManual && window.htmlToImage && typeof window.htmlToImage.toCanvas === 'function') {
+            if (!options.preferManual && !auroraMap && window.htmlToImage && typeof window.htmlToImage.toCanvas === 'function') {
                 try {
                     const canvas = await window.htmlToImage.toCanvas(dashboard, {
                         cacheBust: true,
@@ -4185,8 +5323,20 @@
                 drawRoundedRect(rectToCanvas(panel), cardColor, borderColor);
             });
 
-            const mapImg = await loadImage(mapImage.src);
-            const mapRect = rectToCanvas(mapImage);
+            const mapTarget = document.getElementById('aurora-interactive-map') || mapImage;
+            const mapRect = rectToCanvas(mapTarget);
+            let mapImg;
+            if (auroraMap && !auroraMapUsingFallback) {
+                const mapBlob = await fetchAuroraMapViewBlob();
+                const mapUrl = URL.createObjectURL(mapBlob);
+                try {
+                    mapImg = await loadImage(mapUrl);
+                } finally {
+                    URL.revokeObjectURL(mapUrl);
+                }
+            } else {
+                mapImg = await loadImage(mapImage.src);
+            }
             ctx.drawImage(mapImg, mapRect.x, mapRect.y, mapRect.width, mapRect.height);
 
             const topPanels = panelElements.filter((panel) => {

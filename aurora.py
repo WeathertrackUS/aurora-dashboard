@@ -74,10 +74,31 @@ GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-d
 GOES_PROTON_URL = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
 SOLAR_REGIONS_URL = "https://services.swpc.noaa.gov/json/solar_regions.json"
 FLARE_EVENT_FEED_URL = "https://services.swpc.noaa.gov/json/solar_events_last_30_days.json"
+SOLAR_CYCLE_INDICES_URL = "https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json"
+SUNSPOTS_SMOOTHED_URL = "https://services.swpc.noaa.gov/json/solar-cycle/sunspots-smoothed.json"
 SOLAR_REGION_SUMMARY_URLS = [
+    "https://services.swpc.noaa.gov/text/srs.txt",
     "https://services.swpc.noaa.gov/text/solar-region-summary.txt",
     "https://services.swpc.noaa.gov/text/solar-regions.txt",
 ]
+SWPC_REPORT_TEXTS = {
+    'discussion': {
+        'title': 'Forecast Discussion',
+        'url': 'https://services.swpc.noaa.gov/text/discussion.txt'
+    },
+    'three_day': {
+        'title': '3-Day Forecast',
+        'url': 'https://services.swpc.noaa.gov/text/3-day-forecast.txt'
+    },
+    'solar_geomag': {
+        'title': '3-Day Solar-Geophysical Predictions',
+        'url': 'https://services.swpc.noaa.gov/text/3-day-solar-geomag-predictions.txt'
+    },
+    'solar_regions': {
+        'title': 'Solar Region Summary',
+        'url': 'https://services.swpc.noaa.gov/text/srs.txt'
+    },
+}
 OVATION_URL = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json"
 HEMI_POWER_URL = "https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt"
 GOES_MAG_PRIMARY_URL = "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json"
@@ -515,22 +536,104 @@ def parse_solar_regions(data):
 
             regions.append({
                 'number': str(entry.get('region', '')),
+                'observed_date': entry.get('observed_date') or latest_date,
                 'location': entry.get('location') or '',
                 'lo': str(entry.get('longitude') or ''),
                 'area': str(entry.get('area') or ''),
                 'z': entry.get('spot_class') or '',
                 'll': str(entry.get('latitude') or ''),
                 'nn': '', 
+                'mag_class': mag_class or '',
                 'mag_type': mag_type,
                 'c_flares': entry.get('c_xray_events', 0),
                 'm_flares': entry.get('m_xray_events', 0),
-                'x_flares': entry.get('x_xray_events', 0)
+                'x_flares': entry.get('x_xray_events', 0),
+                'c_flare_probability': entry.get('c_flare_probability'),
+                'm_flare_probability': entry.get('m_flare_probability'),
+                'x_flare_probability': entry.get('x_flare_probability')
             })
             
     # Sort by region number
     regions.sort(key=lambda x: int(x['number']) if x['number'].isdigit() else 0, reverse=True)
     
     return regions
+
+
+def build_active_region_watchlist(regions):
+    """Build a factual watchlist from SWPC region fields only."""
+    if not regions:
+        return []
+
+    complexity_rank = {
+        'Alpha': 0,
+        'Beta': 1,
+        'Gamma': 2,
+        'Beta-Gamma': 3,
+        'Beta-Delta': 4,
+        'Gamma-Delta': 5,
+        'Beta-Gamma-Delta': 6,
+    }
+
+    watchlist = []
+    for region in regions:
+        mag_type = region.get('mag_type') or ''
+        area = _safe_int(region.get('area'), 0)
+        m_prob = _safe_int(region.get('m_flare_probability'), 0)
+        x_prob = _safe_int(region.get('x_flare_probability'), 0)
+        m_flares = _safe_int(region.get('m_flares'), 0)
+        x_flares = _safe_int(region.get('x_flares'), 0)
+        complex_region = 'Gamma' in mag_type or 'Delta' in mag_type
+
+        high_probability = x_prob >= 5 or m_prob >= 10
+        complex_with_probability = complex_region and (m_prob > 0 or x_prob > 0)
+        recent_major_flare = m_flares > 0 or x_flares > 0
+        include = (
+            high_probability or
+            complex_with_probability or
+            recent_major_flare
+        )
+        if not include:
+            continue
+
+        reasons = []
+        if x_prob >= 5:
+            reasons.append(f'SWPC X {x_prob}%')
+        if m_prob >= 10:
+            reasons.append(f'SWPC M {m_prob}%')
+        elif m_prob > 0 and complex_region:
+            reasons.append(f'SWPC M {m_prob}%')
+        if complex_region:
+            reasons.append(f'{mag_type} ')
+        if x_flares > 0:
+            reasons.append(f'{x_flares} recent X flare{"s" if x_flares != 1 else ""}')
+        if m_flares > 0:
+            reasons.append(f'{m_flares} recent M flare{"s" if m_flares != 1 else ""}')
+        if area >= 650:
+            reasons.append(f'{area} MSH area')
+
+        item = dict(region)
+        item['watch_reasons'] = reasons
+        item['watch_level'] = (
+            'Primary watch'
+            if x_prob >= 5 or m_prob >= 20 or x_flares > 0
+            else 'Elevated watch'
+        )
+        item['watch_basis'] = 'SWPC probabilities, magnetic class, and observed flare counts'
+        item['_sort'] = (
+            x_prob,
+            m_prob,
+            complexity_rank.get(mag_type, 0),
+            area,
+            x_flares,
+            m_flares,
+        )
+        watchlist.append(item)
+
+    watchlist.sort(key=lambda item: item['_sort'], reverse=True)
+    watchlist = watchlist[:5]
+    for item in watchlist:
+        item.pop('_sort', None)
+    return watchlist
 
 
 def parse_returning_regions(data):
@@ -701,7 +804,13 @@ def fetch_solar_data():
         proton_data = results['proton']
         regions_data = results['regions']
         sunspots = parse_solar_regions(regions_data)
+        watchlist_regions = build_active_region_watchlist(sunspots)
         returning = parse_returning_regions(regions_data)
+        region_updated = None
+        for region in sunspots:
+            observed_date = region.get('observed_date')
+            if observed_date and (region_updated is None or observed_date > region_updated):
+                region_updated = observed_date
 
         # If JSON didn't include explicit returning list, try parsing SWPC Solar Region Summary text
         if not returning:
@@ -720,6 +829,8 @@ def fetch_solar_data():
             'xray_1day': xray_1day_data,
             'proton': proton_data,
             'sunspots': sunspots,
+            'watchlist_regions': watchlist_regions,
+            'solar_regions_updated': region_updated,
             'returning_regions': returning
         }
     except Exception as e:
@@ -787,7 +898,7 @@ def fetch_noaa_scales():
 
 def _safe_int(value, default=0):
     try:
-        return int(str(value).strip())
+        return int(float(str(value).strip().rstrip('%')))
     except (TypeError, ValueError, AttributeError):
         return default
 
@@ -3090,6 +3201,26 @@ def get_solar_data():
     return jsonify({'error': 'Failed to fetch data'}), 500
 
 
+@app.route('/api/active-region-watchlist')
+def get_active_region_watchlist():
+    """Return SWPC-backed active regions worth watching."""
+    cache_key = 'solar_data'
+    data = get_cached(cache_key, max_age_seconds=45)
+    if not data:
+        data = fetch_solar_data()
+        if data:
+            set_cached(cache_key, data)
+
+    if not data:
+        return jsonify({'error': 'Failed to fetch solar region data', 'watchlist_regions': []}), 500
+
+    return jsonify({
+        'watchlist_regions': data.get('watchlist_regions', []),
+        'solar_regions_updated': data.get('solar_regions_updated'),
+        'source': 'NOAA SWPC solar_regions.json'
+    })
+
+
 @app.route('/api/flare-alert')
 def get_flare_alert():
     """Return the latest flare alert summary for popup notifications."""
@@ -4424,6 +4555,384 @@ def generate_map_image(ovation_snapshot=None):
     
     return buf
 
+
+def build_auroral_oval_payload(threshold=1):
+    """Return current OVATION auroral oval cells for the interactive map."""
+    cache_key = f'auroral_oval_payload_{threshold}'
+    cached = get_cached(cache_key, max_age_seconds=30)
+    if cached is not None:
+        return cached
+
+    ovation_snapshot = fetch_ovation_latest_snapshot()
+    lons, lats, values, frame_label, _ = extract_ovation_north_frame(ovation_snapshot)
+    if lons is None or lats is None or values is None:
+        payload = {
+            'points': [],
+            'time_tag': frame_label,
+            'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'source': 'NOAA SWPC OVATION Aurora 30-minute forecast'
+        }
+        set_cached(cache_key, payload, timeout=30)
+        return payload
+
+    lons = np.asarray(lons, dtype=float)
+    lats = np.asarray(lats, dtype=float)
+    values = np.asarray(values, dtype=float)
+    adjusted_lons = np.where(lons > 180, lons - 360, lons)
+    mask = (
+        np.isfinite(adjusted_lons) &
+        np.isfinite(lats) &
+        np.isfinite(values) &
+        (values >= threshold) &
+        (lats >= 20) &
+        (lats <= 85)
+    )
+
+    points = [
+        {
+            'lat': round(float(lat), 3),
+            'lon': round(float(lon), 3),
+            'value': round(float(value), 1)
+        }
+        for lat, lon, value in zip(lats[mask], adjusted_lons[mask], values[mask])
+    ]
+
+    payload = {
+        'points': points,
+        'time_tag': frame_label,
+        'max_probability': round(float(values[mask].max()), 1) if np.any(mask) else None,
+        'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'source': 'NOAA SWPC OVATION Aurora 30-minute forecast'
+    }
+    set_cached(cache_key, payload, timeout=30)
+    return payload
+
+
+def _request_float(name, default):
+    try:
+        return float(request.args.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _request_int(name, default, minimum, maximum):
+    try:
+        value = int(float(request.args.get(name, default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+def _normalized_map_bounds():
+    west = _request_float('west', -135)
+    south = _request_float('south', 25)
+    east = _request_float('east', -55)
+    north = _request_float('north', 85)
+
+    south = max(-80, min(84.5, south))
+    north = max(-79.5, min(85, north))
+    if north - south < 4:
+        mid = (north + south) / 2
+        south = max(-80, mid - 2)
+        north = min(85, mid + 2)
+
+    span = abs(east - west)
+    if span >= 350:
+        west, east = -180, 180
+    else:
+        west = max(-180, min(180, west))
+        east = max(-180, min(180, east))
+        if east <= west:
+            west, east = -180, 180
+
+    if east - west < 6:
+        mid = (east + west) / 2
+        west = max(-180, mid - 3)
+        east = min(180, mid + 3)
+
+    return west, south, east, north
+
+
+_AURORA_EXPORT_STOP_VALUES = np.array([5, 15, 40, 65, 90, 100], dtype=float)
+_AURORA_EXPORT_STOP_COLORS = np.array([
+    [16, 185, 129],
+    [132, 204, 22],
+    [250, 204, 21],
+    [251, 146, 60],
+    [239, 68, 68],
+    [239, 68, 68],
+], dtype=float)
+
+
+def _aurora_export_colormap():
+    return LinearSegmentedColormap.from_list(
+        'aurora_export_overlay',
+        [
+            (0.0, '#10b981'),
+            (0.25, '#84cc16'),
+            (0.5, '#facc15'),
+            (0.75, '#fb923c'),
+            (1.0, '#ef4444'),
+        ],
+        N=256,
+    )
+
+
+def _mercator_y_for_latitudes(latitudes):
+    limited = np.clip(np.asarray(latitudes, dtype=float), -85.05112878, 85.05112878)
+    radians = np.deg2rad(limited)
+    sin_values = np.sin(radians)
+    return 0.5 - np.log((1 + sin_values) / (1 - sin_values)) / (4 * np.pi)
+
+
+def _latitudes_for_mercator_y(y_values):
+    radians = 2 * np.arctan(np.exp((0.5 - np.asarray(y_values, dtype=float)) * 2 * np.pi)) - (np.pi / 2)
+    return np.rad2deg(radians)
+
+
+def _build_aurora_source_grid(ovation_lons, ovation_lats, ovation_aurora):
+    if ovation_lons is None or ovation_lats is None or ovation_aurora is None:
+        return None
+
+    lons = np.asarray(ovation_lons, dtype=float)
+    lats = np.asarray(ovation_lats, dtype=float)
+    values = np.asarray(ovation_aurora, dtype=float)
+    valid = np.isfinite(lons) & np.isfinite(lats) & np.isfinite(values) & (values > 0)
+    if not np.any(valid):
+        return None
+
+    rounded_lats = np.rint(lats[valid]).astype(int)
+    unique_lats = np.unique(rounded_lats)
+    if unique_lats.size == 0:
+        return None
+
+    south = int(unique_lats.min())
+    north = int(unique_lats.max())
+    lat_count = (north - south) + 1
+    source_grid = np.zeros((lat_count, 360), dtype=np.float32)
+
+    normalized_lons = ((lons[valid] + 180) % 360)
+    lon_indices = np.rint(normalized_lons).astype(int) % 360
+    lat_indices = rounded_lats - south
+    np.maximum.at(source_grid, (lat_indices, lon_indices), values[valid].astype(np.float32))
+
+    return source_grid, south, north
+
+
+def _render_aurora_export_overlay(ovation_lons, ovation_lats, ovation_aurora, west, south, east, north, width, height, projection):
+    source = _build_aurora_source_grid(ovation_lons, ovation_lats, ovation_aurora)
+    if source is None:
+        return None, None, None
+
+    source_grid, source_south, source_north = source
+    source_mask = source_grid > 0
+    softened_values = gaussian_filter(source_grid, sigma=(0.8, 1.0))
+    softened_weights = gaussian_filter(source_mask.astype(np.float32), sigma=(0.8, 1.0))
+    source_grid = np.where(
+        softened_weights > 0.02,
+        np.maximum(source_grid * 0.8, softened_values / np.maximum(softened_weights, 1e-6)),
+        0.0,
+    ).astype(np.float32)
+
+    raster_width = max(720, min(2400, int(width)))
+    raster_height = max(420, min(1800, int(height)))
+    sampled_values = np.full((raster_height, raster_width), np.nan, dtype=np.float32)
+
+    x_samples = np.linspace(west, east, raster_width)
+    lon_positions = np.mod(x_samples + 180.0, 360.0)
+    lon_floor = np.floor(lon_positions).astype(int) % 360
+    lon_ceil = (lon_floor + 1) % 360
+    lon_mix = lon_positions - np.floor(lon_positions)
+
+    north_y = _mercator_y_for_latitudes([north])[0]
+    south_y = _mercator_y_for_latitudes([south])[0]
+    y_samples = np.linspace(north_y, south_y, raster_height)
+    sample_lats = _latitudes_for_mercator_y(y_samples)
+
+    red_stops = _AURORA_EXPORT_STOP_COLORS[:, 0]
+    green_stops = _AURORA_EXPORT_STOP_COLORS[:, 1]
+    blue_stops = _AURORA_EXPORT_STOP_COLORS[:, 2]
+
+    for row_index, sample_lat in enumerate(sample_lats):
+        if sample_lat < source_south or sample_lat > source_north:
+            continue
+
+        lat_position = min(source_grid.shape[0] - 1.0001, max(0.0, sample_lat - source_south))
+        lat_floor = int(np.floor(lat_position))
+        lat_ceil = min(source_grid.shape[0] - 1, lat_floor + 1)
+        lat_mix = lat_position - lat_floor
+
+        top_left = source_grid[lat_floor, lon_floor]
+        top_right = source_grid[lat_floor, lon_ceil]
+        bottom_left = source_grid[lat_ceil, lon_floor]
+        bottom_right = source_grid[lat_ceil, lon_ceil]
+        top_blend = top_left + ((top_right - top_left) * lon_mix)
+        bottom_blend = bottom_left + ((bottom_right - bottom_left) * lon_mix)
+        sampled_values[row_index, :] = top_blend + ((bottom_blend - top_blend) * lat_mix)
+
+    valid_mask = np.isfinite(sampled_values) & (sampled_values > 0)
+    if not np.any(valid_mask):
+        return None, None, None
+
+    normalized = np.clip((sampled_values - 5.0) / 95.0, 0.0, 1.0)
+    alpha = np.where(np.isfinite(normalized), np.minimum(1.0, 0.15 + np.power(normalized, 1.01) * 0.98), 0.0)
+    alpha = gaussian_filter(alpha, sigma=(0.55, 0.6))
+    alpha *= np.where(valid_mask, 1.0, 0.0)
+    visible = alpha > 0.025
+
+    rgba = np.zeros((raster_height, raster_width, 4), dtype=np.uint8)
+    if np.any(visible):
+        clipped_values = np.clip(np.where(np.isfinite(sampled_values), sampled_values, 0.0), 5.0, 100.0)
+        rgba[:, :, 0] = np.rint(np.interp(clipped_values, _AURORA_EXPORT_STOP_VALUES, red_stops)).astype(np.uint8)
+        rgba[:, :, 1] = np.rint(np.interp(clipped_values, _AURORA_EXPORT_STOP_VALUES, green_stops)).astype(np.uint8)
+        rgba[:, :, 2] = np.rint(np.interp(clipped_values, _AURORA_EXPORT_STOP_VALUES, blue_stops)).astype(np.uint8)
+        rgba[:, :, 3] = np.where(visible, np.rint(np.clip(alpha, 0.0, 1.0) * 255), 0).astype(np.uint8)
+
+    if not np.any(rgba[:, :, 3]):
+        return None, None, None
+
+    overlay_image = Image.fromarray(rgba, mode='RGBA')
+    glow_radius = max(0.9, min(width, height) / 1500)
+    glow_array = np.asarray(overlay_image.filter(ImageFilter.GaussianBlur(radius=glow_radius)))
+    overlay_array = np.asarray(overlay_image)
+
+    x_extent = projection.transform_points(ccrs.PlateCarree(), np.array([west, east]), np.array([0.0, 0.0]))[:, 0]
+    y_extent = projection.transform_points(ccrs.PlateCarree(), np.array([0.0, 0.0]), np.array([south, north]))[:, 1]
+    extent = (float(x_extent[0]), float(x_extent[1]), float(y_extent[0]), float(y_extent[1]))
+
+    return glow_array, overlay_array, extent
+
+
+def _add_aurora_export_legend(fig):
+    legend_box = mpatches.FancyBboxPatch(
+        (0.028, 0.03),
+        0.26,
+        0.11,
+        boxstyle='round,pad=0.012,rounding_size=0.016',
+        transform=fig.transFigure,
+        facecolor=(7 / 255, 16 / 255, 20 / 255, 0.9),
+        edgecolor=(71 / 255, 85 / 255, 105 / 255, 0.8),
+        linewidth=1.0,
+        zorder=10,
+    )
+    fig.add_artist(legend_box)
+
+    fig.text(0.045, 0.117, 'Aurora probability', ha='left', va='center', fontsize=8.5, color='#edf3f7', fontweight='bold', zorder=11)
+
+    legend_ax = fig.add_axes([0.045, 0.082, 0.225, 0.016], zorder=11)
+    legend_ax.imshow(np.linspace(0, 1, 256)[None, :], aspect='auto', cmap=_aurora_export_colormap(), origin='lower')
+    legend_ax.set_xticks([])
+    legend_ax.set_yticks([])
+    for spine in legend_ax.spines.values():
+        spine.set_edgecolor('#475569')
+        spine.set_linewidth(0.8)
+
+    fig.text(0.045, 0.055, '5%', ha='left', va='center', fontsize=8, color='#cbd5e1', fontweight='bold', zorder=11)
+    fig.text(0.1575, 0.055, '50%', ha='center', va='center', fontsize=8, color='#cbd5e1', fontweight='bold', zorder=11)
+    fig.text(0.27, 0.055, '90%+', ha='right', va='center', fontsize=8, color='#cbd5e1', fontweight='bold', zorder=11)
+
+
+def generate_map_view_image(west, south, east, north, width=1400, height=1000, ovation_snapshot=None):
+    """Generate an export PNG for the current interactive map bounds."""
+    if ovation_snapshot is None:
+        ovation_snapshot = fetch_ovation_latest_snapshot()
+
+    ovation_lons, ovation_lats, ovation_aurora, ovation_time, _ = extract_ovation_north_frame(ovation_snapshot)
+
+    dpi = 150
+    fig = plt.figure(figsize=(width / dpi, height / dpi), dpi=dpi, facecolor='#071014')
+    projection = ccrs.Mercator()
+    ax_map = fig.add_axes([0, 0, 1, 1], projection=projection)
+    ax_map.set_extent([west, east, south, north], crs=ccrs.PlateCarree())
+    ax_map.set_aspect('auto')
+    ax_map.set_facecolor('#071014')
+
+    scale = '50m'
+    ax_map.add_feature(cfeature.NaturalEarthFeature('physical', 'ocean', scale, facecolor='#071014', edgecolor='none'), zorder=0)
+    ax_map.add_feature(cfeature.NaturalEarthFeature('physical', 'land', scale, facecolor='#15212a', edgecolor='none'), zorder=0)
+    ax_map.add_feature(cfeature.NaturalEarthFeature('physical', 'lakes', scale, facecolor='#071014', edgecolor='none'), zorder=0)
+    ax_map.add_feature(cfeature.NaturalEarthFeature('physical', 'coastline', scale, facecolor='none', edgecolor='#5fa6bb'), linewidth=0.55, alpha=0.75, zorder=1)
+    ax_map.add_feature(cfeature.NaturalEarthFeature('cultural', 'admin_0_boundary_lines_land', scale, facecolor='none', edgecolor='#667887'), linewidth=0.45, alpha=0.6, zorder=1)
+    ax_map.add_feature(cfeature.NaturalEarthFeature('cultural', 'admin_1_states_provinces_lines', scale, facecolor='none', edgecolor='#8fa2b1'), linewidth=0.38, linestyle=':', alpha=0.45, zorder=1)
+    ax_map.gridlines(draw_labels=False, linewidth=0.25, color='#475569', alpha=0.35, linestyle='--', zorder=2)
+
+    if ovation_lons is not None and len(ovation_lons) > 0:
+        glow_overlay, overlay_image, overlay_extent = _render_aurora_export_overlay(
+            ovation_lons,
+            ovation_lats,
+            ovation_aurora,
+            west,
+            south,
+            east,
+            north,
+            width,
+            height,
+            projection,
+        )
+
+        if overlay_image is not None:
+            ax_map.imshow(
+                glow_overlay,
+                origin='upper',
+                extent=overlay_extent,
+                transform=projection,
+                interpolation='bilinear',
+                alpha=0.82,
+                zorder=3,
+            )
+            ax_map.imshow(
+                overlay_image,
+                origin='upper',
+                extent=overlay_extent,
+                transform=projection,
+                interpolation='bilinear',
+                zorder=4,
+            )
+
+    header_time = ovation_time or datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    title_text = fig.text(0.015, 0.975, 'LIVE AURORAL OVAL', ha='left', va='top', fontsize=13, color='#edf3f7', fontweight='bold')
+    title_text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.5, foreground='#071014', alpha=0.92)])
+    timestamp_text = fig.text(0.985, 0.975, header_time, ha='right', va='top', fontsize=10, color='#cbd5e1', fontweight='bold')
+    timestamp_text.set_path_effects([matplotlib.patheffects.withStroke(linewidth=2.2, foreground='#071014', alpha=0.92)])
+    fig.text(0.985, 0.015, 'NOAA SWPC OVATION Aurora 30-minute forecast', ha='right', va='bottom', fontsize=8, color='#94a3b8')
+
+    _add_aurora_export_legend(fig)
+
+    return _figure_to_png_buffer(fig, dpi=dpi, facecolor='#071014', edgecolor='none', pad_inches=0)
+
+
+@app.route('/api/auroral-oval-data')
+def get_auroral_oval_data():
+    """Return SWPC OVATION cells for the interactive auroral oval map."""
+    try:
+        threshold = max(0, min(100, _request_int('threshold', 1, 0, 100)))
+        return jsonify(build_auroral_oval_payload(threshold=threshold))
+    except Exception as e:
+        print(f"Error fetching auroral oval data: {e}")
+        return jsonify({'points': [], 'error': str(e)}), 500
+
+
+@app.route('/aurora-map-view.png')
+def get_aurora_map_view_image():
+    """Export the auroral oval for the current interactive map viewport."""
+    try:
+        west, south, east, north = _normalized_map_bounds()
+        width = _request_int('width', 1400, 600, 2600)
+        height = _request_int('height', 1000, 500, 2200)
+        img_buffer = generate_map_view_image(west, south, east, north, width=width, height=height)
+        force_download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
+        return send_file(
+            img_buffer,
+            mimetype='image/png',
+            as_attachment=force_download,
+            download_name=f'auroral_oval_view_{datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")}.png'
+        )
+    except Exception as e:
+        print(f"Error generating aurora map view: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/aurora-map.png')
 def get_aurora_map_image():
     """Generate and serve just the auroral oval map image with caching and concurrency control"""
@@ -4818,6 +5327,181 @@ def get_f107():
         return jsonify({'flux': 0}), 500
 
 
+def fetch_daily_sunspot_summary():
+    """Aggregate the latest SWPC sunspot report into a daily Wolf-style number."""
+    response = requests.get("https://services.swpc.noaa.gov/json/sunspot_report.json", timeout=10)
+    response.raise_for_status()
+    rows = response.json()
+    if not isinstance(rows, list) or not rows:
+        return None
+
+    valid_rows = [
+        row for row in rows
+        if row.get('Region') and row.get('Type') == 'spt'
+    ]
+    if not valid_rows:
+        return None
+
+    def row_time(row):
+        return parse_swpc_datetime(row.get('time_tag')) or parse_swpc_datetime(row.get('Obsdate')) or datetime.min.replace(tzinfo=timezone.utc)
+
+    latest_obsdate = max((row.get('Obsdate') for row in valid_rows if row.get('Obsdate')), default=None)
+    latest_date_rows = [
+        row for row in valid_rows
+        if row.get('Obsdate') == latest_obsdate
+    ] if latest_obsdate else valid_rows
+
+    latest_time = max((row_time(row) for row in latest_date_rows), default=None)
+    latest_rows = [
+        row for row in latest_date_rows
+        if row_time(row) == latest_time
+    ] if latest_time else latest_date_rows
+
+    region_rows = {}
+    for row in latest_rows:
+        region = row.get('Region')
+        if region is not None:
+            region_rows[str(region)] = row
+
+    groups = len(region_rows)
+    spots = sum(_safe_int(row.get('Numspot'), 0) for row in region_rows.values())
+    area = sum(_safe_int(row.get('Area'), 0) for row in region_rows.values())
+    sunspot_number = groups * 10 + spots
+    observatories = sorted({
+        str(row.get('Observatory'))
+        for row in region_rows.values()
+        if row.get('Observatory')
+    })
+
+    obs_dt = parse_swpc_datetime(latest_obsdate)
+    return {
+        'daily_sunspot_number': sunspot_number,
+        'daily_spot_count': spots,
+        'daily_group_count': groups,
+        'daily_spot_area': area,
+        'daily_sunspot_date': obs_dt.strftime('%Y-%m-%d') if obs_dt else latest_obsdate,
+        'daily_sunspot_time': latest_time.strftime('%Y-%m-%dT%H:%M:%SZ') if latest_time else '',
+        'daily_observatories': observatories,
+        'daily_sunspot_source': 'NOAA SWPC sunspot_report.json'
+    }
+
+
+def fetch_smoothed_sunspot_summary():
+    """Fetch the latest official centered 13-month smoothed SSN from SWPC."""
+    response = requests.get(SUNSPOTS_SMOOTHED_URL, timeout=10)
+    response.raise_for_status()
+    rows = response.json()
+    if not isinstance(rows, list) or not rows:
+        return None
+
+    entries = _coerce_cycle_entries(rows, predicted=False)
+    latest = _latest_entry_with(entries, 'smoothed_ssn')
+    if not latest:
+        return None
+
+    return {
+        'smoothed_sunspot_number': _format_number(latest.get('smoothed_ssn'), 1),
+        'smoothed_time': latest.get('time') or '',
+        'smoothed_source': 'NOAA SWPC sunspots-smoothed.json',
+        'smoothed_note': 'Latest centered 13-month smoothed value; the final six months are unavailable by definition.'
+    }
+
+
+@app.route('/api/solar-summary')
+def get_solar_summary():
+    """Get compact solar-cycle and ephemeris values for the overview page."""
+    try:
+        cache_key = 'solar_summary'
+        cached = get_cached(cache_key, max_age_seconds=1800)
+        if cached is not None:
+            return jsonify(cached)
+
+        response = requests.get(SOLAR_CYCLE_INDICES_URL, timeout=10)
+        response.raise_for_status()
+        raw_entries = response.json()
+        entries = _coerce_cycle_entries(raw_entries, predicted=False)
+        latest = _latest_entry_with(entries, 'ssn', 'f107') or _latest_entry_with(entries, 'ssn') or {}
+        latest_smoothed = _latest_entry_with(entries, 'smoothed_ssn') or {}
+        daily = fetch_daily_sunspot_summary() or {}
+        smoothed = fetch_smoothed_sunspot_summary() or {}
+
+        now = datetime.now(timezone.utc)
+        payload = {
+            'sunspot_number': daily.get('daily_sunspot_number'),
+            'sunspot_time': daily.get('daily_sunspot_date') or '',
+            'daily_sunspot_number': daily.get('daily_sunspot_number'),
+            'daily_spot_count': daily.get('daily_spot_count'),
+            'daily_group_count': daily.get('daily_group_count'),
+            'daily_spot_area': daily.get('daily_spot_area'),
+            'daily_sunspot_date': daily.get('daily_sunspot_date') or '',
+            'daily_sunspot_time': daily.get('daily_sunspot_time') or '',
+            'daily_observatories': daily.get('daily_observatories') or [],
+            'monthly_sunspot_number': _format_number(latest.get('ssn'), 1),
+            'monthly_sunspot_time': latest.get('time') or '',
+            'smoothed_sunspot_number': smoothed.get('smoothed_sunspot_number') or _format_number(latest_smoothed.get('smoothed_ssn'), 1),
+            'smoothed_time': smoothed.get('smoothed_time') or latest_smoothed.get('time') or '',
+            'smoothed_source': smoothed.get('smoothed_source') or 'NOAA SWPC observed solar-cycle indices',
+            'smoothed_note': smoothed.get('smoothed_note') or 'Latest centered 13-month smoothed value.',
+            'f107': _format_number(latest.get('f107'), 1),
+            'f107_time': latest.get('time') or '',
+            'carrington_rotation': current_carrington_rotation(now),
+            'generated_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'source': 'NOAA SWPC sunspot report, smoothed sunspots, and observed solar-cycle indices'
+        }
+        set_cached(cache_key, payload, timeout=1800)
+        return jsonify(payload)
+    except Exception as e:
+        print(f"Error fetching solar summary: {e}")
+        return jsonify({
+            'sunspot_number': None,
+            'smoothed_sunspot_number': None,
+            'f107': None,
+            'carrington_rotation': current_carrington_rotation(),
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/swpc-report-texts')
+def get_swpc_report_texts():
+    """List available SWPC text report products for the report modal."""
+    return jsonify({
+        'reports': [
+            {'id': key, 'title': meta['title']}
+            for key, meta in SWPC_REPORT_TEXTS.items()
+        ]
+    })
+
+
+@app.route('/api/swpc-report-text/<report_id>')
+def get_swpc_report_text(report_id):
+    """Fetch one latest SWPC text report through the backend."""
+    meta = SWPC_REPORT_TEXTS.get(report_id)
+    if not meta:
+        return jsonify({'error': 'Unknown report id'}), 404
+
+    try:
+        cache_key = f"swpc_report_{report_id}"
+        cached = get_cached(cache_key, max_age_seconds=300)
+        if cached is not None:
+            return jsonify(cached)
+
+        response = requests.get(meta['url'], timeout=10)
+        response.raise_for_status()
+        text = response.text.strip()
+        payload = {
+            'id': report_id,
+            'title': meta['title'],
+            'source_url': meta['url'],
+            'text': text,
+            'fetched_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        }
+        set_cached(cache_key, payload, timeout=300)
+        return jsonify(payload)
+    except Exception as e:
+        print(f"Error fetching SWPC report {report_id}: {e}")
+        return jsonify({'error': str(e), 'id': report_id, 'title': meta['title'], 'text': ''}), 500
+
+
 SOLAR_CYCLE_MINIMA = {
     '24': datetime(2008, 12, 1),
     '25': datetime(2019, 12, 1)
@@ -4927,6 +5611,33 @@ def _format_number(value, digits=1):
     if value is None:
         return None
     return round(value, digits)
+
+
+def _julian_date(dt):
+    """Convert a UTC datetime to Julian Date."""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    year = dt.year
+    month = dt.month
+    day = dt.day + (
+        dt.hour + (dt.minute + (dt.second + dt.microsecond / 1_000_000) / 60) / 60
+    ) / 24
+
+    if month <= 2:
+        year -= 1
+        month += 12
+
+    a = year // 100
+    b = 2 - a + (a // 4)
+    return int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
+
+
+def current_carrington_rotation(now=None):
+    """Return the current Carrington rotation number using the standard synodic period."""
+    now = now or datetime.now(timezone.utc)
+    jd = _julian_date(now)
+    return int((jd - 2398167.329) / 27.2753) + 1
 
 
 def _describe_cycle_phase(current_month, observed_peak_month, six_month_change, twelve_month_change):
@@ -5277,36 +5988,14 @@ def get_electron_flux():
 
 @app.route('/api/region-heatmap')
 def get_region_heatmap():
-    """Get active region heatmap (flare activity over time)"""
+    """Deprecated: avoid mock active-region heatmaps without historical source data."""
     try:
-        # Fetch sunspot regions
-        regions_data = fetch_json_with_retry(SOLAR_REGIONS_URL, retries=3, timeout=30)
-        sunspots = parse_solar_regions(regions_data)
-        
-        # Create mock heatmap data based on flare counts
-        regions = [spot['number'] for spot in sunspots[:5]]  # Top 5 regions
-        days = [(datetime.now(timezone.utc) - timedelta(days=i)).strftime('%m/%d') for i in range(7, -1, -1)]
-        
-        # Create activity matrix (regions x days)
-        activity = []
-        for spot in sunspots[:5]:
-            # Calculate activity score based on flare counts
-            c_flares = spot.get('c_flares', 0)
-            m_flares = spot.get('m_flares', 0)
-            x_flares = spot.get('x_flares', 0)
-            
-            # Create activity pattern (simplified - same for all days for now)
-            region_activity = []
-            base_activity = (c_flares * 1 + m_flares * 5 + x_flares * 10) / 8
-            
-            for _ in range(8):
-                # Add some variation
-                variation = np.random.uniform(0.7, 1.3)
-                region_activity.append(max(0, base_activity * variation))
-            
-            activity.append(region_activity)
-        
-        return jsonify({'regions': regions, 'days': days, 'activity': activity})
+        return jsonify({
+            'regions': [],
+            'days': [],
+            'activity': [],
+            'note': 'Region heatmap disabled because historical per-region activity is not available from the current SWPC feed.'
+        })
     except Exception as e:
         print(f"Error fetching region heatmap: {e}")
         return jsonify({'regions': [], 'days': [], 'activity': []}), 500
@@ -6005,7 +6694,7 @@ if __name__ == '__main__':
         interval = int(sys.argv[3]) if len(sys.argv) > 3 else 1
         duration = int(sys.argv[4]) if len(sys.argv) > 4 else 500
         
-        print(f"🎬 CLI Mode: Generating Animated GIF")
+        print("CLI Mode: Generating Animated GIF")
         gif_path = generate_animated_gif(
             hours_duration=hours,
             frame_interval_minutes=interval,
@@ -6013,9 +6702,9 @@ if __name__ == '__main__':
         )
         
         if gif_path:
-            print(f"\n✅ Success! Animation saved to: {gif_path}")
+            print(f"\nSuccess! Animation saved to: {gif_path}")
         else:
-            print(f"\n❌ Failed to generate animation")
+            print("\nFailed to generate animation")
         
     else:
         # Web server mode
@@ -6051,14 +6740,17 @@ if __name__ == '__main__':
                 # Check every 20 seconds
                 time.sleep(20)
         
-        # Start background thread
-        bg_thread = threading.Thread(target=background_map_refresh, daemon=True)
-        bg_thread.start()
-        print("🔄 Background map refresh thread started")
+        # Start background thread unless disabled for local smoke tests.
+        if os.environ.get('AURORA_DISABLE_BG_REFRESH') == '1':
+            print("Background map refresh thread disabled")
+        else:
+            bg_thread = threading.Thread(target=background_map_refresh, daemon=True)
+            bg_thread.start()
+            print("Background map refresh thread started")
         
-        print("🌌 Aurora Dashboard Starting...")
-        print(f"🌐 Open your browser to: http://localhost:{port}")
-        print(f"🎬 Generate GIF: http://localhost:{port}/generate-gif?hours=2&interval=1&duration=500")
-        print("\n💡 CLI Mode: python aurora.py generate-gif [hours] [interval_minutes] [frame_duration_ms]")
+        print("Aurora Dashboard Starting...")
+        print(f"Open your browser to: http://localhost:{port}")
+        print(f"Generate GIF: http://localhost:{port}/generate-gif?hours=2&interval=1&duration=500")
+        print("\nCLI Mode: python aurora.py generate-gif [hours] [interval_minutes] [frame_duration_ms]")
         print("   Example: python aurora.py generate-gif 2 1 500  (captures 2 hours at 1-min intervals)")
         app.run(debug=debug_mode, host=host, port=port, threaded=True)

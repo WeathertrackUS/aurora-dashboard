@@ -1,0 +1,593 @@
+:root {
+    --wtus-bg: #0a0d11;
+    --wtus-panel: #11151a;
+    --wtus-panel-2: #151b21;
+    --wtus-border: rgba(180, 215, 228, 0.10);
+    --wtus-border-strong: rgba(180, 215, 228, 0.16);
+    --wtus-text: #edf3f7;
+    --wtus-muted: #8fa2b1;
+    --wtus-accent: #8bd3cf;
+    --wtus-blue: #5fa6bb;
+    --wtus-yellow: #fbbf24;
+    --wtus-orange: #fb923c;
+    --wtus-red: #ef4444;
+    --wtus-green: #22c55e;
+}
+
+.navbar {
+    background: #0c1117 !important;
+    border-bottom: 1px solid var(--wtus-border) !important;
+    box-shadow: 0 8px 24px -22px rgba(0, 0, 0, 0.92) !important;
+}
+
+.brand span {
+    display: none;
+}
+
+.card,
+.chart-panel,
+.map-panel,
+.tab-navigation,
+.tab-bar,
+.date-bar,
+.update-indicator {
+    border-radius: 5px !important;
+    border-color: var(--wtus-border) !important;
+    box-shadow: 0 10px 28px -26px rgba(0, 0, 0, 0.95) !important;
+}
+
+.card,
+.chart-panel,
+.map-panel {
+    background: var(--wtus-panel) !important;
+}
+
+.card:hover,
+.chart-panel:hover {
+    background: var(--wtus-panel-2) !important;
+    border-color: var(--wtus-border-strong) !important;
+}
+
+.card-title,
+.chart-title,
+.imagery-section-title {
+    letter-spacing: 0.055em !important;
+}
+
+.btn,
+.refresh-btn,
+.action-btn,
+.time-btn,
+.filter-btn,
+.tab-btn,
+.range-btn,
+.mode-toggle-btn,
+.sub-tab,
+.load-btn {
+    border-radius: 4px !important;
+}
+
+.wtus-source-note {
+    color: var(--wtus-muted);
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.solar-command-header {
+    margin-bottom: 0.85rem;
+}
+
+.solar-status-item {
+    background: var(--wtus-panel);
+    border: 1px solid var(--wtus-border);
+    border-radius: 5px;
+    box-shadow: 0 10px 28px -26px rgba(0, 0, 0, 0.95);
+}
+
+.solar-status-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.solar-status-item {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 76px;
+    padding: 0.68rem 0.72rem;
+    border-top: 2px solid rgba(139, 211, 207, 0.34);
+}
+
+.solar-status-item:nth-child(2) {
+    border-top-color: rgba(251, 191, 36, 0.42);
+}
+
+.solar-status-item:nth-child(3) {
+    border-top-color: rgba(167, 139, 250, 0.38);
+}
+
+.solar-status-item:nth-child(4) {
+    border-top-color: rgba(96, 165, 250, 0.36);
+}
+
+.solar-status-item span {
+    color: var(--wtus-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.solar-status-item strong {
+    margin-top: 0.2rem;
+    color: var(--wtus-text);
+    font-family: var(--font-mono, monospace);
+    font-size: 1.02rem;
+    line-height: 1.15;
+}
+
+.solar-status-item.is-accent {
+    border-color: rgba(139, 211, 207, 0.24);
+    background: rgba(139, 211, 207, 0.055);
+}
+
+.overview-layout {
+    grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.82fr) !important;
+}
+
+.content-row {
+    grid-template-columns: minmax(0, 2.25fr) minmax(230px, 0.8fr) minmax(230px, 0.8fr) !important;
+}
+
+.xray-card,
+.proton-card,
+.suvi-card,
+.ccor-card,
+.sunspot-card,
+.coronal-hole-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.xray-card::before,
+.proton-card::before,
+.suvi-card::before,
+.ccor-card::before,
+.sunspot-card::before,
+.coronal-hole-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: var(--wtus-accent);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.proton-card::before {
+    background: #a78bfa;
+}
+
+.suvi-card::before,
+.coronal-hole-card::before {
+    background: #8bd3cf;
+}
+
+.ccor-card::before {
+    background: #60a5fa;
+}
+
+.sunspot-card::before {
+    background: #fbbf24;
+}
+
+.image-card .solar-image-container {
+    min-height: 250px;
+}
+
+.solar-reference-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr) minmax(260px, 0.8fr);
+    gap: 0.85rem;
+}
+
+.solar-reference-card {
+    min-height: 150px;
+    background:
+        linear-gradient(180deg, rgba(139, 211, 207, 0.035), transparent 48%),
+        var(--wtus-panel) !important;
+}
+
+.solar-reference-card:nth-child(2) {
+    background:
+        linear-gradient(180deg, rgba(96, 165, 250, 0.04), transparent 48%),
+        var(--wtus-panel) !important;
+}
+
+.solar-reference-card:nth-child(3) {
+    background:
+        linear-gradient(180deg, rgba(251, 191, 36, 0.035), transparent 48%),
+        var(--wtus-panel) !important;
+}
+
+.solar-reference-values {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+    padding: 0.55rem;
+}
+
+.solar-reference-card:nth-child(2) .solar-reference-values {
+    grid-template-columns: 1fr 1fr;
+}
+
+.solar-reference-item {
+    min-width: 0;
+    padding: 0.62rem;
+    border: 1px solid var(--wtus-border);
+    border-radius: 5px;
+    background: rgba(3, 8, 12, 0.28);
+}
+
+.solar-reference-item span {
+    display: block;
+    color: var(--wtus-muted);
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.solar-reference-item strong {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--wtus-text);
+    font-family: var(--font-mono, monospace);
+    font-size: 1.16rem;
+    line-height: 1.1;
+}
+
+.solar-reference-item small {
+    display: block;
+    margin-top: 0.22rem;
+    color: var(--wtus-muted);
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
+.solar-reference-item.is-large strong {
+    color: var(--wtus-accent);
+    font-size: 1.42rem;
+}
+
+.swpc-report-actions {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.55rem;
+}
+
+.report-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 34px;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--wtus-border);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--wtus-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: left;
+}
+
+.report-btn::after {
+    content: "View";
+    color: var(--wtus-accent);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.report-btn:hover {
+    border-color: rgba(139, 211, 207, 0.26);
+    background: rgba(139, 211, 207, 0.055);
+}
+
+.swpc-report-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2300;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(3, 7, 12, 0.82);
+}
+
+.swpc-report-modal.open {
+    display: flex;
+}
+
+.swpc-report-dialog {
+    width: min(920px, 100%);
+    max-height: min(82vh, 760px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--wtus-border);
+    border-radius: 6px;
+    background: var(--wtus-panel);
+    box-shadow: 0 26px 80px -42px rgba(0, 0, 0, 0.95);
+}
+
+.swpc-report-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--wtus-border);
+}
+
+.swpc-report-title {
+    color: var(--wtus-text);
+    font-weight: 800;
+}
+
+.swpc-report-source {
+    margin-top: 0.15rem;
+    color: var(--wtus-muted);
+    font-size: 0.72rem;
+}
+
+.swpc-report-close {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--wtus-border);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--wtus-text);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.swpc-report-body {
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    color: #d8e2e8;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.watchlist-panel {
+    margin-bottom: 0.75rem;
+}
+
+.watchlist-summary {
+    margin: 0.1rem 0.55rem 0;
+    padding: 0.62rem 0.68rem;
+    border: 1px solid rgba(139, 211, 207, 0.16);
+    border-radius: 5px;
+    background: rgba(139, 211, 207, 0.045);
+    color: #d8e8ec;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.watchlist-body {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.55rem;
+}
+
+.watchlist-row {
+    display: grid;
+    grid-template-columns: minmax(66px, auto) minmax(0, 1fr);
+    gap: 0.55rem 0.7rem;
+    padding: 0.62rem;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--wtus-border);
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.watchlist-row:hover {
+    border-color: rgba(139, 211, 207, 0.24);
+    background: rgba(139, 211, 207, 0.045);
+}
+
+.watchlist-row.is-primary {
+    border-color: rgba(251, 146, 60, 0.26);
+    background: rgba(251, 146, 60, 0.045);
+}
+
+.watchlist-region {
+    font-family: var(--font-mono, monospace);
+    font-weight: 700;
+    color: var(--wtus-text);
+}
+
+.watchlist-location {
+    margin-top: 0.18rem;
+    font-family: var(--font-mono, monospace);
+    color: var(--wtus-muted);
+    font-size: 0.72rem;
+}
+
+.watchlist-main {
+    min-width: 0;
+}
+
+.watchlist-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.watchlist-mag {
+    color: var(--wtus-text);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.watchlist-level {
+    color: var(--wtus-accent);
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.watchlist-area {
+    color: var(--wtus-muted);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    white-space: nowrap;
+}
+
+.watchlist-probs {
+    display: grid;
+    gap: 0.32rem;
+    margin-top: 0.45rem;
+}
+
+.watchlist-prob {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+}
+
+.watchlist-prob span {
+    color: var(--wtus-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.watchlist-prob strong {
+    color: var(--wtus-text);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    text-align: right;
+}
+
+.watchlist-bar {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.watchlist-bar-fill {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--wtus-accent);
+}
+
+.watchlist-bar-fill.c {
+    background: var(--wtus-yellow);
+}
+
+.watchlist-bar-fill.m {
+    background: var(--wtus-orange);
+}
+
+.watchlist-bar-fill.x {
+    background: var(--wtus-red);
+}
+
+.watchlist-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+}
+
+.watch-chip,
+.flare-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 4px;
+    border: 1px solid var(--wtus-border);
+    padding: 0.14rem 0.34rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.watch-chip {
+    color: #d6e3ea;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.flare-badge {
+    margin-left: 0.25rem;
+    font-family: var(--font-mono, monospace);
+}
+
+.flare-c {
+    color: var(--wtus-yellow);
+    background: rgba(251, 191, 36, 0.10);
+}
+
+.flare-m {
+    color: var(--wtus-orange);
+    background: rgba(251, 146, 60, 0.10);
+}
+
+.flare-x {
+    color: var(--wtus-red);
+    background: rgba(239, 68, 68, 0.10);
+}
+
+.data-state {
+    padding: 1rem;
+    text-align: center;
+    color: var(--wtus-muted);
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .overview-layout {
+        grid-template-columns: 1fr !important;
+    }
+
+    .solar-status-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .content-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    .solar-reference-grid,
+    .solar-reference-values,
+    .solar-reference-card:nth-child(2) .solar-reference-values {
+        grid-template-columns: 1fr;
+    }
+
+    .watchlist-row {
+        grid-template-columns: 1fr;
+    }
+
+    .watchlist-line {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
