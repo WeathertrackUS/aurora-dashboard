@@ -2594,10 +2594,33 @@
         </div>
     </nav>
 
-    <div class="mobile-page-switcher" aria-label="Quick page switch">
+    <div class="mobile-page-switcher" aria-label="Quick page switch" hidden>
         <a href="/" class="mobile-page-link active">Geomagnetic</a>
         <a href="/solar" class="mobile-page-link">Solar</a>
     </div>
+
+    <script>
+        (function() {
+            try {
+                const mobileSwitcher = document.querySelector('.mobile-page-switcher');
+                if (!mobileSwitcher) return;
+
+                const mediaQuery = window.matchMedia('(max-width: 768px)');
+                const syncMobileSwitcher = () => {
+                    mobileSwitcher.hidden = !mediaQuery.matches;
+                };
+
+                syncMobileSwitcher();
+                if (typeof mediaQuery.addEventListener === 'function') {
+                    mediaQuery.addEventListener('change', syncMobileSwitcher);
+                } else if (typeof mediaQuery.addListener === 'function') {
+                    mediaQuery.addListener(syncMobileSwitcher);
+                }
+            } catch (e) {
+                console.warn('Mobile switcher sync failed:', e);
+            }
+        })();
+    </script>
 
     <!-- System Alerts Container (supports multiple alerts). Individual banners are created by JS. -->
     <div id="system-alerts-container" style="margin: 0.5rem 1rem;"></div>
@@ -6074,6 +6097,28 @@
             const container = document.getElementById('system-alerts-container');
             container.innerHTML = '';
 
+            function escapeHtml(str) {
+                return String(str || '').replace(/[&<>"']/g, function (s) {
+                    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s];
+                });
+            }
+
+            function formatAlertMessage(message, issueRepo) {
+                let formatted = escapeHtml(message);
+
+                formatted = formatted.replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+                    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+                });
+
+                if (issueRepo) {
+                    formatted = formatted.replace(/(^|\s)#(\d+)\b/g, function (_, pre, id) {
+                        return pre + `<a href="https://github.com/${issueRepo}/issues/${id}" target="_blank" rel="noopener noreferrer">#${id}</a>`;
+                    });
+                }
+
+                return formatted;
+            }
+
             if (!alerts || alerts.length === 0) return;
 
             alerts.forEach((config, idx) => {
@@ -6093,36 +6138,39 @@
 
                 const inner = document.createElement('div');
                 inner.className = 'system-alert-banner__inner';
+                inner.style.display = 'flex';
+                inner.style.alignItems = 'flex-start';
+                inner.style.gap = '0.9rem';
 
                 const icon = document.createElement('span');
                 icon.style.fontSize = '1.5rem';
 
                 const body = document.createElement('div');
                 body.className = 'system-alert-banner__body';
+                body.style.flex = '1';
+                body.style.minWidth = '0';
 
                 const titleEl = document.createElement('div');
                 titleEl.className = 'system-alert-banner__title';
 
                 const messageEl = document.createElement('div');
                 messageEl.className = 'system-alert-banner__message';
+                messageEl.style.wordBreak = 'break-word';
 
                 const closeBtn = document.createElement('button');
                 closeBtn.className = 'system-alert-banner__close';
                 closeBtn.textContent = '×';
-
-                // Set textual content and styles based on type
-                function escapeHtml(str) {
-                    return String(str || '').replace(/[&<>"']/g, function (s) {
-                        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s];
-                    });
-                }
-
-                let processed = escapeHtml(messageText);
-                if (config.issue_repo) {
-                    processed = processed.replace(/(^|\s)#(\d+)\b/g, function (_, pre, id) {
-                        return pre + `<a href="https://github.com/${config.issue_repo}/issues/${id}" target="_blank" rel="noopener noreferrer">#${id}</a>`;
-                    });
-                }
+                closeBtn.type = 'button';
+                closeBtn.style.flexShrink = '0';
+                closeBtn.style.width = '30px';
+                closeBtn.style.height = '30px';
+                closeBtn.style.border = '1px solid rgba(180, 215, 228, 0.12)';
+                closeBtn.style.borderRadius = '999px';
+                closeBtn.style.background = 'rgba(255, 255, 255, 0.03)';
+                closeBtn.style.color = 'var(--text-secondary, #8fa2b1)';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.style.fontSize = '1rem';
+                closeBtn.style.lineHeight = '1';
 
                 // Type styling
                 let bgColor = 'rgba(59, 130, 246, 0.12)', borderColor = '#5fa6bb', iconText = '', titleText = 'System Notice';
@@ -6142,7 +6190,7 @@
                 banner.style.setProperty('--alert-accent', borderColor);
                 icon.textContent = iconText;
                 titleEl.textContent = titleText;
-                messageEl.innerHTML = processed;
+                messageEl.innerHTML = formatAlertMessage(messageText, config.issue_repo);
 
                 // Wire close behavior
                 if (config.dismissible) {
