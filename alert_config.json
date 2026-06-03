@@ -1,7 +1,7 @@
 [
   {
-    "enabled": false,
-    "message": "We are aware of an issue affecting images from SDO. We are working to resolve it as quickly as possible. See #6 for the latest on the issue.",
+    "enabled": true,
+    "message": "The SWPC (Space Weather Prediction Center) has issued a G3 (Strong) Geomagnetic Storm WATCH for Thu, Jun 4 & Fri, Jun 5 (UTC). Moderate-Strong Geomagnetic Storming is possible. https://www.swpc.noaa.gov/products/alerts-watches-and-warnings",
     "issue_repo": "WeathertrackUS/aurora-dashboard",
     "type": "warning",
     "dismissible": true
