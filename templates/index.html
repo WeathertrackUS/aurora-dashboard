@@ -16,23 +16,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/flare-alert.css">
     <style>
-        /* Local Metropolis fallback - requires font files in static/fonts/metropolis/ */
+        /* Use a local Metropolis install when available; otherwise fall back to the loaded web fonts. */
         @font-face {
             font-family: 'Metropolis';
-            src: local('Metropolis'),
-                 url('/static/fonts/metropolis/Metropolis-Regular.woff2') format('woff2'),
-                 url('/static/fonts/metropolis/Metropolis-Regular.woff') format('woff'),
-                 url('/static/fonts/metropolis/Metropolis-Regular.ttf') format('truetype');
+            src: local('Metropolis');
             font-weight: 400;
             font-style: normal;
             font-display: swap;
         }
         @font-face {
             font-family: 'Metropolis';
-            src: local('Metropolis Bold'),
-                 url('/static/fonts/metropolis/Metropolis-Bold.woff2') format('woff2'),
-                 url('/static/fonts/metropolis/Metropolis-Bold.woff') format('woff'),
-                 url('/static/fonts/metropolis/Metropolis-Bold.ttf') format('truetype');
+            src: local('Metropolis Bold');
             font-weight: 700;
             font-style: normal;
             font-display: swap;
@@ -296,13 +290,13 @@
 
         .aurora-probability-popup .leaflet-popup-content-wrapper {
             border: 1px solid rgba(143, 211, 207, 0.16);
-            border-radius: 18px;
-            background: linear-gradient(180deg, rgba(6, 12, 17, 0.985) 0%, rgba(9, 17, 24, 0.965) 100%);
-            box-shadow: 0 26px 58px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(7, 12, 17, 0.985) 0%, rgba(10, 17, 23, 0.97) 100%);
+            box-shadow: 0 22px 44px rgba(0, 0, 0, 0.42);
             color: var(--text-primary);
             padding: 0;
-            overflow: hidden;
-            backdrop-filter: blur(16px);
+            overflow: visible;
+            backdrop-filter: blur(12px);
         }
 
         .aurora-probability-popup .leaflet-popup-content {
@@ -315,15 +309,22 @@
         }
 
         .aurora-probability-popup .leaflet-popup-close-button {
-            top: 0.55rem;
-            right: 0.55rem;
-            width: 1.45rem;
-            height: 1.45rem;
+            top: 0.7rem;
+            right: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.4rem;
+            height: 1.4rem;
+            padding: 0;
+            box-sizing: border-box;
             border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.035);
             color: rgba(237, 243, 247, 0.72);
-            font-size: 1rem;
-            line-height: 1.45rem;
-            transition: background 0.18s ease, color 0.18s ease;
+            font-size: 0.92rem;
+            line-height: 1;
+            transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
         }
 
         .aurora-probability-popup .leaflet-popup-close-button:hover {
@@ -333,10 +334,11 @@
 
         .aurora-popup-card {
             position: relative;
-            padding: 0.92rem 0.95rem 0.88rem;
+            overflow: hidden;
+            border-radius: 15px;
+            padding: 0.95rem;
             font-family: 'Metropolis', var(--font-sans);
-            background:
-                linear-gradient(180deg, rgba(8, 13, 18, 0.985) 0%, rgba(9, 15, 21, 0.98) 100%);
+            background: linear-gradient(180deg, rgba(8, 13, 18, 0.992) 0%, rgba(8, 14, 20, 0.982) 100%);
         }
 
         .aurora-popup-card::before {
@@ -345,87 +347,82 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, color-mix(in srgb, var(--aurora-glow, #8bd3cf) 35%, transparent), var(--aurora-glow, #8bd3cf));
+            height: 3px;
+            background: linear-gradient(90deg, color-mix(in srgb, var(--aurora-glow, #8bd3cf) 28%, transparent), var(--aurora-glow, #8bd3cf));
             pointer-events: none;
         }
 
         .aurora-popup-hero {
             position: relative;
             margin: 0 0 0.82rem;
-            padding: 0 0 0.72rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .aurora-popup-hero::after {
-            content: none;
         }
 
         .aurora-popup-header {
             position: relative;
             z-index: 1;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 0.65rem;
         }
 
         .aurora-popup-overline {
             display: block;
-            font-size: 0.58rem;
+            font-size: 0.56rem;
             font-weight: 800;
-            letter-spacing: 0.16em;
+            letter-spacing: 0.15em;
             text-transform: uppercase;
             color: rgba(146, 168, 182, 0.84);
+            margin-bottom: 0.32rem;
         }
 
         .aurora-popup-badge {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 3.1rem;
-            padding: 0.26rem 0.56rem;
-            border-radius: 999px;
-            font-size: 0.76rem;
+            min-width: 3.35rem;
+            padding: 0.36rem 0.62rem;
+            border-radius: 12px;
+            border: 1px solid color-mix(in srgb, var(--aurora-glow, #8bd3cf) 34%, rgba(255, 255, 255, 0.12));
+            background: color-mix(in srgb, var(--aurora-glow, #8bd3cf) 18%, rgba(255, 255, 255, 0.04));
+            font-size: 0.8rem;
             font-weight: 800;
             letter-spacing: 0.02em;
-            color: #041015;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            filter: saturate(0.92);
+            color: var(--text-primary);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .aurora-popup-title {
             position: relative;
             z-index: 1;
-            margin: 0.72rem 0 0.26rem;
+            margin: 0;
             font-family: 'Metropolis', var(--font-sans);
-            font-size: 1.12rem;
+            font-size: 1.02rem;
             font-weight: 800;
-            line-height: 1.02;
+            line-height: 1.16;
             color: var(--text-primary);
             text-wrap: balance;
-            letter-spacing: -0.025em;
+            letter-spacing: -0.018em;
         }
 
         .aurora-popup-summary {
             position: relative;
             z-index: 1;
-            margin: 0 0 0.62rem;
-            max-width: 34ch;
+            margin: 0.6rem 0 0.68rem;
+            max-width: 35ch;
             font-size: 0.76rem;
-            line-height: 1.42;
-            color: rgba(237, 243, 247, 0.72);
+            line-height: 1.5;
+            color: rgba(226, 234, 240, 0.78);
         }
 
         .aurora-popup-meter {
             position: relative;
             z-index: 1;
-            position: relative;
             height: 6px;
             margin-bottom: 0;
             overflow: hidden;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.055);
             box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
         }
 
@@ -440,20 +437,24 @@
         .aurora-popup-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.42rem;
-            margin-bottom: 0.54rem;
+            gap: 0.48rem;
+            margin-bottom: 0.62rem;
         }
 
         .aurora-popup-metric {
-            padding: 0.6rem 0.66rem 0.56rem;
-            border: 1px solid rgba(180, 215, 228, 0.08);
-            border-radius: 11px;
+            padding: 0.66rem 0.7rem 0.64rem;
+            border: 1px solid rgba(180, 215, 228, 0.06);
+            border-radius: 12px;
             background: rgba(255, 255, 255, 0.025);
+        }
+
+        .aurora-popup-metric--wide {
+            grid-column: 1 / -1;
         }
 
         .aurora-popup-label {
             display: block;
-            margin-bottom: 0.22rem;
+            margin-bottom: 0.26rem;
             font-size: 0.56rem;
             font-weight: 800;
             letter-spacing: 0.14em;
@@ -475,87 +476,46 @@
             white-space: nowrap;
         }
 
-        .aurora-popup-inline-meta {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.36rem 0.62rem;
-            margin-bottom: 0.62rem;
+        .aurora-popup-note-strip {
+            margin: 0 0 0.62rem;
+            padding: 0.6rem 0.68rem;
+            border-radius: 11px;
+            background: rgba(130, 154, 170, 0.07);
+            border: 1px solid rgba(180, 215, 228, 0.05);
             font-size: 0.66rem;
-            color: rgba(237, 243, 247, 0.8);
-            padding-top: 0.04rem;
-            padding-bottom: 0.02rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .aurora-popup-inline-meta span {
-            display: inline-flex;
-            align-items: baseline;
-            gap: 0.32rem;
-        }
-
-        .aurora-popup-inline-meta span::after {
-            content: '';
-            width: 3px;
-            height: 3px;
-            margin-left: 0.1rem;
-            border-radius: 999px;
-            background: rgba(140, 164, 180, 0.4);
-        }
-
-        .aurora-popup-inline-meta span:last-child::after {
-            content: none;
-        }
-
-        .aurora-popup-inline-meta strong {
-            font-size: 0.57rem;
-            font-weight: 800;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: rgba(140, 164, 180, 0.84);
+            line-height: 1.46;
+            color: rgba(193, 206, 216, 0.84);
         }
 
         .aurora-popup-time {
             display: block;
-            margin-bottom: 0.18rem;
-            font-size: 0.62rem;
+            margin-bottom: 0.26rem;
+            font-size: 0.64rem;
             font-weight: 700;
             color: rgba(192, 205, 216, 0.88);
             letter-spacing: 0.02em;
         }
 
-        .aurora-popup-note {
+        .aurora-popup-note,
+        .aurora-popup-guidance {
             display: block;
         }
 
-        .aurora-popup-disclaimer {
-            margin-top: 0.5rem;
-            padding: 0.58rem 0.66rem 0.62rem;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.025);
-            font-size: 0.62rem;
-            line-height: 1.46;
-            color: rgba(178, 192, 205, 0.9);
-        }
-
-        .aurora-popup-disclaimer strong {
-            display: inline-block;
-            margin-right: 0.26rem;
-            font-size: 0.56rem;
-            font-weight: 800;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: rgba(206, 220, 230, 0.92);
+        .aurora-popup-guidance {
+            color: rgba(163, 180, 193, 0.86);
         }
 
         .aurora-popup-footnote {
             margin-top: 0;
-            padding-top: 0.56rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 0.62rem;
-            line-height: 1.42;
-            color: rgba(140, 164, 180, 0.88);
+            padding-top: 0.58rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.68rem;
+            line-height: 1.58;
+            color: rgba(151, 174, 189, 0.9);
+        }
+
+        .aurora-popup-footnote .aurora-popup-guidance {
+            max-width: 34ch;
         }
         
         .map-image {
@@ -698,7 +658,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 0;
-            opacity: 0.018;
+            opacity: 0;
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
@@ -777,13 +737,13 @@
             justify-content: space-between;
             align-items: center;
             padding: 0.7rem 1.5rem;
-            background: #0d1117;
-            border-bottom: 1px solid rgba(180, 215, 228, 0.08);
+            background: rgba(12, 17, 23, 0.96);
+            border-bottom: 1px solid rgba(180, 215, 228, 0.12);
             position: sticky;
             top: 0;
             z-index: 1000;
             min-height: 56px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: none;
         }
 
         .brand {
@@ -816,25 +776,24 @@
             text-decoration: none;
             font-size: 0.9rem;
             font-weight: 500;
-            transition: color 0.2s;
+            padding: 0.38rem 0.72rem;
+            border-radius: 999px;
+            transition: color 0.2s, background-color 0.2s;
         }
 
         .nav-link:hover {
-            color: var(--accent-primary);
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .nav-link.active {
-            color: var(--accent-primary);
+            color: var(--text-primary);
+            background: rgba(139, 211, 207, 0.12);
             font-weight: 600;
         }
 
         .nav-link.active::after {
-            content: '';
-            display: block;
-            height: 2px;
-            margin-top: 0.3rem;
-            border-radius: 999px;
-            background: var(--accent-primary);
+            display: none;
         }
 
         .nav-stats {
@@ -2212,6 +2171,118 @@
                 font-size: 0.8rem;
             }
         }
+
+        @media (max-width: 768px) {
+            .main-container {
+                gap: 0.65rem;
+                padding: 0.5rem;
+            }
+
+            .dashboard-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.55rem;
+                padding: 0;
+                min-height: auto;
+            }
+
+            .map-panel {
+                grid-column: 1 / -1;
+                min-height: 300px;
+                aspect-ratio: auto;
+            }
+
+            .chart-panel {
+                min-height: 150px;
+                padding: 0.45rem;
+            }
+
+            .chart-container {
+                height: 116px !important;
+                min-height: 116px !important;
+                margin-top: 26px;
+            }
+
+            .bottom-charts-panel {
+                grid-column: 1 / -1 !important;
+            }
+
+            .bottom-charts-grid {
+                grid-template-columns: 1fr !important;
+                gap: 0.55rem !important;
+            }
+
+            .mag-chart-wrapper,
+            .power-chart-wrapper {
+                min-height: 156px;
+            }
+
+            .sidebar {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.55rem;
+                width: 100%;
+                max-width: none;
+                min-width: 0;
+            }
+
+            .sidebar .card {
+                margin-bottom: 0;
+            }
+
+            .card-dst,
+            .card-forecast,
+            .card-actions {
+                grid-column: 1 / -1;
+            }
+
+            .control-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .btn-full {
+                grid-column: 1 / -1;
+            }
+
+            .aurora-map-title {
+                padding: 0.36rem 0.48rem;
+            }
+
+            .aurora-map-title strong {
+                font-size: 0.72rem;
+            }
+
+            .aurora-map-title span {
+                font-size: 0.62rem;
+            }
+
+            .map-tool-btn {
+                padding: 0.3rem 0.42rem;
+                font-size: 0.62rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-container {
+                padding: 0.35rem;
+            }
+
+            .dashboard-grid {
+                gap: 0.45rem;
+            }
+
+            .chart-panel {
+                min-height: 142px;
+            }
+
+            .map-panel {
+                min-height: 260px;
+            }
+
+            .sidebar {
+                grid-template-columns: 1fr;
+            }
+        }
         
         /* Touch-specific improvements */
         @media (hover: none) and (pointer: coarse) {
@@ -2285,14 +2356,14 @@
         /* System alert link styles: brighter blue/purple for visibility */
         #system-alert-banner a,
         #system-alert-banner a:visited {
-            color: #6C63FF; /* bright blue/purple */
+            color: #9ac7ff;
             text-decoration: underline;
             font-weight: 600;
         }
 
         #system-alert-banner a:hover,
         #system-alert-banner a:focus {
-            color: #9FA8FF;
+            color: #c1dcff;
             text-decoration: underline;
             outline: none;
         }
@@ -2504,7 +2575,8 @@
     <div class="bg-noise"></div>
     <nav class="navbar">
         <a href="/" class="brand">
-            <span></span> WTUS Space Weather Dashboard
+            <span class="brand-full">WTUS Space Weather Dashboard</span>
+            <span class="brand-short">WTUS SpaceWx</span>
         </a>
         <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
             ☰
@@ -2521,6 +2593,11 @@
             </div>
         </div>
     </nav>
+
+    <div class="mobile-page-switcher" aria-label="Quick page switch">
+        <a href="/" class="mobile-page-link active">Geomagnetic</a>
+        <a href="/solar" class="mobile-page-link">Solar</a>
+    </div>
 
     <!-- System Alerts Container (supports multiple alerts). Individual banners are created by JS. -->
     <div id="system-alerts-container" style="margin: 0.5rem 1rem;"></div>
@@ -2548,6 +2625,25 @@
             <button onclick="document.getElementById('alert-banner').style.display='none'" style="background: none; border: none; color: #8b8b8b; font-size: 1.2rem; cursor: pointer; padding: 0.25rem 0.5rem;">&times;</button>
         </div>
     </div>
+
+    <section class="mobile-quick-stats" aria-label="Geomagnetic snapshot">
+        <div class="mobile-quick-stat">
+            <span>Kp Index</span>
+            <strong id="mobile-kp-value">--</strong>
+        </div>
+        <div class="mobile-quick-stat">
+            <span>IMF Bz</span>
+            <strong id="mobile-bz-value">--</strong>
+        </div>
+        <div class="mobile-quick-stat">
+            <span>Solar Wind</span>
+            <strong id="mobile-wind-value">--</strong>
+        </div>
+        <div class="mobile-quick-stat">
+            <span>Hemispheric Power</span>
+            <strong id="mobile-power-value">--</strong>
+        </div>
+    </section>
 
     <main class="main-container">
 
@@ -3403,16 +3499,23 @@
             const AuroraOvalLayer = L.Layer.extend({
                 onAdd(map) {
                     this._map = map;
-                    this._canvas = L.DomUtil.create('canvas', 'aurora-oval-canvas');
+                    this._zoomAnimated = map._zoomAnimated;
+                    this._canvas = L.DomUtil.create('canvas', 'aurora-oval-canvas leaflet-zoom-animated');
                     this._canvas.style.position = 'absolute';
                     this._canvas.style.pointerEvents = 'none';
                     this._canvas.style.mixBlendMode = 'screen';
                     map.getPanes().overlayPane.appendChild(this._canvas);
-                    map.on('move zoom resize', this._reset, this);
+                    map.on('moveend zoomend resize', this._reset, this);
+                    if (this._zoomAnimated) {
+                        map.on('zoomanim', this._animateZoom, this);
+                    }
                     this._reset();
                 },
                 onRemove(map) {
-                    map.off('move zoom resize', this._reset, this);
+                    map.off('moveend zoomend resize', this._reset, this);
+                    if (this._zoomAnimated) {
+                        map.off('zoomanim', this._animateZoom, this);
+                    }
                     L.DomUtil.remove(this._canvas);
                 },
                 redraw() {
@@ -3429,10 +3532,26 @@
                     this._canvas.height = Math.round(size.y * pixelRatio);
                     this._canvas.style.width = `${size.x}px`;
                     this._canvas.style.height = `${size.y}px`;
+                    this._center = this._map.getCenter();
+                    this._zoom = this._map.getZoom();
 
                     const ctx = this._canvas.getContext('2d');
                     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
                     this._draw();
+                },
+                _animateZoom(event) {
+                    if (!this._map || !this._canvas || !this._center || this._zoom === undefined) return;
+
+                    const scale = this._map.getZoomScale(event.zoom, this._zoom);
+                    const viewHalf = this._map.getSize().multiplyBy(0.5);
+                    const currentCenterPoint = this._map.project(this._center, event.zoom);
+                    const topLeftOffset = viewHalf
+                        .multiplyBy(-scale)
+                        .add(currentCenterPoint)
+                        .subtract(this._map._getNewPixelOrigin(event.center, event.zoom))
+                        .round();
+
+                    L.DomUtil.setTransform(this._canvas, topLeftOffset, scale);
                 },
                 _draw() {
                     const ctx = this._canvas.getContext('2d');
@@ -3442,10 +3561,11 @@
 
                     const zoom = this._map.getZoom();
                     const worldWidth = this._map.options.crs.scale(zoom);
-                    const northWest = this._map.latLngToContainerPoint([auroraOvalRaster.north, auroraOvalRaster.west]);
-                    const southEast = this._map.latLngToContainerPoint([auroraOvalRaster.south, auroraOvalRaster.east]);
-                    const drawLeft = northWest.x;
-                    const drawTop = northWest.y;
+                    const topLeft = this._topLeft || this._map.containerPointToLayerPoint([0, 0]);
+                    const northWest = this._map.latLngToLayerPoint([auroraOvalRaster.north, auroraOvalRaster.west]);
+                    const southEast = this._map.latLngToLayerPoint([auroraOvalRaster.south, auroraOvalRaster.east]);
+                    const drawLeft = northWest.x - topLeft.x;
+                    const drawTop = northWest.y - topLeft.y;
                     let drawWidth = southEast.x - northWest.x;
                     const drawHeight = southEast.y - northWest.y;
                     if (drawWidth <= 0) {
@@ -3517,7 +3637,7 @@
             auroraOvalTimestamp = payload.time_tag || payload.generated_at || null;
             const statusEl = document.getElementById('aurora-map-updated');
             if (statusEl) {
-                statusEl.textContent = `${formatAuroraMapTimestamp(auroraOvalTimestamp)} · ${auroraOvalPoints.length.toLocaleString()} plotted cells`;
+                statusEl.textContent = formatAuroraMapTimestamp(auroraOvalTimestamp);
             }
             auroraOvalLayer.redraw();
             auroraMap.invalidateSize();
@@ -3562,9 +3682,9 @@
 
         function auroraProbabilityLabel(value) {
             if (value >= 80) return 'Intense';
-            if (value >= 55) return 'Active';
+            if (value >= 60) return 'Active';
             if (value >= 30) return 'Moderate';
-            if (value >= 12) return 'Faint';
+            if (value >= 12) return 'Minor';
             return 'Minimal';
         }
 
@@ -3577,10 +3697,10 @@
         }
 
         function auroraProbabilityNarrative(value) {
-            if (value >= 80) return 'This click lands under one of the stronger modeled sections of the oval.';
-            if (value >= 55) return 'The modeled oval is fairly active here, with a stronger-than-average local signal.';
-            if (value >= 30) return 'This point sits inside a workable part of the oval, though intensity is still uneven.';
-            if (value >= 12) return 'You are near a softer fringe of the modeled oval rather than its brighter core.';
+            if (value >= 80) return 'Very High chance of auroral visibility. Overhead auroras very likely.';
+            if (value >= 60) return 'Decent chance of auroral visibility. Overhead auroras possible under darker skies.';
+            if (value >= 30) return 'Moderate chance of auroral visibility, particularly under darker skies.';
+            if (value >= 12) return 'Minor chance of auroral visibility.';
             return 'This click is on the quiet outer edge of the modeled oval.';
         }
 
@@ -3606,10 +3726,12 @@
                     <div class="aurora-popup-card" style="--aurora-glow:${popupColor};">
                         <div class="aurora-popup-hero">
                             <div class="aurora-popup-header">
-                                <span class="aurora-popup-overline">OVATION cell forecast</span>
-                                <span class="aurora-popup-badge" style="background:${popupColor};">${probability}</span>
+                                <div>
+                                    <span class="aurora-popup-overline">SWPC OVATION cell forecast</span>
+                                    <p class="aurora-popup-title">${popupTone} auroral potential</p>
+                                </div>
+                                <span class="aurora-popup-badge">${probability}</span>
                             </div>
-                            <p class="aurora-popup-title">${popupTone} auroral potential</p>
                             <p class="aurora-popup-summary">${popupNarrative}</p>
                             <div class="aurora-popup-meter"><span style="width:${probabilityPercent}%;"></span></div>
                         </div>
@@ -3619,30 +3741,32 @@
                                 <span class="aurora-popup-value aurora-popup-value--mono">${formatSignedCoordinate(nearest.lat, 'N', 'S')} · ${formatSignedCoordinate(nearest.lon, 'E', 'W')}</span>
                             </div>
                             <div class="aurora-popup-metric">
-                                <span class="aurora-popup-label">Forecast window</span>
+                                <span class="aurora-popup-label">Model window</span>
                                 <span class="aurora-popup-value">30 minute model</span>
                             </div>
+                            <div class="aurora-popup-metric aurora-popup-metric--wide">
+                                <span class="aurora-popup-label">Source</span>
+                                <span class="aurora-popup-value">SWPC OVATION</span>
+                            </div>
                         </div>
-                        <div class="aurora-popup-inline-meta">
-                            <span><strong>Band</strong><span>${popupTone}</span></span>
-                            <span><strong>Source</strong><span>SWPC OVATION</span></span>
-                        </div>
-                        <p class="aurora-popup-footnote"><span class="aurora-popup-time">${popupTimestamp}</span><span class="aurora-popup-note">Nearest 1° grid cell; not an exact point forecast.</span></p>
-                        <p class="aurora-popup-disclaimer"><strong>Caution</strong>Please use this with caution. Geomagnetic conditions, and auroral visibility will vary. Monitor real-time solar wind &amp; magnetometer data.</p>
+                        <p class="aurora-popup-note-strip"><span class="aurora-popup-label">Modeled probability</span><span class="aurora-popup-note">${probability} for the nearest 1° grid cell. Use this as a modeled local signal, not an exact point forecast.</span></p>
+                        <p class="aurora-popup-footnote"><span class="aurora-popup-time">${popupTimestamp}</span><span class="aurora-popup-guidance">Please use this with caution. Geomagnetic conditions, and auroral visibility will vary. Monitor real-time solar wind &amp; magnetometer data.</span></p>
                     </div>
                 `
                 : `
                     <div class="aurora-popup-card" style="--aurora-glow:${popupColor};">
                         <div class="aurora-popup-hero">
                             <div class="aurora-popup-header">
-                                <span class="aurora-popup-overline">OVATION cell forecast</span>
-                                <span class="aurora-popup-badge" style="background:${popupColor};">N/A</span>
+                                <div>
+                                    <span class="aurora-popup-overline">SWPC OVATION cell forecast</span>
+                                    <p class="aurora-popup-title">No nearby forecast cell</p>
+                                </div>
+                                <span class="aurora-popup-badge">N/A</span>
                             </div>
-                            <p class="aurora-popup-title">No nearby forecast cell</p>
                             <p class="aurora-popup-summary">The current SWPC payload did not include a usable auroral cell near this click.</p>
                         </div>
-                        <p class="aurora-popup-footnote"><span class="aurora-popup-time">${popupTimestamp}</span></p>
-                        <p class="aurora-popup-disclaimer"><strong>Caution</strong>Please use this with caution. Geomagnetic conditions, and auroral visibility will vary. Monitor real-time solar wind &amp; magnetometer data.</p>
+                        <p class="aurora-popup-note-strip">Try another nearby point or zoom out slightly if you want a broader read on the modeled oval edge.</p>
+                        <p class="aurora-popup-footnote"><span class="aurora-popup-time">${popupTimestamp}</span><span class="aurora-popup-guidance">Please use this with caution. Geomagnetic conditions, and auroral visibility will vary. Monitor real-time solar wind &amp; magnetometer data.</span></p>
                     </div>
                 `;
             L.popup({
@@ -4926,6 +5050,10 @@
                     
                     const lastVal = values[values.length - 1];
                     document.getElementById('chart-val-power').textContent = lastVal ? Math.round(lastVal) + ' GW' : '--';
+                    const mobilePowerEl = document.getElementById('mobile-power-value');
+                    if (mobilePowerEl) {
+                        mobilePowerEl.textContent = lastVal ? Math.round(lastVal) + ' GW' : '--';
+                    }
                 }
             }
             
@@ -5011,6 +5139,12 @@
             else if (kp >= 4) kpFill.style.background = '#84cc16'; // Kp4: Light Green
             else if (kp >= 3) kpFill.style.background = '#166534'; // Kp3: Dark Green
             else kpFill.style.background = '#6b7280';              // Kp0-2: Gray
+
+            const mobileKpEl = document.getElementById('mobile-kp-value');
+            if (mobileKpEl) {
+                mobileKpEl.textContent = formatKp(kp);
+                mobileKpEl.style.color = kpFill.style.background || 'var(--text-primary)';
+            }
             
             // G-Scale: Use the live NOAA scale value we already have
             // noaaGScale was already parsed above for Kp staleness detection
@@ -5043,6 +5177,10 @@
             if (solarWind.speed !== null && solarWind.speed !== undefined && speedEl && speedEl.textContent === '--') {
                 speedEl.textContent = Math.round(Number(solarWind.speed)) + ' km/s';
             }
+            const mobileWindEl = document.getElementById('mobile-wind-value');
+            if (mobileWindEl) {
+                mobileWindEl.textContent = solarWind.speed !== null && solarWind.speed !== undefined ? Math.round(Number(solarWind.speed)) + ' km/s' : '--';
+            }
             if (solarWind.density !== null && solarWind.density !== undefined && densityEl && densityEl.textContent === '--') {
                 densityEl.textContent = Number(solarWind.density).toFixed(1);
             }
@@ -5052,6 +5190,18 @@
             if (solarWind.bz !== null && solarWind.bz !== undefined && bzEl && bzEl.textContent === '--') {
                 bzEl.textContent = Number(solarWind.bz).toFixed(1) + ' nT';
                 bzEl.style.color = Number(solarWind.bz) < 0 ? '#ff4444' : '#4ade80';
+            }
+
+            const mobileBzEl = document.getElementById('mobile-bz-value');
+            if (mobileBzEl) {
+                if (solarWind.bz !== null && solarWind.bz !== undefined) {
+                    const bzValue = Number(solarWind.bz);
+                    mobileBzEl.textContent = bzValue.toFixed(1) + ' nT';
+                    mobileBzEl.style.color = bzValue < 0 ? '#ef4444' : '#22c55e';
+                } else {
+                    mobileBzEl.textContent = '--';
+                    mobileBzEl.style.color = 'var(--text-primary)';
+                }
             }
 
 
@@ -5448,8 +5598,11 @@
                 const logo = await loadImage('/wtusredlogotransparentx.png');
                 const logoHeight = Math.max(54, 56 * scale);
                 const logoWidth = (logo.width / logo.height) * logoHeight;
+                const logoPadding = Math.max(18, Math.min(mapRect.width, mapRect.height) * 0.035);
+                const logoX = mapRect.x + mapRect.width - logoWidth - logoPadding;
+                const logoY = mapRect.y + mapRect.height - logoHeight - logoPadding;
                 ctx.globalAlpha = 0.8;
-                ctx.drawImage(logo, 20 * scale, 20 * scale, logoWidth, logoHeight);
+                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
                 ctx.globalAlpha = 1.0;
             } catch (e) {
                 console.warn('Failed to load logo:', e);
@@ -5939,31 +6092,22 @@
                 banner.style.marginBottom = '0.5rem';
 
                 const inner = document.createElement('div');
-                inner.style.display = 'flex';
-                inner.style.alignItems = 'center';
-                inner.style.gap = '0.75rem';
+                inner.className = 'system-alert-banner__inner';
 
                 const icon = document.createElement('span');
                 icon.style.fontSize = '1.5rem';
 
                 const body = document.createElement('div');
-                body.style.flex = '1';
+                body.className = 'system-alert-banner__body';
 
                 const titleEl = document.createElement('div');
-                titleEl.style.fontWeight = '600';
-                titleEl.style.marginBottom = '0.25rem';
+                titleEl.className = 'system-alert-banner__title';
 
                 const messageEl = document.createElement('div');
-                messageEl.style.color = '#e5e5e5';
-                messageEl.style.fontSize = '0.9rem';
+                messageEl.className = 'system-alert-banner__message';
 
                 const closeBtn = document.createElement('button');
-                closeBtn.style.background = 'none';
-                closeBtn.style.border = 'none';
-                closeBtn.style.color = '#8b8b8b';
-                closeBtn.style.fontSize = '1.2rem';
-                closeBtn.style.cursor = 'pointer';
-                closeBtn.style.padding = '0.25rem 0.5rem';
+                closeBtn.className = 'system-alert-banner__close';
                 closeBtn.textContent = '×';
 
                 // Set textual content and styles based on type
@@ -5981,24 +6125,23 @@
                 }
 
                 // Type styling
-                let bgColor = 'rgba(59, 130, 246, 0.12)', borderColor = '#3b82f6', iconText = '', titleText = 'System Notice';
+                let bgColor = 'rgba(59, 130, 246, 0.12)', borderColor = '#5fa6bb', iconText = '', titleText = 'System Notice';
                 switch (config.type) {
                     case 'warning':
-                        bgColor = 'rgba(251, 146, 60, 0.12)'; borderColor = '#fb923c'; iconText = ''; titleText = 'Warning'; break;
+                        bgColor = 'rgba(112, 78, 42, 0.26)'; borderColor = '#f59e0b'; iconText = ''; titleText = 'Warning'; break;
                     case 'error':
-                        bgColor = 'rgba(239, 68, 68, 0.12)'; borderColor = '#ef4444'; iconText = ''; titleText = 'Important Notice'; break;
+                        bgColor = 'rgba(122, 42, 42, 0.24)'; borderColor = '#ef4444'; iconText = ''; titleText = 'Important Notice'; break;
                     case 'success':
-                        bgColor = 'rgba(34, 197, 94, 0.12)'; borderColor = '#22c55e'; iconText = ''; titleText = 'System Update'; break;
+                        bgColor = 'rgba(29, 83, 59, 0.24)'; borderColor = '#22c55e'; iconText = ''; titleText = 'System Update'; break;
                     case 'info':
                     default:
                         break;
                 }
 
-                banner.style.background = bgColor;
-                banner.style.border = `1px solid ${borderColor}`;
+                banner.style.setProperty('--alert-bg', bgColor);
+                banner.style.setProperty('--alert-accent', borderColor);
                 icon.textContent = iconText;
                 titleEl.textContent = titleText;
-                titleEl.style.color = borderColor;
                 messageEl.innerHTML = processed;
 
                 // Wire close behavior

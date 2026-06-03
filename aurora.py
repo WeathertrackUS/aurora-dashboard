@@ -1792,8 +1792,30 @@ def fetch_goes_magnetometer():
         goes18_hp = []
         goes19_times = []
         goes19_hp = []
+
+        def append_entry(entry):
+            try:
+                time_str = entry.get('time_tag')
+                satellite = entry.get('satellite')
+                hp = entry.get('Hp')
+
+                if not time_str or hp is None:
+                    return
+
+                time_obj = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                hp_value = float(hp)
+
+                if satellite == 18:
+                    goes18_times.append(time_obj)
+                    goes18_hp.append(hp_value)
+                elif satellite == 19:
+                    goes19_times.append(time_obj)
+                    goes19_hp.append(hp_value)
+            except Exception:
+                return
         
-        # Fetch primary satellite (GOES-19)
+        # SWPC's primary/secondary feeds can swap satellite assignment, so
+        # always trust the record's `satellite` field instead of the URL.
         try:
             response_primary = requests.get(GOES_MAG_PRIMARY_URL, timeout=10)
             if response_primary.status_code == 200:
@@ -1804,22 +1826,10 @@ def fetch_goes_magnetometer():
                     data_primary = []
                 
                 for entry in data_primary:
-                    try:
-                        time_str = entry.get('time_tag')
-                        satellite = entry.get('satellite')
-                        hp = entry.get('Hp')
-                        
-                        if time_str and hp is not None:
-                            time_obj = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-                            if satellite == 19:
-                                goes19_times.append(time_obj)
-                                goes19_hp.append(float(hp))
-                    except Exception as e:
-                        continue
+                    append_entry(entry)
         except Exception as e:
             print(f"Warning: Could not fetch GOES primary magnetometer: {e}")
         
-        # Fetch secondary satellite (GOES-18)
         try:
             response_secondary = requests.get(GOES_MAG_SECONDARY_URL, timeout=10)
             if response_secondary.status_code == 200:
@@ -1830,18 +1840,7 @@ def fetch_goes_magnetometer():
                     data_secondary = []
                 
                 for entry in data_secondary:
-                    try:
-                        time_str = entry.get('time_tag')
-                        satellite = entry.get('satellite')
-                        hp = entry.get('Hp')
-                        
-                        if time_str and hp is not None:
-                            time_obj = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-                            if satellite == 18:
-                                goes18_times.append(time_obj)
-                                goes18_hp.append(float(hp))
-                    except Exception as e:
-                        continue
+                    append_entry(entry)
         except Exception as e:
             print(f"Warning: Could not fetch GOES secondary magnetometer: {e}")
         
