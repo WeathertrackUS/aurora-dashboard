@@ -8,6 +8,8 @@ import json
 import time
 import threading
 import sys
+from math import cos, pi
+from zoneinfo import ZoneInfo
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
@@ -22,6 +24,8 @@ import cartopy.feature as cfeature
 from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
+from astral import Observer, moon
+from timezonefinder import TimezoneFinder
 import warnings
 import os
 import glob
@@ -139,6 +143,8 @@ cache = _SimpleCache()
 # Thread lock for expensive operations to prevent concurrent generation
 _map_generation_lock = threading.Lock()
 _map_generating = False  # Flag to indicate generation in progress
+_moon_timezone_finder = TimezoneFinder()
+_MOON_SYNODIC_MONTH = 29.53058867
 
 def _estimate_cache_value_size(value):
     """Best-effort deep size estimate without allocating serialized copies."""
@@ -269,6 +275,157 @@ def _figure_to_png_buffer(fig, **savefig_kwargs):
         return buf
     finally:
         plt.close(fig)
+
+
+def _moon_phase_details(phase_age_days):
+    phase_age_days = phase_age_days % _MOON_SYNODIC_MONTH
+    if phase_age_days < 1.84566 or phase_age_days >= 27.68493:
+        return 'New Moon', 'Excellent for aurora viewing - dark skies'
+    if phase_age_days < 5.53699:
+        return 'Waxing Crescent', 'Very good - minimal moonlight interference'
+    if phase_age_days < 9.22831:
+        return 'First Quarter', 'Good - moon sets around midnight'
+    if phase_age_days < 12.91963:
+        return 'Waxing Gibbous', 'Fair - bright moon may reduce visibility'
+    if phase_age_days < 16.61096:
+        return 'Full Moon', 'Poor - bright moonlight washes out aurora'
+    if phase_age_days < 20.30228:
+        return 'Waning Gibbous', 'Fair - moon rises late evening'
+    if phase_age_days < 23.99361:
+        return 'Last Quarter', 'Good - moon rises after midnight'
+    return 'Waning Crescent', 'Very good - moon rises near dawn'
+
+
+def _resolve_moon_location(location_query):
+    normalized_query = ' '.join(str(location_query).split())
+    if not normalized_query:
+        return None
+
+    cache_key = f"moon_location_lookup_{normalized_query.casefold()}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        response = requests.get(
+            'https://nominatim.openstreetmap.org/search',
+            params={
+                'q': normalized_query,
+                'format': 'jsonv2',
+                'limit': 1,
+                'addressdetails': 1,
+            },
+            headers={'User-Agent': 'WTUS SpaceWx/1.0 (location lookup)'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        results = response.json()
+    except Exception as exc:
+        print(f"[MOON_DATA] Location lookup failed for '{normalized_query}': {exc}")
+        return None
+
+    if not results:
+        return None
+
+    best_match = results[0]
+    try:
+        latitude = float(best_match.get('lat'))
+        longitude = float(best_match.get('lon'))
+    except (TypeError, ValueError):
+        return None
+
+    timezone_name = (
+        _moon_timezone_finder.timezone_at(lat=latitude, lng=longitude)
+        or _moon_timezone_finder.closest_timezone_at(lat=latitude, lng=longitude)
+        or 'UTC'
+    )
+
+    resolved = {
+        'latitude': latitude,
+        'longitude': longitude,
+        'timezone': timezone_name,
+        'label': best_match.get('display_name') or normalized_query,
+        'query': normalized_query,
+        'source': 'Nominatim',
+    }
+    cache.set(cache_key, resolved, timeout=86400)
+    return resolved
+
+
+def _format_moon_time(dt):
+    if dt is None:
+        return None
+    return dt.strftime('%I:%M %p %Z').lstrip('0')
+
+
+def _moon_payload_for_location(latitude=None, longitude=None):
+    now_utc = datetime.now(timezone.utc)
+    timezone_name = 'UTC'
+    location_now = now_utc
+    observer = None
+
+    if latitude is not None and longitude is not None:
+        timezone_name = (
+            _moon_timezone_finder.timezone_at(lat=latitude, lng=longitude)
+            or _moon_timezone_finder.closest_timezone_at(lat=latitude, lng=longitude)
+            or 'UTC'
+        )
+        try:
+            location_tz = ZoneInfo(timezone_name)
+            location_now = now_utc.astimezone(location_tz)
+        except Exception:
+            timezone_name = 'UTC'
+            location_tz = timezone.utc
+            location_now = now_utc
+        observer = Observer(latitude=latitude, longitude=longitude)
+    else:
+        location_tz = timezone.utc
+
+    reference_date = location_now.date()
+    phase_age_days = moon.phase(reference_date)
+    phase_fraction = (phase_age_days % _MOON_SYNODIC_MONTH) / _MOON_SYNODIC_MONTH
+    illumination_percent = int(round(50 * (1 - cos(phase_fraction * 2 * pi))))
+    phase_name, visibility_impact = _moon_phase_details(phase_age_days)
+
+    payload = {
+        'date': reference_date.isoformat(),
+        'as_of_utc': now_utc.isoformat(),
+        'phase_age_days': round(phase_age_days, 2),
+        'phase_fraction': round(phase_fraction, 6),
+        'illumination_percent': illumination_percent,
+        'phase_name': phase_name,
+        'visibility_impact': visibility_impact,
+        'source': 'Astral',
+        'timezone': timezone_name,
+        'location': None,
+        'moonrise': None,
+        'moonset': None,
+        'moonrise_label': None,
+        'moonset_label': None,
+    }
+
+    if observer is not None:
+        moonrise_dt = None
+        moonset_dt = None
+        try:
+            moonrise_dt = moon.moonrise(observer, date=reference_date, tzinfo=location_tz)
+        except ValueError:
+            moonrise_dt = None
+        try:
+            moonset_dt = moon.moonset(observer, date=reference_date, tzinfo=location_tz)
+        except ValueError:
+            moonset_dt = None
+        payload['location'] = {
+            'latitude': round(latitude, 4),
+            'longitude': round(longitude, 4),
+            'timezone': timezone_name,
+        }
+        payload['moonrise'] = moonrise_dt.isoformat() if moonrise_dt else None
+        payload['moonset'] = moonset_dt.isoformat() if moonset_dt else None
+        payload['moonrise_label'] = _format_moon_time(moonrise_dt) if moonrise_dt else 'No moonrise on this date'
+        payload['moonset_label'] = _format_moon_time(moonset_dt) if moonset_dt else 'No moonset on this date'
+
+    return payload
 
 
 
@@ -2671,6 +2828,62 @@ def solar_page():
 def historical_page():
     """Render the historical data archive page"""
     return render_template('historical.html')
+
+
+@app.route('/api/moon-data')
+def moon_data():
+    """Return current moon phase data, optionally enriched with location-based rise/set times."""
+    location_query = request.args.get('location', '').strip()
+    latitude_raw = request.args.get('lat', '').strip()
+    longitude_raw = request.args.get('lon', '').strip()
+
+    try:
+        resolved_location = None
+        latitude = None
+        longitude = None
+
+        if latitude_raw or longitude_raw:
+            latitude = float(latitude_raw) if latitude_raw else None
+            longitude = float(longitude_raw) if longitude_raw else None
+        elif location_query:
+            resolved_location = _resolve_moon_location(location_query)
+            if resolved_location:
+                latitude = resolved_location['latitude']
+                longitude = resolved_location['longitude']
+            else:
+                return jsonify({'error': f'Could not resolve location "{location_query}".'}), 404
+
+        if (latitude is None) != (longitude is None):
+            return jsonify({'error': 'Provide both latitude and longitude, or neither.'}), 400
+
+        if latitude is not None:
+            if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+                return jsonify({'error': 'Latitude must be between -90 and 90 and longitude between -180 and 180.'}), 400
+
+        cache_key = 'moon_data_global' if latitude is None else f'moon_data_{round(latitude, 4)}_{round(longitude, 4)}'
+        if resolved_location is not None:
+            cache_key = f"{cache_key}_{resolved_location['query'].casefold()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = jsonify(cached)
+            resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return resp
+
+        payload = _moon_payload_for_location(latitude, longitude)
+        if resolved_location is not None and payload.get('location'):
+            payload['location']['label'] = resolved_location['label']
+            payload['location']['query'] = resolved_location['query']
+            payload['location']['source'] = resolved_location['source']
+        cache.set(cache_key, payload, timeout=1800)
+
+        resp = jsonify(payload)
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
+    except ValueError:
+        return jsonify({'error': 'Invalid latitude or longitude.'}), 400
+    except Exception as e:
+        print(f"[MOON_DATA] Error: {e}")
+        return jsonify({'error': 'Failed to compute moon data.'}), 500
 
 # ── Historical Data API Endpoints ────────────────────────────────────────
 

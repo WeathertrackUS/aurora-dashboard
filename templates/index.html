@@ -2863,6 +2863,38 @@
                     <div style="font-weight: 600; margin-bottom: 0.15rem; color: var(--text-primary); font-size: 0.9rem;" id="moon-phase-name">New Moon</div>
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;" id="moon-illumination">0% illuminated</div>
                     <div style="font-size: 0.7rem; color: var(--text-secondary); padding: 0.3rem; background: rgba(255,255,255,0.03); border-radius: 3px; line-height: 1.3;" id="moon-visibility-impact"></div>
+                    <div style="display: grid; gap: 0.4rem; margin-top: 0.55rem; text-align: left;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.2rem; color: var(--text-secondary); font-size: 0.68rem;">City / Town</label>
+                            <input type="text" id="moon-location-query" placeholder="e.g., Reykjavik or Vancouver, BC"
+                                   style="width: 100%; padding: 0.35rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem;"
+                                   onchange="calculateMoonPhase()">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.2rem; color: var(--text-secondary); font-size: 0.68rem;">Latitude</label>
+                                <input type="number" id="moon-latitude" placeholder="e.g., 45.5" step="0.0001" min="-90" max="90"
+                                       style="width: 100%; padding: 0.35rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem;"
+                                       onchange="calculateMoonPhase()">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.2rem; color: var(--text-secondary); font-size: 0.68rem;">Longitude</label>
+                                <input type="number" id="moon-longitude" placeholder="e.g., -122.7" step="0.0001" min="-180" max="180"
+                                       style="width: 100%; padding: 0.35rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem;"
+                                       onchange="calculateMoonPhase()">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" type="button" style="flex: 1 1 0; min-height: 34px; padding: 0.35rem 0.55rem; font-size: 0.78rem;" onclick="searchMoonLocation()">Use City / Town</button>
+                            <button class="btn btn-secondary" type="button" style="flex: 1 1 0; min-height: 34px; padding: 0.35rem 0.55rem; font-size: 0.78rem;" onclick="useMoonLocation()">Use My Location</button>
+                            <button class="btn btn-secondary" type="button" style="flex: 1 1 0; min-height: 34px; padding: 0.35rem 0.55rem; font-size: 0.78rem;" onclick="clearMoonLocation()">Clear</button>
+                        </div>
+                        <div id="moon-location-status" style="font-size: 0.7rem; color: var(--text-secondary); padding: 0.35rem; background: rgba(255,255,255,0.03); border-radius: 3px; line-height: 1.35;">Enter a location or allow browser access to show moonrise and moonset times.</div>
+                        <div id="moon-rise-set" style="font-size: 0.75rem; color: var(--text-primary); padding: 0.35rem; background: rgba(255,255,255,0.03); border-radius: 3px; border: 1px solid var(--border); line-height: 1.4;">
+                            <div id="moonrise-label">Moonrise: --</div>
+                            <div id="moonset-label">Moonset: --</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3031,6 +3063,20 @@
             if (savedTz) {
                 document.getElementById('timezone-selector').value = savedTz;
                 currentTimezone = savedTz;
+            }
+
+            const savedMoonLat = localStorage.getItem('moonLatitude');
+            const savedMoonLon = localStorage.getItem('moonLongitude');
+            const savedMoonLocation = localStorage.getItem('moonLocationQuery');
+            if (savedMoonLat && savedMoonLon) {
+                const moonLatitudeInput = document.getElementById('moon-latitude');
+                const moonLongitudeInput = document.getElementById('moon-longitude');
+                if (moonLatitudeInput) moonLatitudeInput.value = savedMoonLat;
+                if (moonLongitudeInput) moonLongitudeInput.value = savedMoonLon;
+            }
+            if (savedMoonLocation) {
+                const moonLocationInput = document.getElementById('moon-location-query');
+                if (moonLocationInput) moonLocationInput.value = savedMoonLocation;
             }
             
             // Initialize moon phase
@@ -3243,11 +3289,13 @@
             const chart = echarts.init(container);
             window.echartsInstances['chart-dst'] = chart;
             
-            // Calculate Y axis range
-            const minDst = Math.min(...values, -50);
-            const maxDst = Math.max(...values, 50);
-            const yMin = Math.min(minDst - 20, -100);
-            const yMax = Math.max(maxDst + 20, 50);
+            // Calculate Y axis range from the data so the storm curve keeps its shape.
+            const minDst = Math.min(...values);
+            const maxDst = Math.max(...values);
+            const span = Math.max(20, maxDst - minDst);
+            const padding = Math.max(5, span * 0.18);
+            const yMin = Math.min(minDst - padding, -5);
+            const yMax = Math.max(maxDst + padding, 5);
             
             // Normalize function to map Dst values to gradient positions (0 = bottom, 1 = top)
             // Note: More negative Dst = more severe storm = should be red (at bottom of chart)
@@ -5854,57 +5902,191 @@
             }
         }
 
-        // Moon Phase Calculator
-        function calculateMoonPhase() {
-            const now = new Date();
-            
-            // Known new moon: January 29, 2025 at 12:36 UTC
-            const knownNewMoon = new Date('2025-01-29T12:36:00Z');
-            const lunarCycle = 29.53058867; // synodic month in days
-            
-            // Calculate phase (0-1 through the cycle)
-            const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
-            const daysInCycle = ((daysSinceNew % lunarCycle) + lunarCycle) % lunarCycle;
-            const phase = daysInCycle / lunarCycle; // 0 = new, 0.5 = full, 1 = new
-            
-            // Illumination: 0% at new, 100% at full
-            const illumination = Math.round(50 * (1 - Math.cos(phase * 2 * Math.PI)));
-            
-            // Phase name and aurora visibility impact
-            let phaseName, visibilityImpact;
-            
-            if (phase < 0.033 || phase > 0.967) {
-                phaseName = 'New Moon';
-                visibilityImpact = 'Excellent for aurora viewing — dark skies';
-            } else if (phase < 0.216) {
-                phaseName = 'Waxing Crescent';
-                visibilityImpact = 'Very good — minimal moonlight interference';
-            } else if (phase < 0.283) {
-                phaseName = 'First Quarter';
-                visibilityImpact = 'Good — moon sets around midnight';
-            } else if (phase < 0.466) {
-                phaseName = 'Waxing Gibbous';
-                visibilityImpact = 'Fair — bright moon may reduce visibility';
-            } else if (phase < 0.533) {
-                phaseName = 'Full Moon';
-                visibilityImpact = 'Poor — bright moonlight washes out aurora';
-            } else if (phase < 0.716) {
-                phaseName = 'Waning Gibbous';
-                visibilityImpact = 'Fair — moon rises late evening';
-            } else if (phase < 0.783) {
-                phaseName = 'Last Quarter';
-                visibilityImpact = 'Good — moon rises after midnight';
-            } else {
-                phaseName = 'Waning Crescent';
-                visibilityImpact = 'Very good — moon rises near dawn';
+        function formatMoonTimeInTimezone(isoString, timezoneName) {
+            if (!isoString) {
+                return '--';
             }
-            
-            // Render the moon on canvas
-            renderMoonCanvas(phase, illumination);
-            
-            document.getElementById('moon-phase-name').textContent = phaseName;
-            document.getElementById('moon-illumination').textContent = `${illumination}% illuminated`;
-            document.getElementById('moon-visibility-impact').textContent = visibilityImpact;
+
+            const date = new Date(isoString);
+            if (!timezoneName || timezoneName === 'UTC') {
+                return date.toISOString().slice(11, 16) + ' UTC';
+            }
+
+            try {
+                return date.toLocaleString('en-US', {
+                    timeZone: timezoneName,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZoneName: 'short'
+                });
+            } catch (e) {
+                return date.toISOString().slice(11, 16) + ' UTC';
+            }
+        }
+
+        // Moon Phase Calculator
+        async function calculateMoonPhase() {
+            const locationQueryInput = document.getElementById('moon-location-query');
+            const latitudeInput = document.getElementById('moon-latitude');
+            const longitudeInput = document.getElementById('moon-longitude');
+            const locationQuery = locationQueryInput ? locationQueryInput.value.trim() : '';
+            const latitude = latitudeInput ? latitudeInput.value.trim() : '';
+            const longitude = longitudeInput ? longitudeInput.value.trim() : '';
+            const locationStatus = document.getElementById('moon-location-status');
+            const moonriseLabel = document.getElementById('moonrise-label');
+            const moonsetLabel = document.getElementById('moonset-label');
+
+            const params = new URLSearchParams();
+            if (locationQuery) {
+                params.set('location', locationQuery);
+            }
+            if (latitude && longitude) {
+                params.set('lat', latitude);
+                params.set('lon', longitude);
+            }
+
+            if (latitudeInput && longitudeInput && ((latitude && !longitude) || (!latitude && longitude))) {
+                if (locationStatus) {
+                    locationStatus.textContent = 'Enter both latitude and longitude to calculate moonrise and moonset.';
+                }
+                if (moonriseLabel) {
+                    moonriseLabel.textContent = 'Moonrise: --';
+                }
+                if (moonsetLabel) {
+                    moonsetLabel.textContent = 'Moonset: --';
+                }
+                return;
+            }
+
+            if (!locationQuery && !latitude && !longitude) {
+                if (locationStatus) {
+                    locationStatus.textContent = 'Enter a location or allow browser access to show moonrise and moonset times.';
+                }
+                if (moonriseLabel) {
+                    moonriseLabel.textContent = 'Moonrise: --';
+                }
+                if (moonsetLabel) {
+                    moonsetLabel.textContent = 'Moonset: --';
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/moon-data${params.toString() ? `?${params.toString()}` : ''}`);
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Failed to fetch moon data');
+                }
+
+                const phase = typeof data.phase_fraction === 'number' ? data.phase_fraction : 0;
+                const illumination = Number.isFinite(data.illumination_percent) ? data.illumination_percent : 0;
+
+                renderMoonCanvas(phase, illumination);
+                document.getElementById('moon-phase-name').textContent = data.phase_name || 'Moon Phase';
+                document.getElementById('moon-illumination').textContent = `${illumination}% illuminated`;
+                document.getElementById('moon-visibility-impact').textContent = data.visibility_impact || '';
+
+                if (data.location) {
+                    if (locationStatus) {
+                        locationStatus.textContent = data.location.label
+                            ? `Times for ${data.location.label} in ${data.location.timezone}.`
+                            : `Times for ${data.location.latitude.toFixed(4)}, ${data.location.longitude.toFixed(4)} in ${data.location.timezone}.`;
+                    }
+                    if (moonriseLabel) {
+                        moonriseLabel.textContent = `Moonrise: ${data.moonrise_label || formatMoonTimeInTimezone(data.moonrise, data.location.timezone)}`;
+                    }
+                    if (moonsetLabel) {
+                        moonsetLabel.textContent = `Moonset: ${data.moonset_label || formatMoonTimeInTimezone(data.moonset, data.location.timezone)}`;
+                    }
+                    if (latitude && longitude) {
+                        localStorage.setItem('moonLatitude', latitude);
+                        localStorage.setItem('moonLongitude', longitude);
+                    }
+                    if (locationQuery) {
+                        localStorage.setItem('moonLocationQuery', locationQuery);
+                    }
+                } else {
+                    if (locationStatus) {
+                        locationStatus.textContent = 'Enter a location or allow browser access to show moonrise and moonset times.';
+                    }
+                    if (moonriseLabel) {
+                        moonriseLabel.textContent = 'Moonrise: --';
+                    }
+                    if (moonsetLabel) {
+                        moonsetLabel.textContent = 'Moonset: --';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching moon data:', error);
+                if (locationStatus) {
+                    locationStatus.textContent = 'Unable to load moonrise and moonset right now.';
+                }
+            }
+        }
+
+        function useMoonLocation() {
+            if (!navigator.geolocation) {
+                showToast('Browser location is not available.', 'error');
+                return;
+            }
+
+            const locationQueryInput = document.getElementById('moon-location-query');
+            if (locationQueryInput) {
+                locationQueryInput.value = '';
+            }
+            localStorage.removeItem('moonLocationQuery');
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const latitude = position.coords.latitude.toFixed(4);
+                    const longitude = position.coords.longitude.toFixed(4);
+                    const latitudeInput = document.getElementById('moon-latitude');
+                    const longitudeInput = document.getElementById('moon-longitude');
+
+                    if (latitudeInput) latitudeInput.value = latitude;
+                    if (longitudeInput) longitudeInput.value = longitude;
+                    localStorage.setItem('moonLatitude', latitude);
+                    localStorage.setItem('moonLongitude', longitude);
+                    calculateMoonPhase();
+                },
+                (error) => {
+                    console.error('Geolocation error:', error);
+                    showToast('Location access was not granted.', 'error');
+                },
+                { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+            );
+        }
+
+        function clearMoonLocation() {
+            const locationQueryInput = document.getElementById('moon-location-query');
+            const latitudeInput = document.getElementById('moon-latitude');
+            const longitudeInput = document.getElementById('moon-longitude');
+            if (locationQueryInput) locationQueryInput.value = '';
+            if (latitudeInput) latitudeInput.value = '';
+            if (longitudeInput) longitudeInput.value = '';
+            localStorage.removeItem('moonLocationQuery');
+            localStorage.removeItem('moonLatitude');
+            localStorage.removeItem('moonLongitude');
+            calculateMoonPhase();
+        }
+
+        async function searchMoonLocation() {
+            const locationQueryInput = document.getElementById('moon-location-query');
+            const latitudeInput = document.getElementById('moon-latitude');
+            const longitudeInput = document.getElementById('moon-longitude');
+            if (!locationQueryInput || !locationQueryInput.value.trim()) {
+                showToast('Enter a city or town name first.', 'error');
+                return;
+            }
+
+            if (latitudeInput) latitudeInput.value = '';
+            if (longitudeInput) longitudeInput.value = '';
+            localStorage.removeItem('moonLatitude');
+            localStorage.removeItem('moonLongitude');
+            localStorage.setItem('moonLocationQuery', locationQueryInput.value.trim());
+            calculateMoonPhase();
         }
         
         /**
