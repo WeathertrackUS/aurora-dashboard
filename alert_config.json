@@ -1,7 +1,7 @@
 [
   {
-    "enabled": true,
-    "message": "The SWPC (Space Weather Prediction Center) has issued a G3 (Strong) Geomagnetic Storm WATCH for Thu, Jun 4 & Fri, Jun 5 (UTC). Moderate-Strong Geomagnetic Storming is possible. https://www.swpc.noaa.gov/products/alerts-watches-and-warnings",
+    "enabled": false,
+    "message": "Test",
     "issue_repo": "WeathertrackUS/aurora-dashboard",
     "type": "warning",
     "dismissible": true
