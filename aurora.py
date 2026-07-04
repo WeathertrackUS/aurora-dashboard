@@ -68,10 +68,10 @@ if os.path.isdir(METROPOLIS_DIR):
 app = Flask(__name__)
 
 # External data endpoints
-PLASMA_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
-MAG_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json"
-PLASMA_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json"
-MAG_2HR_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json"
+PLASMA_URL = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json"
+MAG_URL = "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json"
+PLASMA_2HR_URL = PLASMA_URL
+MAG_2HR_URL = MAG_URL
 SCALES_URL = "https://services.swpc.noaa.gov/products/noaa-scales.json"
 GOES_XRAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json"
 GOES_XRAY_1DAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"
@@ -461,14 +461,20 @@ def interpolate_gaps(values, max_gap_minutes=10, time_interval_minutes=1):
     return [None if np.isnan(value) else float(value) for value in result]
 
 
-def _swpc_table_to_rows(table_rows):
-    """Convert SWPC JSON table payloads into header-keyed dictionaries."""
-    if not isinstance(table_rows, list) or len(table_rows) < 2:
+def _swpc_table_to_rows(payload):
+    """Normalize SWPC payloads into a list of dictionaries."""
+    if not isinstance(payload, list) or len(payload) == 0:
         return []
 
-    header = [str(column).strip() for column in table_rows[0]]
+    if isinstance(payload[0], dict):
+        return [row for row in payload if isinstance(row, dict)]
+
+    if len(payload) < 2 or not isinstance(payload[0], list):
+        return []
+
+    header = [str(column).strip() for column in payload[0]]
     parsed_rows = []
-    for row in table_rows[1:]:
+    for row in payload[1:]:
         if not isinstance(row, list):
             continue
         parsed_rows.append({
@@ -476,6 +482,42 @@ def _swpc_table_to_rows(table_rows):
             for index in range(len(header))
         })
     return parsed_rows
+
+
+def _swpc_plasma_value(row, *keys):
+    for key in keys:
+        if key in row:
+            return row.get(key)
+    return None
+
+
+def _swpc_row_priority(row):
+    active_value = row.get('active')
+    if isinstance(active_value, str):
+        active = active_value.strip().lower() == 'true'
+    else:
+        active = bool(active_value)
+
+    source = str(row.get('source') or '').upper()
+    source_priority = 2 if source == 'SOLAR1' else 1 if source else 0
+    return (1 if active else 0, source_priority)
+
+
+def _latest_swpc_row(rows):
+    latest_row = None
+    latest_time = None
+    for row in rows:
+        row_time = parse_swpc_datetime(row.get('time_tag'))
+        if not row_time:
+            continue
+        if latest_time is None or row_time > latest_time:
+            latest_row = row
+            latest_time = row_time
+            continue
+        if row_time == latest_time and latest_row is not None:
+            if _swpc_row_priority(row) > _swpc_row_priority(latest_row):
+                latest_row = row
+    return latest_row, latest_time
 
 
 def _swpc_numeric(value):
@@ -517,32 +559,32 @@ def fetch_solar_wind_data():
         mag_response.raise_for_status()
         mag_rows = _swpc_table_to_rows(mag_response.json())
         
-        latest_plasma = None
-        latest_plasma_time = None
-        for row in reversed(plasma_rows):
-            row_time = parse_swpc_datetime(row.get('time_tag'))
-            if row_time:
-                latest_plasma = row
-                latest_plasma_time = row_time
-                break
+        latest_plasma, latest_plasma_time = _latest_swpc_row(plasma_rows)
 
         latest_mag = None
-        for row in reversed(mag_rows):
+        latest_mag_time = None
+        for row in mag_rows:
             row_time = parse_swpc_datetime(row.get('time_tag'))
             if not row_time:
                 continue
             if latest_plasma_time and row_time == latest_plasma_time:
+                if latest_mag is None or _swpc_row_priority(row) > _swpc_row_priority(latest_mag):
+                    latest_mag = row
+                    latest_mag_time = row_time
+                continue
+            if latest_mag_time is None or row_time > latest_mag_time:
                 latest_mag = row
-                break
-            if latest_mag is None:
-                latest_mag = row
+                latest_mag_time = row_time
+            elif row_time == latest_mag_time and latest_mag is not None:
+                if _swpc_row_priority(row) > _swpc_row_priority(latest_mag):
+                    latest_mag = row
 
         if latest_plasma and latest_mag:
             return {
                 'time': latest_plasma.get('time_tag') or latest_mag.get('time_tag'),
-                'speed': _swpc_numeric(latest_plasma.get('speed')),
-                'density': _swpc_numeric(latest_plasma.get('density')),
-                'temperature': _swpc_numeric(latest_plasma.get('temperature')),
+                'speed': _swpc_numeric(_swpc_plasma_value(latest_plasma, 'speed', 'proton_speed')),
+                'density': _swpc_numeric(_swpc_plasma_value(latest_plasma, 'density', 'proton_density')),
+                'temperature': _swpc_numeric(_swpc_plasma_value(latest_plasma, 'temperature', 'proton_temperature')),
                 'bt': _swpc_numeric(latest_mag.get('bt')),
                 'bz': _swpc_numeric(latest_mag.get('bz_gsm')),
                 'bx': _swpc_numeric(latest_mag.get('bx_gsm')),
@@ -578,9 +620,14 @@ def fetch_solar_wind_history():
             dt = parse_swpc_datetime(row.get('time_tag'))
             if not dt:
                 continue
+            current_priority = _swpc_row_priority(row)
+            existing = plasma_by_time.get(dt)
+            if existing and existing['priority'] > current_priority:
+                continue
             plasma_by_time[dt] = {
-                'speed': _swpc_numeric(row.get('speed')),
-                'density': _swpc_numeric(row.get('density')),
+                'speed': _swpc_numeric(_swpc_plasma_value(row, 'speed', 'proton_speed')),
+                'density': _swpc_numeric(_swpc_plasma_value(row, 'density', 'proton_density')),
+                'priority': current_priority,
             }
 
         mag_by_time = {}
@@ -588,15 +635,24 @@ def fetch_solar_wind_history():
             dt = parse_swpc_datetime(row.get('time_tag'))
             if not dt:
                 continue
+            current_priority = _swpc_row_priority(row)
+            existing = mag_by_time.get(dt)
+            if existing and existing['priority'] > current_priority:
+                continue
             mag_by_time[dt] = {
                 'bz': _swpc_numeric(row.get('bz_gsm')),
                 'bt': _swpc_numeric(row.get('bt')),
+                'priority': current_priority,
             }
 
         common_times = sorted(set(plasma_by_time) & set(mag_by_time))
         if len(common_times) == 0:
             print("Warning: No overlapping plasma/magnetic solar wind timestamps")
             return _fallback_solar_wind_history(fetch_solar_wind_data())
+
+        latest_common_time = common_times[-1]
+        window_start = latest_common_time - timedelta(hours=2)
+        common_times = [dt for dt in common_times if dt >= window_start]
 
         times = []
         speeds = []
@@ -1000,19 +1056,22 @@ def fetch_kp_index():
         # Use forecast endpoint which has more up-to-date observed values
         KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
         response = requests.get(KP_FORECAST_URL, timeout=10)
+        response.raise_for_status()
         kp_data = response.json()
         
         # Find the most recent OBSERVED Kp value (not forecast)
-        if len(kp_data) > 1:
+        if isinstance(kp_data, list) and len(kp_data) > 0:
             latest_observed = None
             latest_time = None
             
             # Iterate backwards to find most recent observed value
-            for row in reversed(kp_data[1:]):  # Skip header
-                if len(row) >= 3 and row[2] == 'observed':
+            normalized_rows = _swpc_table_to_rows(kp_data)
+            for row in reversed(normalized_rows):
+                observed_flag = str(row.get('observed') or '').strip().lower()
+                if observed_flag == 'observed':
                     try:
-                        kp_value = float(row[1])
-                        kp_time = row[0]
+                        kp_value = float(row.get('kp'))
+                        kp_time = row.get('time_tag') or row.get('time')
                         latest_observed = kp_value
                         latest_time = kp_time
                         break
