@@ -108,6 +108,8 @@ OVATION_URL = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json"
 HEMI_POWER_URL = "https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt"
 GOES_MAG_PRIMARY_URL = "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json"
 GOES_MAG_SECONDARY_URL = "https://services.swpc.noaa.gov/json/goes/secondary/magnetometers-6-hour.json"
+KP_OBSERVED_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
+KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
 NASA_API_KEY = os.getenv('NASA_API_KEY', 'bgduJ4idKoFqHnlU7nUkToH4QJtrg7F44xhiuAwm')
 FLARE_ALERT_MAX_AGE_HOURS = 24
 
@@ -527,6 +529,41 @@ def _latest_swpc_row(rows):
             if _swpc_row_priority(row) > _swpc_row_priority(latest_row):
                 latest_row = row
     return latest_row, latest_time
+
+
+def _normalize_kp_rows(payload, default_observed=None):
+    rows = []
+    for row in _swpc_table_to_rows(payload):
+        kp_time = parse_swpc_datetime(row.get('time_tag') or row.get('time'))
+        if not kp_time:
+            continue
+
+        kp_value = _swpc_numeric(row.get('kp'))
+        if kp_value is None:
+            kp_value = _swpc_numeric(row.get('Kp'))
+        if kp_value is None:
+            continue
+
+        if default_observed is None:
+            observed_flag = str(row.get('observed') or '').strip().lower()
+            is_observed = observed_flag == 'observed'
+        else:
+            is_observed = default_observed
+
+        rows.append({
+            'time': kp_time,
+            'kp': kp_value,
+            'observed': is_observed,
+        })
+
+    rows.sort(key=lambda item: item['time'])
+    return rows
+
+
+def _fetch_kp_rows(url, default_observed=None):
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return _normalize_kp_rows(response.json(), default_observed=default_observed)
 
 
 def _swpc_numeric(value):
@@ -1060,40 +1097,26 @@ def fetch_solar_data():
         return None
 
 def fetch_kp_index():
-    """Fetch current Kp index from forecast endpoint (has most recent observed data)"""
+    """Fetch the latest observed planetary Kp index."""
     try:
-        # Use forecast endpoint which has more up-to-date observed values
-        KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
-        response = requests.get(KP_FORECAST_URL, timeout=10)
-        response.raise_for_status()
-        kp_data = response.json()
-        
-        # Find the most recent OBSERVED Kp value (not forecast)
-        if isinstance(kp_data, list) and len(kp_data) > 0:
-            latest_observed = None
-            latest_time = None
-            
-            # Iterate backwards to find most recent observed value
-            normalized_rows = _swpc_table_to_rows(kp_data)
-            for row in reversed(normalized_rows):
-                observed_flag = str(row.get('observed') or '').strip().lower()
-                if observed_flag == 'observed':
-                    try:
-                        kp_value = float(row.get('kp'))
-                        kp_time = row.get('time_tag') or row.get('time')
-                        latest_observed = kp_value
-                        latest_time = kp_time
-                        break
-                    except (ValueError, TypeError):
-                        continue
-            
-            if latest_observed is not None:
-                print(f"[KP_INDEX] Retrieved latest observed Kp: {latest_observed} at {latest_time}")
-                return {
-                    'time': latest_time,
-                    'kp': latest_observed
-                }
-            
+        observed_rows = _fetch_kp_rows(KP_OBSERVED_URL, default_observed=True)
+        if observed_rows:
+            latest_observed = observed_rows[-1]
+            print(f"[KP_INDEX] Retrieved latest observed Kp: {latest_observed['kp']} at {latest_observed['time'].isoformat()}")
+            return {
+                'time': latest_observed['time'].isoformat(),
+                'kp': latest_observed['kp']
+            }
+
+        forecast_rows = [row for row in _fetch_kp_rows(KP_FORECAST_URL) if row['observed']]
+        if forecast_rows:
+            latest_observed = forecast_rows[-1]
+            print(f"[KP_INDEX] Fallback observed Kp from forecast feed: {latest_observed['kp']} at {latest_observed['time'].isoformat()}")
+            return {
+                'time': latest_observed['time'].isoformat(),
+                'kp': latest_observed['kp']
+            }
+
         print("[KP_INDEX] No observed Kp data available")
         return None
     except Exception as e:
@@ -5291,16 +5314,7 @@ def get_geomagnetic_alerts():
         from datetime import datetime, timedelta, timezone
         from collections import defaultdict
         
-        # Use the 3-day Kp forecast which is more reliable
-        KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
-        
-        response = requests.get(KP_FORECAST_URL, timeout=10)
-        
-        if response.status_code != 200:
-            print(f"Error: Got status {response.status_code} from SWPC")
-            return jsonify({'forecast': []}), 500
-        
-        forecast_data = response.json()
+        forecast_rows = [row for row in _fetch_kp_rows(KP_FORECAST_URL) if not row['observed']]
         
         # Parse the 3-day forecast
         # Format: [timestamp, kp_value, observed/predicted]
@@ -5309,22 +5323,11 @@ def get_geomagnetic_alerts():
         current_time = datetime.now(timezone.utc)
         
         print(f"DEBUG: Current UTC time: {current_time}")
-        print(f"DEBUG: Processing {len(forecast_data)-1} forecast rows")
+        print(f"DEBUG: Processing {len(forecast_rows)} forecast rows")
         
-        for row in forecast_data[1:]:  # Skip header
+        for row in forecast_rows:
             try:
-                timestamp_str = row[0]  # Format: "YYYY-MM-DD HH:MM:SS"
-                kp_str = row[1]
-                
-                if not timestamp_str or not kp_str:
-                    continue
-                
-                # Parse timestamp
-                try:
-                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                    dt = dt.replace(tzinfo=timezone.utc)
-                except:
-                    continue
+                dt = row['time']
                 
                 # Only include current and future predictions
                 if dt < current_time - timedelta(hours=3):  # Allow 3-hour lookback
@@ -5333,11 +5336,7 @@ def get_geomagnetic_alerts():
                 # Extract date
                 date = dt.strftime('%Y-%m-%d')
                 
-                # Parse Kp value
-                try:
-                    kp_value = float(kp_str)
-                except (ValueError, TypeError):
-                    continue
+                kp_value = row['kp']
                 
                 daily_kp[date].append(kp_value)
                 
@@ -5545,41 +5544,41 @@ def get_region_flares(region_number):
 def get_kp_history():
     """Get 3-day Kp index history with observed and forecast data"""
     try:
-        KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
-        print(f"[KP_HISTORY] Fetching Kp history from {KP_FORECAST_URL}")
-        response = requests.get(KP_FORECAST_URL, timeout=10)
-        data = response.json()
-        
+        print(f"[KP_HISTORY] Fetching observed Kp history from {KP_OBSERVED_URL}")
+        observed_rows = _fetch_kp_rows(KP_OBSERVED_URL, default_observed=True)
+        forecast_rows = _fetch_kp_rows(KP_FORECAST_URL)
+
         kp_values = []
         current_time = datetime.now(timezone.utc)
+        observed_cutoff = current_time - timedelta(hours=48)
         obs_count = 0
         pred_count = 0
-        
-        for row in data[1:]:  # Skip header
-            try:
-                time_str = row[0]
-                kp_str = row[1]
-                obs_pred = row[2] if len(row) > 2 else 'predicted'  # 'observed' or 'predicted'
-                
-                if not kp_str:
-                    continue
-                    
-                kp = float(kp_str)
-                dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                
-                # Include last 48 hours of observed + 72 hours forecast
-                if dt >= current_time - timedelta(hours=48):
-                    kp_values.append({
-                        'time': dt.isoformat(),
-                        'kp': kp,
-                        'observed': obs_pred == 'observed'
-                    })
-                    if obs_pred == 'observed':
-                        obs_count += 1
-                    else:
-                        pred_count += 1
-            except Exception as e:
+
+        latest_observed_time = observed_rows[-1]['time'] if observed_rows else None
+
+        for row in observed_rows:
+            if row['time'] < observed_cutoff:
                 continue
+            kp_values.append({
+                'time': row['time'].isoformat(),
+                'kp': row['kp'],
+                'observed': True,
+            })
+            obs_count += 1
+
+        for row in forecast_rows:
+            if row['observed']:
+                continue
+            if latest_observed_time and row['time'] <= latest_observed_time:
+                continue
+            kp_values.append({
+                'time': row['time'].isoformat(),
+                'kp': row['kp'],
+                'observed': False,
+            })
+            pred_count += 1
+
+        kp_values.sort(key=lambda item: item['time'])
         
         print(f"[KP_HISTORY] Retrieved {obs_count} observed points and {pred_count} forecast points")
         print(f"[KP_HISTORY] Total Kp history points: {len(kp_values)}")
@@ -6634,23 +6633,16 @@ def get_historical_data():
         except Exception as e:
             print(f"Error fetching historical proton data: {e}")
         
-        # For Kp data, construct historical values from forecast endpoint
+        # For Kp data, use the dedicated observed feed
         try:
-            kp_url = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
-            response = requests.get(kp_url, timeout=10)
-            if response.status_code == 200:
-                all_kp = response.json()[1:]  # Skip header
-                for row in all_kp:
-                    try:
-                        kp_time = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                        if kp_time.date() == target_date.date() and row[2] == 'observed':
-                            kp_data.append({
-                                'time': kp_time.isoformat(),
-                                'kp': float(row[1]),
-                                'observed': True
-                            })
-                    except:
-                        continue
+            for row in _fetch_kp_rows(KP_OBSERVED_URL, default_observed=True):
+                kp_time = row['time']
+                if kp_time.date() == target_date.date():
+                    kp_data.append({
+                        'time': kp_time.isoformat(),
+                        'kp': row['kp'],
+                        'observed': True
+                    })
         except Exception as e:
             print(f"Error fetching historical Kp data: {e}")
         

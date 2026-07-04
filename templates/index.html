@@ -5169,29 +5169,27 @@
         function updateDataCard(data) {
             const safeVal = (val, decimals = 1) => val !== null && val !== undefined ? Number(val).toFixed(decimals) : '--';
             
-            // Get observed Kp - but check if it's stale and use G-scale estimate if needed
-            let kp = data.kp_index?.kp || 0;
+            // Prefer the latest observed Kp. Only estimate from G-scale if Kp is missing or stale.
+            let kp = data.kp_index?.kp;
             const kpTime = data.kp_index?.time || '';
             const noaaGScale = parseInt(data.noaa_scales?.g_scale) || 0;
+            const kpTimestamp = kpTime ? new Date(kpTime) : null;
+            const kpAgeHours = kpTimestamp && !Number.isNaN(kpTimestamp.getTime())
+                ? (Date.now() - kpTimestamp.getTime()) / 3600000
+                : null;
+            const hasObservedKp = Number.isFinite(Number(kp));
+            const isStaleObservedKp = kpAgeHours !== null && kpAgeHours > 4.5;
             
-            // NOAA Kp is updated every 3 hours. If live G-scale differs significantly
-            // from what the Kp suggests, show an estimated Kp based on G-scale
             // G-scale to Kp midpoint: G0=2, G1=5, G2=6, G3=7, G4=8, G5=9
             const gToKpEstimate = [2, 5, 6, 7, 8, 9];
             const kpFromG = gToKpEstimate[noaaGScale] || 0;
-            
-            // If the observed Kp implies a different G-scale than current, use estimate
-            let calculatedG = 0;
-            if (kp > 8.67) calculatedG = 5;
-            else if (kp >= 7.67) calculatedG = 4;
-            else if (kp >= 6.67) calculatedG = 3;
-            else if (kp >= 5.67) calculatedG = 2;
-            else if (kp >= 5.00) calculatedG = 1;
-            
-            if (Math.abs(calculatedG - noaaGScale) >= 1 && noaaGScale >= 0) {
-                // Kp is stale - use estimate from live G-scale
+
+            if (!hasObservedKp) {
                 kp = kpFromG;
-                console.log('[KP_INDEX] Kp data stale, estimated Kp ' + kp + ' from live G' + noaaGScale);
+                console.log('[KP_INDEX] Missing observed Kp, estimated Kp ' + kp + ' from live G' + noaaGScale);
+            } else if (isStaleObservedKp && noaaGScale >= 0) {
+                kp = kpFromG;
+                console.log('[KP_INDEX] Observed Kp stale (' + kpAgeHours.toFixed(1) + 'h old), estimated Kp ' + kp + ' from live G' + noaaGScale);
             } else {
                 console.log('[KP_INDEX] Observed Kp: ' + kp + ' at ' + kpTime);
             }
