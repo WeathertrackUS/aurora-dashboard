@@ -25,6 +25,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from astral import Observer, moon
+import ephem
 from timezonefinder import TimezoneFinder
 import warnings
 import os
@@ -145,6 +146,14 @@ _map_generation_lock = threading.Lock()
 _map_generating = False  # Flag to indicate generation in progress
 _moon_timezone_finder = TimezoneFinder()
 _MOON_SYNODIC_MONTH = 29.53058867
+
+
+def _moon_illumination_percent(reference_datetime):
+    """Return the illuminated fraction of the moon from ephem."""
+    if reference_datetime.tzinfo is None:
+        reference_datetime = reference_datetime.replace(tzinfo=timezone.utc)
+    moon_body = ephem.Moon(reference_datetime.astimezone(timezone.utc))
+    return int(round(max(0.0, min(100.0, float(moon_body.phase)))))
 
 def _estimate_cache_value_size(value):
     """Best-effort deep size estimate without allocating serialized copies."""
@@ -383,8 +392,8 @@ def _moon_payload_for_location(latitude=None, longitude=None):
 
     reference_date = location_now.date()
     phase_age_days = moon.phase(reference_date)
-    phase_fraction = (phase_age_days % _MOON_SYNODIC_MONTH) / _MOON_SYNODIC_MONTH
-    illumination_percent = int(round(50 * (1 - cos(phase_fraction * 2 * pi))))
+    phase_fraction = phase_age_days / _MOON_SYNODIC_MONTH
+    illumination_percent = _moon_illumination_percent(now_utc)
     phase_name, visibility_impact = _moon_phase_details(phase_age_days)
 
     payload = {
@@ -395,7 +404,7 @@ def _moon_payload_for_location(latitude=None, longitude=None):
         'illumination_percent': illumination_percent,
         'phase_name': phase_name,
         'visibility_impact': visibility_impact,
-        'source': 'Astral',
+        'source': 'Ephem + Astral',
         'timezone': timezone_name,
         'location': None,
         'moonrise': None,

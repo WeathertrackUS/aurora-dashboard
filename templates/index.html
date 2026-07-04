@@ -5959,19 +5959,6 @@
                 return;
             }
 
-            if (!locationQuery && !latitude && !longitude) {
-                if (locationStatus) {
-                    locationStatus.textContent = 'Enter a location or allow browser access to show moonrise and moonset times.';
-                }
-                if (moonriseLabel) {
-                    moonriseLabel.textContent = 'Moonrise: --';
-                }
-                if (moonsetLabel) {
-                    moonsetLabel.textContent = 'Moonset: --';
-                }
-                return;
-            }
-
             try {
                 const response = await fetch(`/api/moon-data${params.toString() ? `?${params.toString()}` : ''}`);
                 const data = await response.json();
